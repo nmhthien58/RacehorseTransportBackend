@@ -104,7 +104,7 @@ namespace RacehorseTransport.Services.Implementations
             };
 
             await _horseRepo.AddAsync(horse);
-            return await ToModelAsync(horse);
+            return await GetHorseByIdAsync(horse.HorseId, currentUser); // đọc lại để có tên chủ ngựa
         }
 
         public async Task<HorseModel> UpdateHorseAsync(int id, HorseModel model, FileUploadModel? photo, bool removePhoto, CurrentUser currentUser)
@@ -133,7 +133,7 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             await _horseRepo.UpdateAsync(horse);
-            return await ToModelAsync(horse);
+            return await GetHorseByIdAsync(horse.HorseId, currentUser);
         }
 
         // Xóa mềm: ngựa đã từng đi chuyến vẫn phải còn trong lịch sử đơn và hồ sơ

@@ -183,6 +183,7 @@ Cần có: .NET SDK 8 và PostgreSQL 15 trở lên (cài trên máy, hoặc ch�
 | `01_schema.sql` | 10 schema, 19 bảng, toàn bộ ràng buộc |
 | `02_seed.sql` | Danh mục, bảng giá, 6 tài khoản dev, một kịch bản đã chạy trọn 6 luồng |
 | `00_reset.sql` | (Tùy chọn) Xóa sạch để dựng lại: chạy `00` → `01` → `02` |
+| `03_update_*.sql` | Cập nhật cho database đã dựng từ trước (thêm cột mới). Database dựng mới bằng `01` không cần chạy |
 
 Chọn một trong ba cách:
 

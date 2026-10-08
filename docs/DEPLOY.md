@@ -13,6 +13,7 @@ Lưu ý:
 
 - Các bảng nằm trong 10 schema riêng (`identity`, `booking`, `fleet`...), không nằm trong `public`. Supabase không mở các schema này ra Data API, đó là điều mong muốn: chỉ backend được đọc ghi.
 - Muốn dựng lại từ đầu: chạy `database/00_reset.sql` rồi lặp lại bước 2 và 3. Lệnh này xóa toàn bộ dữ liệu của hệ thống.
+- Database đã dựng từ trước và muốn giữ dữ liệu: chạy các file `database/03_update_*.sql` **trước khi** deploy bản code mới. Các file này chỉ thêm cột, chạy lại nhiều lần không sao.
 - `02_seed.sql` tạo 6 tài khoản dùng chung một mật khẩu đã ghi công khai trong repo. Xem mục 4 trước khi đưa link cho người khác.
 
 ### Lấy chuỗi kết nối
