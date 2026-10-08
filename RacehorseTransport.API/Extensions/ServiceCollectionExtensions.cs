@@ -63,6 +63,8 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<IBookingService, BookingService>();
             services.AddScoped<ITripService, TripService>();
             services.AddScoped<ITripPlanningService, TripPlanningService>();
+            services.AddScoped<ITripExecutionService, TripExecutionService>();
+            services.AddScoped<ITrackingService, TrackingService>();
             services.AddScoped<IDossierService, DossierService>();
             services.AddScoped<IDocumentTypeService, DocumentTypeService>();
 

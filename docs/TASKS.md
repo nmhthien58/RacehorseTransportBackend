@@ -153,10 +153,10 @@ Làm sau khi T-05 và T-26 xong. Tạo project `RacehorseTransport.Tests` (xUnit
 
 ### M5 – Flow 4: Trạng thái & nhật ký lộ trình · REQUIRED
 
-- [ ] **T-19 · Xuất phát** — `POST /api/trips/{id}/start`: chỉ khi `Scheduled`, người gọi thuộc đoàn, mọi hồ sơ của ngựa trên chuyến đã `Cleared`. Chuyến → `InTransit`, xe → `InTransit`, mốc `Origin` → `Departed`.
-- [ ] **T-20 · Check-in mốc** — `POST /api/checkpoints/{id}/arrive`, `/clear` (cửa khẩu), `/depart`: phải theo đúng thứ tự, ghi giờ thực tế, chưa nghỉ đủ `MandatoryRestMinutes` thì không cho rời. Mỗi lần cập nhật báo cho khách.
-- [ ] **T-21 · Nhật ký thể trạng ngựa** — `POST /api/trips/{id}/welfare-logs` (nhiệt độ, nước, ăn uống, mức căng thẳng, ghi chú, ảnh); `GET` theo chuyến / theo ngựa. Ngựa `Refused` hoặc `Agitated` → cảnh báo Coordinator.
-- [ ] **T-22 · Theo dõi** — Coordinator: `GET /api/tracking/trips` (dự kiến so với thực tế, số phút trễ từng mốc). Khách: `GET /api/tracking/bookings/{id}` (dòng thời gian các mốc + nhật ký của ngựa mình). Cache Redis TTL ngắn, xóa cache khi có check-in mới.
+- [x] **T-19 · Xuất phát** — `POST /api/trips/{id}/start`: chỉ khi `Scheduled`, người gọi thuộc đoàn, mọi hồ sơ của ngựa trên chuyến đã `Cleared`. Chuyến → `InTransit`, xe → `InTransit`, mốc `Origin` → `Departed`.
+- [x] **T-20 · Check-in mốc** — `POST /api/checkpoints/{id}/arrive`, `/clear` (cửa khẩu), `/depart`: phải theo đúng thứ tự, ghi giờ thực tế, chưa nghỉ đủ `MandatoryRestMinutes` thì không cho rời. Mỗi lần cập nhật báo cho khách.
+- [x] **T-21 · Nhật ký thể trạng ngựa** — `POST /api/trips/{id}/welfare-logs` (nhiệt độ, nước, ăn uống, mức căng thẳng, ghi chú, ảnh); `GET` theo chuyến / theo ngựa. Ngựa `Refused` hoặc `Agitated` → cảnh báo Coordinator.
+- [x] **T-22 · Theo dõi** — Coordinator: `GET /api/tracking/trips` (dự kiến so với thực tế, số phút trễ từng mốc). Khách: `GET /api/tracking/bookings/{id}` (dòng thời gian các mốc + nhật ký của ngựa mình). Cache Redis TTL ngắn, xóa cache khi có check-in mới.
 
 ### M6 – Flow 5: Sự cố & nắn tuyến · OPTIONAL
 
@@ -165,7 +165,7 @@ Làm sau khi T-05 và T-26 xong. Tạo project `RacehorseTransport.Tests` (xUnit
 
 ### M7 – Flow 6: Bàn giao & nghiệm thu · OPTIONAL
 
-- [ ] **T-25 · Đến đích & e-POD** — `POST /api/trips/{id}/arrive-destination`; `POST /api/trips/{id}/handover` (người nhận, ảnh chữ ký vẽ tay trên màn hình, tình trạng, đối chiếu mã microchip từng ngựa). Tài xế tạo biên bản trên ứng dụng mobile. Chuyến ghép nhiều đơn thì **mỗi đơn một biên bản**; chuyến chỉ đóng được khi mọi đơn trên chuyến đã ký.
+- [ ] **T-25 · Đến đích & e-POD** — Việc "đã tới điểm giao" đã có ở T-20 (check-in mốc `Destination` chuyển chuyến sang `ArrivedDestination`), nên task này chỉ còn `POST /api/trips/{id}/handover` (người nhận, ảnh chữ ký vẽ tay trên màn hình, tình trạng, đối chiếu mã microchip từng ngựa). Tài xế tạo biên bản trên ứng dụng mobile. Chuyến ghép nhiều đơn thì **mỗi đơn một biên bản**; chuyến chỉ đóng được khi mọi đơn trên chuyến đã ký.
 - [ ] **T-26 · Đóng chuyến** — `POST /api/trips/{id}/close` (Manager): chốt KPI bằng C# trong một transaction (quy tắc ở phụ lục cuối file); trả về KPI, số phút trễ, chi phí thực tế.
 - [ ] **T-27 · Báo cáo** — `GET /api/reports/summary?from=&to=`: doanh thu, chi phí vận hành, tỉ lệ đúng giờ, KPI trung bình, số sự cố theo loại.
 

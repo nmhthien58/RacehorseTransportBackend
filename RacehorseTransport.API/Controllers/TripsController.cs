@@ -20,13 +20,17 @@ namespace RacehorseTransport.API.Controllers
         private const string PlanWriteRoles = UserRoles.FleetCoordinator + "," + UserRoles.Admin;
         private const string PlanReviewRoles = UserRoles.LogisticsManager + "," + UserRoles.Admin;
 
+        private const string ExecutionRoles = UserRoles.DriverEscort + "," + UserRoles.Admin;
+
         private readonly ITripService _tripService;
         private readonly ITripPlanningService _planningService;
+        private readonly ITripExecutionService _executionService;
 
-        public TripsController(ITripService tripService, ITripPlanningService planningService)
+        public TripsController(ITripService tripService, ITripPlanningService planningService, ITripExecutionService executionService)
         {
             _tripService = tripService;
             _planningService = planningService;
+            _executionService = executionService;
         }
 
         /// <summary>
@@ -250,6 +254,58 @@ namespace RacehorseTransport.API.Controllers
         {
             var trip = await _planningService.CancelTripAsync(id, User.ToCurrentUser());
             return Ok(ApiResponse<TripDetailResponse>.SuccessResult(trip.ToResponse(), "Trip cancelled successfully"));
+        }
+
+        // ---------------------------------------------------------------------------------------------
+        // Flow 4: đoàn xe cập nhật hành trình (check-in từng mốc nằm ở CheckpointsController)
+        // ---------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// Depart: the trip becomes InTransit. Blocked while any horse on the trip has a dossier that is not Cleared.
+        /// </summary>
+        [HttpPost("{id:int}/start")]
+        [Authorize(Roles = ExecutionRoles)]
+        [ProducesResponseType(typeof(ApiResponse<TripDetailResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> Start(int id)
+        {
+            var trip = await _executionService.StartTripAsync(id, User.ToCurrentUser());
+            return Ok(ApiResponse<TripDetailResponse>.SuccessResult(trip.ToResponse(), "Trip departed successfully"));
+        }
+
+        /// <summary>
+        /// Record the condition of one horse (cabin temperature, water, feed, stress, optional photo).
+        /// </summary>
+        [HttpPost("{id:int}/welfare-logs")]
+        [Authorize(Roles = ExecutionRoles)]
+        [ProducesResponseType(typeof(ApiResponse<WelfareLogResponse>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> AddWelfareLog(int id, [FromBody] CreateWelfareLogRequest request)
+        {
+            var log = await _executionService.AddWelfareLogAsync(id, request.ToBusinessModel(), User.ToCurrentUser());
+
+            return StatusCode(
+                StatusCodes.Status201Created,
+                ApiResponse<WelfareLogResponse>.SuccessResult(log.ToResponse(), "Welfare log recorded successfully"));
+        }
+
+        /// <summary>
+        /// Get the welfare logs of a trip, newest first, optionally for one horse.
+        /// </summary>
+        [HttpGet("{id:int}/welfare-logs")]
+        [ProducesResponseType(typeof(ApiResponse<List<WelfareLogResponse>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetWelfareLogs(int id, [FromQuery] int? tripHorseId = null)
+        {
+            var logs = await _executionService.GetWelfareLogsAsync(id, tripHorseId, User.ToCurrentUser());
+            var items = logs.Select(l => l.ToResponse()).ToList();
+
+            return Ok(ApiResponse<List<WelfareLogResponse>>.SuccessResult(items));
         }
     }
 }
