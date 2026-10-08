@@ -11,9 +11,13 @@ Hệ thống số hóa toàn bộ quá trình đưa một con ngựa đua từ t
 - [5. Quy ước khi code](#5-quy-ước-khi-code)
 - [6. Thêm một chức năng CRUD mới](#6-thêm-một-chức-năng-crud-mới)
 
-Danh sách công việc, phân công và các quyết định nghiệp vụ đã chốt: [docs/TASKS.md](docs/TASKS.md).
+| Tài liệu | Nội dung |
+|---|---|
+| [docs/API.md](docs/API.md) | Hướng dẫn dùng API cho frontend: đăng nhập, quy ước, endpoint theo từng luồng |
+| [docs/DEPLOY.md](docs/DEPLOY.md) | Đưa database lên Supabase và API lên Railway |
+| [docs/TASKS.md](docs/TASKS.md) | Công việc, phân công, các quyết định nghiệp vụ đã chốt |
 
-Hướng dẫn đưa database lên Supabase và API lên Railway: [docs/DEPLOY.md](docs/DEPLOY.md).
+Bản đang chạy: https://racehorsetransportbackend-production.up.railway.app/swagger
 
 ## 1. Nghiệp vụ
 
