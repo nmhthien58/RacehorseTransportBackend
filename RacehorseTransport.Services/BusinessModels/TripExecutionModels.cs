@@ -10,7 +10,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public string FeedStatus { get; set; } = string.Empty;
         public string StressLevel { get; set; } = string.Empty;
         public string? Notes { get; set; }
-        public string? PhotoUrl { get; set; }
+        public FileUploadModel? Photo { get; set; } // ảnh chụp kèm, không bắt buộc
     }
 
     public class WelfareLogModel

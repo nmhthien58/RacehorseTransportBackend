@@ -6,7 +6,8 @@ namespace RacehorseTransport.API.Mappers
 {
     public static class TrackingApiMapper
     {
-        public static CreateWelfareLogModel ToBusinessModel(this CreateWelfareLogRequest request)
+        // Stream của ảnh do controller giữ và giải phóng (request.Photo.ToUploadModel())
+        public static CreateWelfareLogModel ToBusinessModel(this CreateWelfareLogRequest request, FileUploadModel? photo)
         {
             return new CreateWelfareLogModel
             {
@@ -17,7 +18,7 @@ namespace RacehorseTransport.API.Mappers
                 FeedStatus = request.FeedStatus.Trim(),
                 StressLevel = request.StressLevel.Trim(),
                 Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
-                PhotoUrl = string.IsNullOrWhiteSpace(request.PhotoUrl) ? null : request.PhotoUrl.Trim()
+                Photo = photo
             };
         }
 

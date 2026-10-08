@@ -5,6 +5,7 @@ using RacehorseTransport.API.Mappers;
 using RacehorseTransport.API.RequestModels;
 using RacehorseTransport.API.ResponseModels;
 using RacehorseTransport.Repositories.Constants;
+using RacehorseTransport.Services.Implementations;
 using RacehorseTransport.Services.Interfaces;
 
 namespace RacehorseTransport.API.Controllers
@@ -276,17 +277,20 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
-        /// Record the condition of one horse (cabin temperature, water, feed, stress, optional photo).
+        /// Record the condition of one horse (cabin temperature, water, feed, stress). multipart/form-data; attach a photo (jpg, png; up to 10 MB) in the optional "photo" field.
         /// </summary>
         [HttpPost("{id:int}/welfare-logs")]
         [Authorize(Roles = ExecutionRoles)]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(SupabaseFileStorageService.MaxFileSizeBytes + 1024 * 1024)]
         [ProducesResponseType(typeof(ApiResponse<WelfareLogResponse>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> AddWelfareLog(int id, [FromBody] CreateWelfareLogRequest request)
+        public async Task<IActionResult> AddWelfareLog(int id, [FromForm] CreateWelfareLogRequest request)
         {
-            var log = await _executionService.AddWelfareLogAsync(id, request.ToBusinessModel(), User.ToCurrentUser());
+            using var photo = request.Photo.ToUploadModel();
+            var log = await _executionService.AddWelfareLogAsync(id, request.ToBusinessModel(photo), User.ToCurrentUser());
 
             return StatusCode(
                 StatusCodes.Status201Created,

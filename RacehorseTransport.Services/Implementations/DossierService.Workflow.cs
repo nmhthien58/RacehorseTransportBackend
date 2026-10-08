@@ -87,11 +87,6 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Document type with ID {model.DocTypeId} does not exist.");
             }
 
-            if (!_fileStorage.IsValidPath(model.FilePath, FileCategories.Documents))
-            {
-                throw new BusinessException("FilePath must be the path returned by POST /api/files for category 'documents'.");
-            }
-
             if (model.ExpiryDate.HasValue && model.ExpiryDate.Value < DateOnly.FromDateTime(DateTime.UtcNow))
             {
                 throw new BusinessException("The document has already expired.");
@@ -111,6 +106,10 @@ namespace RacehorseTransport.Services.Implementations
                 }
             }
 
+            // Mọi kiểm tra nghiệp vụ đã qua mới đẩy file lên storage
+            var stored = await _fileStorage.UploadAsync(
+                model.File.Content, model.File.FileName, model.File.SizeBytes, FileCategories.Documents);
+
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 if (existing == null)
@@ -120,7 +119,7 @@ namespace RacehorseTransport.Services.Implementations
                         DossierId = dossier.DossierId,
                         DocTypeId = model.DocTypeId,
                         DocumentNumber = model.DocumentNumber,
-                        FileUrl = model.FilePath,
+                        FileUrl = stored.Path,
                         ExpiryDate = model.ExpiryDate,
                         UploadedByUserId = currentUser.UserId,
                         Status = DocumentStatuses.Pending
@@ -129,7 +128,7 @@ namespace RacehorseTransport.Services.Implementations
                 else
                 {
                     existing.DocumentNumber = model.DocumentNumber;
-                    existing.FileUrl = model.FilePath;
+                    existing.FileUrl = stored.Path;
                     existing.ExpiryDate = model.ExpiryDate;
                     existing.UploadedByUserId = currentUser.UserId;
                     existing.UploadedAt = DateTimeOffset.UtcNow;

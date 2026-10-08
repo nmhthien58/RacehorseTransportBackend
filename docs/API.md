@@ -247,27 +247,33 @@ Trạng thái đơn `Assigned` còn trong database nhưng không được dùng.
 
 ## 4. Upload file
 
-File không gửi kèm trong request nghiệp vụ. Quy trình luôn là hai bước:
+File gửi **kèm ngay trong request nghiệp vụ**. Ba request có file đều dùng `multipart/form-data` thay cho JSON:
 
-1. Upload file, nhận về `path`.
-2. Gửi `path` đó trong request nghiệp vụ (nộp giấy tờ, ảnh ngựa, ảnh nhật ký).
+| Request | Trường file | Bắt buộc | Loại file |
+|---|---|---|---|
+| `POST /api/horses`, `PUT /api/horses/{id}` | `photo` | Không | `jpg`, `jpeg`, `png` |
+| `POST /api/dossiers/{id}/documents` | `file` | Có | `pdf`, `jpg`, `jpeg`, `png` |
+| `POST /api/trips/{id}/welfare-logs` | `photo` | Không | `jpg`, `jpeg`, `png` |
 
-| Method | Đường dẫn | Mô tả |
-|---|---|---|
-| POST | `/api/files` | Upload. `multipart/form-data` với hai trường: `file` và `category` |
-| GET | `/api/files/url?path=...` | Lấy link xem mới cho một `path` |
-
-Giới hạn: `pdf`, `jpg`, `jpeg`, `png`; tối đa 10 MB. Nội dung file phải khớp với đuôi file.
+Tối đa 10 MB mỗi file. Nội dung file phải khớp với đuôi file. Các trường còn lại gửi thành trường form cùng tên như trước (ngày viết `2027-01-15`, số thập phân dùng dấu chấm). Gửi JSON vào ba request này sẽ nhận `415`.
 
 ```js
 const form = new FormData();
-form.append("file", fileInput.files[0]);
-form.append("category", "documents");
+form.append("name", "Silver Wind");
+form.append("microchipNumber", "982000412345699");
+// ... các trường khác
+form.append("photo", fileInput.files[0]); // bỏ dòng này nếu không có ảnh
 
-const { data } = (await api.post("/api/files", form)).data;
-// data.path -> "documents/2026/10/3f2a...c1.pdf"   (lưu lại, gửi trong request nghiệp vụ)
-// data.url  -> link xem tạm, hết hạn sau 60 phút
+const { data } = (await api.post("/api/horses", form)).data;
+// data.photoUrl -> "horses/2026/10/9b1c...e4.png"
 ```
+
+Không tự đặt header `Content-Type`; để trình duyệt / axios tự thêm kèm `boundary`.
+
+| Method | Đường dẫn | Mô tả |
+|---|---|---|
+| GET | `/api/files/url?path=...` | Lấy link xem mới cho một `path` |
+| POST | `/api/files` | Upload riêng một file (`file` + `category`), trả về `path`. Ba request ở trên không cần tới endpoint này |
 
 **Hiển thị file:** các response nghiệp vụ trả về `path` (ở trường `fileUrl`, `photoUrl`), không phải link xem được. Gọi `GET /api/files/url?path=...` để lấy link có hạn 60 phút rồi mới gắn vào `<img>` hoặc mở PDF. Không lưu link này lâu dài.
 
@@ -301,21 +307,24 @@ Mật khẩu từ 8 đến 64 ký tự. Admin không tự khóa hoặc tự đ�
 | PUT | `/api/horses/{id}` | Chủ ngựa | Sửa |
 | DELETE | `/api/horses/{id}` | Chủ ngựa | Xóa mềm; không xóa được ngựa đang trong đơn chưa kết thúc |
 
-```json
-{
-  "name": "Silver Wind",
-  "microchipNumber": "982000412345699",
-  "passportNumber": "FEI-VN-2024-09",
-  "breed": "Thoroughbred",
-  "gender": "Gelding",
-  "dateOfBirth": "2019-05-20",
-  "color": "Xám",
-  "specialCareRequirements": "Dễ say xe, cần cỏ tươi",
-  "photoUrl": "horses/2026/10/9b1c...e4.png"
-}
-```
+`POST` và `PUT` dùng `multipart/form-data` (mục 4):
 
-`microchipNumber` và `passportNumber` không được trùng trên toàn hệ thống. `breed` bỏ trống thì mặc định `Thoroughbred`. `photoUrl` là `path` từ mục 4 (category `horses`).
+| Trường | Ví dụ | Ghi chú |
+|---|---|---|
+| `name` | `Silver Wind` | Bắt buộc |
+| `microchipNumber` | `982000412345699` | Bắt buộc, không trùng trên toàn hệ thống |
+| `passportNumber` | `FEI-VN-2024-09` | Bắt buộc, không trùng trên toàn hệ thống |
+| `breed` | `Thoroughbred` | Bỏ trống thì mặc định `Thoroughbred` |
+| `gender` | `Gelding` | Bắt buộc |
+| `dateOfBirth` | `2019-05-20` | Bắt buộc |
+| `color` | `Xám` | Bắt buộc |
+| `specialCareRequirements` | `Dễ say xe, cần cỏ tươi` | |
+| `photo` | (file ảnh) | Không bắt buộc |
+| `removePhoto` | `true` | Chỉ có ở `PUT` |
+
+Ảnh khi sửa (`PUT`): gửi `photo` để thay ảnh; không gửi `photo` thì giữ ảnh đang có; gửi `removePhoto=true` để xóa ảnh.
+
+Response trả `photoUrl` là `path` của ảnh (xem "Hiển thị file" ở mục 4).
 
 ---
 
@@ -486,16 +495,14 @@ Mọi endpoint ghi ở trên trả về chi tiết hồ sơ sau khi thay đổi,
 
 ### Nộp giấy tờ
 
-Upload file trước (mục 4, category `documents`), rồi:
+`POST /api/dossiers/{id}/documents`, `multipart/form-data` (mục 4):
 
-```json
-{
-  "docTypeId": 2,
-  "documentNumber": "COGGINS-LAB-2026-888",
-  "filePath": "documents/2026/10/3f2a...c1.pdf",
-  "expiryDate": "2027-01-15"
-}
-```
+| Trường | Ví dụ | Ghi chú |
+|---|---|---|
+| `docTypeId` | `2` | Bắt buộc |
+| `documentNumber` | `COGGINS-LAB-2026-888` | |
+| `expiryDate` | `2027-01-15` | |
+| `file` | (file pdf / ảnh) | Bắt buộc |
 
 Quy tắc:
 
@@ -617,20 +624,20 @@ Quy tắc, kèm thông báo lỗi tương ứng để hiển thị:
 
 Ghi nhật ký:
 
-```json
-{
-  "tripHorseId": 3,
-  "checkpointId": 8,
-  "cabinTemp": 17.5,
-  "waterIntakeLiters": 10,
-  "feedStatus": "Normal",
-  "stressLevel": "Calm",
-  "notes": "Ăn uống bình thường",
-  "photoUrl": "welfare/2026/10/7ad2...b9.jpg"
-}
-```
+`POST /api/trips/{id}/welfare-logs`, `multipart/form-data` (mục 4):
 
-`checkpointId`, `notes`, `photoUrl` không bắt buộc. `photoUrl` là `path` từ mục 4 (category `welfare`). Nhật ký có `feedStatus = Refused` hoặc `stressLevel = Agitated` được đánh dấu `needsAttention: true` và điều phối viên nhận cảnh báo.
+| Trường | Ví dụ |
+|---|---|
+| `tripHorseId` | `3` |
+| `checkpointId` | `8` |
+| `cabinTemp` | `17.5` |
+| `waterIntakeLiters` | `10` |
+| `feedStatus` | `Normal` |
+| `stressLevel` | `Calm` |
+| `notes` | `Ăn uống bình thường` |
+| `photo` | (file ảnh) |
+
+`checkpointId`, `notes`, `photo` không bắt buộc. Nhật ký có `feedStatus = Refused` hoặc `stressLevel = Agitated` được đánh dấu `needsAttention: true` và điều phối viên nhận cảnh báo.
 
 ### Bảng theo dõi của điều phối
 

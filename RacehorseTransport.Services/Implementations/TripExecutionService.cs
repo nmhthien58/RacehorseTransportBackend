@@ -23,6 +23,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ITripService _tripService;
         private readonly ITrackingService _trackingService;
         private readonly INotificationService _notificationService;
+        private readonly IFileStorageService _fileStorage;
         private readonly IUnitOfWork _unitOfWork;
 
         public TripExecutionService(
@@ -34,6 +35,7 @@ namespace RacehorseTransport.Services.Implementations
             ITripService tripService,
             ITrackingService trackingService,
             INotificationService notificationService,
+            IFileStorageService fileStorage,
             IUnitOfWork unitOfWork)
         {
             _tripRepo = tripRepo;
@@ -44,6 +46,7 @@ namespace RacehorseTransport.Services.Implementations
             _tripService = tripService;
             _trackingService = trackingService;
             _notificationService = notificationService;
+            _fileStorage = fileStorage;
             _unitOfWork = unitOfWork;
         }
 
@@ -266,6 +269,14 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Checkpoint with ID {model.CheckpointId} does not belong to trip {trip.TripCode}.");
             }
 
+            string? photoPath = null;
+            if (model.Photo != null)
+            {
+                var stored = await _fileStorage.UploadAsync(
+                    model.Photo.Content, model.Photo.FileName, model.Photo.SizeBytes, FileCategories.Welfare);
+                photoPath = stored.Path;
+            }
+
             var log = new HorseWelfareLog
             {
                 TripHorseId = model.TripHorseId,
@@ -276,7 +287,7 @@ namespace RacehorseTransport.Services.Implementations
                 FeedStatus = model.FeedStatus,
                 StressLevel = model.StressLevel,
                 Notes = model.Notes,
-                PhotoUrl = model.PhotoUrl
+                PhotoUrl = photoPath
             };
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>

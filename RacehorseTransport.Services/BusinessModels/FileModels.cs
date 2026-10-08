@@ -19,6 +19,20 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset UrlExpiresAt { get; set; }
     }
 
+    // File client gửi kèm trong một request nghiệp vụ (ảnh ngựa, giấy tờ, ảnh nhật ký).
+    // Service kiểm tra nghiệp vụ xong mới đẩy lên storage, để request sai không để lại file rác.
+    public sealed class FileUploadModel : IDisposable
+    {
+        public Stream Content { get; set; } = Stream.Null;
+        public string FileName { get; set; } = string.Empty;
+        public long SizeBytes { get; set; }
+
+        public void Dispose()
+        {
+            Content.Dispose();
+        }
+    }
+
     // Nhóm file, cũng là thư mục gốc trong bucket
     public static class FileCategories
     {

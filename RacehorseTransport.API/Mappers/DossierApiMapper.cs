@@ -19,13 +19,14 @@ namespace RacehorseTransport.API.Mappers
             };
         }
 
-        public static UploadDocumentModel ToBusinessModel(this UploadDocumentRequest request)
+        // Stream của file do controller giữ và giải phóng (request.File.ToUploadModel())
+        public static UploadDocumentModel ToBusinessModel(this UploadDocumentRequest request, FileUploadModel file)
         {
             return new UploadDocumentModel
             {
                 DocTypeId = request.DocTypeId,
                 DocumentNumber = string.IsNullOrWhiteSpace(request.DocumentNumber) ? null : request.DocumentNumber.Trim(),
-                FilePath = request.FilePath.Trim(),
+                File = file,
                 ExpiryDate = request.ExpiryDate
             };
         }

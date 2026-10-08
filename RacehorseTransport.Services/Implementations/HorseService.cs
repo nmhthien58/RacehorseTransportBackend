@@ -20,11 +20,13 @@ namespace RacehorseTransport.Services.Implementations
 
         private readonly IRepository<Horse> _horseRepo;
         private readonly IRepository<BookingHorse> _bookingHorseRepo;
+        private readonly IFileStorageService _fileStorage;
 
-        public HorseService(IRepository<Horse> horseRepo, IRepository<BookingHorse> bookingHorseRepo)
+        public HorseService(IRepository<Horse> horseRepo, IRepository<BookingHorse> bookingHorseRepo, IFileStorageService fileStorage)
         {
             _horseRepo = horseRepo;
             _bookingHorseRepo = bookingHorseRepo;
+            _fileStorage = fileStorage;
         }
 
         public async Task<PagedBusinessResult<HorseModel>> GetHorsesAsync(HorseFilterOptions options, CurrentUser currentUser)
@@ -78,10 +80,12 @@ namespace RacehorseTransport.Services.Implementations
             return horse.ToBusinessModel();
         }
 
-        public async Task<HorseModel> CreateHorseAsync(HorseModel model, CurrentUser currentUser)
+        public async Task<HorseModel> CreateHorseAsync(HorseModel model, FileUploadModel? photo, CurrentUser currentUser)
         {
             ValidateFields(model);
             await EnsureIdentifiersAreUniqueAsync(model, excludeHorseId: null);
+
+            string? photoPath = await UploadPhotoAsync(photo);
 
             var horse = new Horse
             {
@@ -94,14 +98,14 @@ namespace RacehorseTransport.Services.Implementations
                 DateOfBirth = model.DateOfBirth,
                 Color = model.Color,
                 SpecialCareRequirements = model.SpecialCareRequirements,
-                PhotoUrl = model.PhotoUrl
+                PhotoUrl = photoPath
             };
 
             await _horseRepo.AddAsync(horse);
             return horse.ToBusinessModel();
         }
 
-        public async Task<HorseModel> UpdateHorseAsync(int id, HorseModel model, CurrentUser currentUser)
+        public async Task<HorseModel> UpdateHorseAsync(int id, HorseModel model, FileUploadModel? photo, bool removePhoto, CurrentUser currentUser)
         {
             var horse = await GetOwnedHorseAsync(id, currentUser);
 
@@ -116,7 +120,15 @@ namespace RacehorseTransport.Services.Implementations
             horse.DateOfBirth = model.DateOfBirth;
             horse.Color = model.Color;
             horse.SpecialCareRequirements = model.SpecialCareRequirements;
-            horse.PhotoUrl = model.PhotoUrl;
+
+            if (photo != null)
+            {
+                horse.PhotoUrl = await UploadPhotoAsync(photo);
+            }
+            else if (removePhoto)
+            {
+                horse.PhotoUrl = null;
+            }
 
             await _horseRepo.UpdateAsync(horse);
             return horse.ToBusinessModel();
@@ -156,6 +168,18 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             return horse;
+        }
+
+        // Gọi sau khi đã kiểm tra xong dữ liệu, để request sai không để lại file trên storage
+        private async Task<string?> UploadPhotoAsync(FileUploadModel? photo)
+        {
+            if (photo == null)
+            {
+                return null;
+            }
+
+            var stored = await _fileStorage.UploadAsync(photo.Content, photo.FileName, photo.SizeBytes, FileCategories.Horses);
+            return stored.Path;
         }
 
         private static void EnsureCanAccess(Horse horse, CurrentUser currentUser)

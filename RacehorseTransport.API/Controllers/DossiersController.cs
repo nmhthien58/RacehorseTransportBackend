@@ -5,6 +5,7 @@ using RacehorseTransport.API.Mappers;
 using RacehorseTransport.API.RequestModels;
 using RacehorseTransport.API.ResponseModels;
 using RacehorseTransport.Repositories.Constants;
+using RacehorseTransport.Services.Implementations;
 using RacehorseTransport.Services.Interfaces;
 
 namespace RacehorseTransport.API.Controllers
@@ -70,17 +71,20 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
-        /// Upload (or re-upload after a rejection) one document. Upload the file with POST /api/files first and send its path.
+        /// Upload (or re-upload after a rejection) one document. multipart/form-data; attach the file (pdf, jpg, png; up to 10 MB) in the "file" field.
         /// </summary>
         [HttpPost("{id:int}/documents")]
         [Authorize(Roles = UserRoles.Customer + "," + SpecialistRoles)]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(SupabaseFileStorageService.MaxFileSizeBytes + 1024 * 1024)]
         [ProducesResponseType(typeof(ApiResponse<DossierDetailResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> UploadDocument(int id, [FromBody] UploadDocumentRequest request)
+        public async Task<IActionResult> UploadDocument(int id, [FromForm] UploadDocumentRequest request)
         {
-            var dossier = await _dossierService.UploadDocumentAsync(id, request.ToBusinessModel(), User.ToCurrentUser());
+            using var file = request.File.ToUploadModel()!;
+            var dossier = await _dossierService.UploadDocumentAsync(id, request.ToBusinessModel(file), User.ToCurrentUser());
             return Ok(ApiResponse<DossierDetailResponse>.SuccessResult(dossier.ToResponse(), "Document uploaded successfully"));
         }
 

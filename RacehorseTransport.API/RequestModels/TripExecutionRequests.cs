@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace RacehorseTransport.API.RequestModels
 {
+    // multipart/form-data
     public class CreateWelfareLogRequest
     {
         [Range(1, int.MaxValue, ErrorMessage = "TripHorseId is required.")]
@@ -26,7 +27,7 @@ namespace RacehorseTransport.API.RequestModels
         [MaxLength(2000, ErrorMessage = "Notes cannot exceed 2000 characters.")]
         public string? Notes { get; set; }
 
-        [MaxLength(500, ErrorMessage = "PhotoUrl cannot exceed 500 characters.")]
-        public string? PhotoUrl { get; set; }
+        // Ảnh chụp kèm (jpg, png), không bắt buộc
+        public IFormFile? Photo { get; set; }
     }
 }

@@ -5,6 +5,7 @@ using RacehorseTransport.API.Mappers;
 using RacehorseTransport.API.RequestModels;
 using RacehorseTransport.API.ResponseModels;
 using RacehorseTransport.Repositories.Constants;
+using RacehorseTransport.Services.Implementations;
 using RacehorseTransport.Services.Interfaces;
 
 namespace RacehorseTransport.API.Controllers
@@ -53,15 +54,18 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
-        /// Register a horse owned by the logged-in customer.
+        /// Register a horse owned by the logged-in customer. multipart/form-data; attach the photo (jpg, png; up to 10 MB) in the optional "photo" field.
         /// </summary>
         [HttpPost]
         [Authorize(Roles = UserRoles.Customer)]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(SupabaseFileStorageService.MaxFileSizeBytes + 1024 * 1024)]
         [ProducesResponseType(typeof(ApiResponse<HorseResponse>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Create([FromBody] CreateHorseRequest request)
+        public async Task<IActionResult> Create([FromForm] CreateHorseRequest request)
         {
-            var created = await _horseService.CreateHorseAsync(request.ToBusinessModel(), User.ToCurrentUser());
+            using var photo = request.Photo.ToUploadModel();
+            var created = await _horseService.CreateHorseAsync(request.ToBusinessModel(), photo, User.ToCurrentUser());
             var response = created.ToResponse();
 
             return CreatedAtAction(
@@ -71,17 +75,21 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
-        /// Update a horse (owner only).
+        /// Update a horse (owner only). multipart/form-data; send "photo" to replace the photo, omit it to keep the current one, or send removePhoto=true to delete it.
         /// </summary>
         [HttpPut("{id:int}")]
         [Authorize(Roles = UserRoles.Customer)]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(SupabaseFileStorageService.MaxFileSizeBytes + 1024 * 1024)]
         [ProducesResponseType(typeof(ApiResponse<HorseResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Update(int id, [FromBody] UpdateHorseRequest request)
+        public async Task<IActionResult> Update(int id, [FromForm] UpdateHorseRequest request)
         {
-            var updated = await _horseService.UpdateHorseAsync(id, request.ToBusinessModel(), User.ToCurrentUser());
+            using var photo = request.Photo.ToUploadModel();
+            var updated = await _horseService.UpdateHorseAsync(
+                id, request.ToBusinessModel(), photo, request.RemovePhoto, User.ToCurrentUser());
             return Ok(ApiResponse<HorseResponse>.SuccessResult(updated.ToResponse(), "Horse updated successfully"));
         }
 

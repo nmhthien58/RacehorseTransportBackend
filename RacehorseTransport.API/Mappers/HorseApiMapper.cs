@@ -32,8 +32,7 @@ namespace RacehorseTransport.API.Mappers
                 Gender = request.Gender.Trim(),
                 DateOfBirth = request.DateOfBirth!.Value,
                 Color = request.Color.Trim(),
-                SpecialCareRequirements = string.IsNullOrWhiteSpace(request.SpecialCareRequirements) ? null : request.SpecialCareRequirements.Trim(),
-                PhotoUrl = string.IsNullOrWhiteSpace(request.PhotoUrl) ? null : request.PhotoUrl.Trim()
+                SpecialCareRequirements = string.IsNullOrWhiteSpace(request.SpecialCareRequirements) ? null : request.SpecialCareRequirements.Trim()
             };
         }
 

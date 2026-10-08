@@ -7,8 +7,8 @@ using RacehorseTransport.Services.Interfaces;
 
 namespace RacehorseTransport.API.Controllers
 {
-    // Cách dùng: upload file ở đây trước, lấy "path" trả về, rồi gửi path đó trong request nghiệp vụ
-    // (nộp giấy tờ, ảnh ngựa, ảnh nhật ký, chữ ký bàn giao).
+    // Upload riêng một file và cấp link xem. Ảnh ngựa, giấy tờ hồ sơ và ảnh nhật ký được gửi kèm ngay trong
+    // request nghiệp vụ (multipart) nên không cần upload ở đây trước.
     [ApiController]
     [Route("api/files")]
     [Produces("application/json")]

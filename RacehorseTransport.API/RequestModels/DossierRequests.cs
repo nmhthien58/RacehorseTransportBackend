@@ -18,7 +18,7 @@ namespace RacehorseTransport.API.RequestModels
         public string? Note { get; set; }
     }
 
-    // File phải được upload trước qua POST /api/files (category "documents"); gửi "path" nhận được vào FilePath.
+    // multipart/form-data: file giấy tờ gửi kèm trong trường "file".
     public class UploadDocumentRequest
     {
         [Range(1, int.MaxValue, ErrorMessage = "DocTypeId is required.")]
@@ -27,9 +27,9 @@ namespace RacehorseTransport.API.RequestModels
         [MaxLength(100, ErrorMessage = "DocumentNumber cannot exceed 100 characters.")]
         public string? DocumentNumber { get; set; }
 
-        [Required(ErrorMessage = "FilePath is required.")]
-        [MaxLength(500, ErrorMessage = "FilePath cannot exceed 500 characters.")]
-        public string FilePath { get; set; } = string.Empty;
+        // pdf, jpg, png
+        [Required(ErrorMessage = "File is required.")]
+        public IFormFile? File { get; set; }
 
         public DateOnly? ExpiryDate { get; set; }
     }

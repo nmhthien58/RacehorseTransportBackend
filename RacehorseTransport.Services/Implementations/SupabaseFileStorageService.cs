@@ -54,6 +54,12 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"File type '{extension}' is not allowed. Allowed types: {string.Join(", ", AllowedTypes.Keys)}.");
             }
 
+            // Chỉ giấy tờ hồ sơ mới nhận PDF; ảnh ngựa, ảnh nhật ký và chữ ký phải là ảnh
+            if (category != FileCategories.Documents && contentType == "application/pdf")
+            {
+                throw new BusinessException($"Files in category '{category}' must be images (.jpg, .jpeg, .png).");
+            }
+
             if (sizeBytes <= 0)
             {
                 throw new BusinessException("The file is empty.");

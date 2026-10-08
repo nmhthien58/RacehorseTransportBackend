@@ -13,6 +13,7 @@ namespace RacehorseTransport.API.RequestModels
         public bool IncludeInactive { get; set; }
     }
 
+    // multipart/form-data
     public class CreateHorseRequest
     {
         [Required(ErrorMessage = "Name is required.")]
@@ -42,11 +43,14 @@ namespace RacehorseTransport.API.RequestModels
 
         public string? SpecialCareRequirements { get; set; }
 
-        [MaxLength(500, ErrorMessage = "PhotoUrl cannot exceed 500 characters.")]
-        public string? PhotoUrl { get; set; }
+        // Ảnh ngựa (jpg, png), không bắt buộc
+        public IFormFile? Photo { get; set; }
     }
 
+    // Không gửi Photo thì giữ ảnh đang có
     public class UpdateHorseRequest : CreateHorseRequest
     {
+        // true: xóa ảnh đang có (bỏ qua nếu gửi kèm Photo mới)
+        public bool RemovePhoto { get; set; }
     }
 }
