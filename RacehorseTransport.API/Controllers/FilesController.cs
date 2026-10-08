@@ -25,6 +25,8 @@ namespace RacehorseTransport.API.Controllers
         /// <summary>
         /// Upload a file (pdf, jpg, png; up to 10 MB). Returns the stored path and a temporary view URL.
         /// </summary>
+        // Tạm ẩn khỏi Swagger: hiện không request nghiệp vụ nào cần upload riêng. Endpoint vẫn hoạt động.
+        [ApiExplorerSettings(IgnoreApi = true)]
         [HttpPost]
         [Consumes("multipart/form-data")]
         [RequestSizeLimit(SupabaseFileStorageService.MaxFileSizeBytes + 1024 * 1024)]

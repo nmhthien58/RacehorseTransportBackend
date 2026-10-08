@@ -273,7 +273,6 @@ Không tự đặt header `Content-Type`; để trình duyệt / axios tự thê
 | Method | Đường dẫn | Mô tả |
 |---|---|---|
 | GET | `/api/files/url?path=...` | Lấy link xem mới cho một `path` |
-| POST | `/api/files` | Upload riêng một file (`file` + `category`), trả về `path`. Ba request ở trên không cần tới endpoint này |
 
 **Hiển thị file:** các response nghiệp vụ trả về `path` (ở trường `fileUrl`, `photoUrl`), không phải link xem được. Gọi `GET /api/files/url?path=...` để lấy link có hạn 60 phút rồi mới gắn vào `<img>` hoặc mở PDF. Không lưu link này lâu dài.
 
