@@ -131,21 +131,21 @@ Làm sau khi T-05 và T-26 xong. Tạo project `RacehorseTransport.Tests` (xUnit
 ### M2 – Flow 1: Tạo & duyệt yêu cầu vận chuyển · REQUIRED
 
 - [x] **T-05 · Báo giá** — `IPricingService` tính giá bằng C# từ bảng `pricing.price_items` (công thức ở phụ lục cuối file); `POST /api/bookings/quote-preview` cho khách xem giá trước khi gửi (không ghi DB); lưu các dòng báo giá vào `QuoteBreakdown` (jsonb). Cache bảng giá, xóa cache khi B-03 sửa giá.
-- [ ] **T-06 · Tạo đơn** — `POST /api/bookings` (Customer đã xác thực email): kiểm tra ngựa thuộc về khách, ngựa chưa nằm trong đơn khác trùng thời gian, `DeliveryDate > DepartureDate`, đơn đường bộ phải có `DistanceKm`, `IsExpress` khi khởi hành dưới 7 ngày. Tạo `BookingHorses`, tính giá, báo cho Manager.
+- [x] **T-06 · Tạo đơn** — `POST /api/bookings` (Customer đã xác thực email): kiểm tra ngựa thuộc về khách, ngựa chưa nằm trong đơn khác trùng thời gian, `DeliveryDate > DepartureDate`, đơn đường bộ phải có `DistanceKm`, `IsExpress` khi khởi hành dưới 7 ngày. Tạo `BookingHorses`, tính giá, báo cho Manager.
 - [x] **T-07 · Xem đơn** — `GET /api/bookings` (khách: đơn của mình; Specialist: đơn mình phụ trách; Manager/Coordinator: tất cả; lọc theo trạng thái, ngày), `GET /api/bookings/{id}` trả đủ ngựa, báo giá, Specialist phụ trách, tiến độ hồ sơ, và **từng con ngựa đang ở chuyến nào** (một đơn có thể đi nhiều chuyến).
-- [ ] **T-08 · Duyệt đơn** — `POST /api/bookings/{id}/approve` (Manager, **bắt buộc chọn Specialist phụ trách** ngay trong thao tác duyệt → `Approved`, tự tạo `DigitalDossier` cho từng ngựa), `/reject` (bắt buộc lý do), `/reassign-specialist` (Manager đổi người), `/cancel` (khách, chỉ khi `Submitted`). Không phân công Coordinator theo đơn. Mỗi bước gửi thông báo.
+- [x] **T-08 · Duyệt đơn** — `POST /api/bookings/{id}/approve` (Manager, **bắt buộc chọn Specialist phụ trách** ngay trong thao tác duyệt → `Approved`, tự tạo `DigitalDossier` cho từng ngựa), `/reject` (bắt buộc lý do), `/reassign-specialist` (Manager đổi người), `/cancel` (khách, chỉ khi `Submitted`). Không phân công Coordinator theo đơn. Mỗi bước gửi thông báo.
 - [x] **T-09 · Tự hết hạn** — `BackgroundService` chuyển đơn `Submitted` quá 48 giờ sang `Expired`.
 
 ### M3 – Flow 2: Hồ sơ pháp lý & kiểm dịch · REQUIRED
 
-- [ ] **T-10 · Xem hồ sơ** — `GET /api/dossiers` (Specialist: hồ sơ được giao; khách: hồ sơ ngựa của mình), `GET /api/dossiers/{id}` kèm **checklist** giấy tờ bắt buộc (Export của nước đi + Import của nước đến, lấy từ `CountryDocRequirements`) đối chiếu với giấy đã nộp.
+- [x] **T-10 · Xem hồ sơ** — `GET /api/dossiers` (Specialist: hồ sơ được giao; khách: hồ sơ ngựa của mình), `GET /api/dossiers/{id}` kèm **checklist** giấy tờ bắt buộc (Export của nước đi + Import của nước đến, lấy từ `CountryDocRequirements`) đối chiếu với giấy đã nộp.
 - [ ] **T-11 · Nộp giấy tờ** — Specialist `POST /api/dossiers/{id}/request-documents` (→ `AwaitingDocs`, báo khách). Khách `POST /api/dossiers/{id}/documents` (file + loại + số + ngày hết hạn), nộp lại giấy bị từ chối.
 - [ ] **T-12 · Thẩm định giấy tờ** — `POST /api/documents/{id}/approve`, `/reject` (kèm `CorrectionNote`). Kiểm tra hạn hiệu lực theo `ValidityDays`. Bị từ chối lần thứ 3 → hồ sơ sang `Issue`, báo Manager.
 - [ ] **T-13 · Nộp cơ quan & thông quan** — `POST /api/dossiers/{id}/submit-to-authorities` (chỉ khi đủ giấy bắt buộc đã duyệt), `/clear` (nhập `ClearanceNumber`), `/issue` (nhập lý do). Khi mọi hồ sơ của đơn đã `Cleared` → báo khách và các Coordinator.
 
 ### M4 – Flow 3: Lộ trình & điều phối phương tiện · REQUIRED
 
-- [ ] **T-14 · Hàng chờ xếp chuyến & tài nguyên rảnh** — `GET /api/trips/unplanned-horses`: ngựa thuộc đơn `Approved` chưa nằm trên chuyến nào, mọi Coordinator đều thấy. `GET /api/trips/available-vehicles?from=&to=&mode=`, `/available-crew?from=&to=`: loại xe/người đã có chuyến trùng thời gian; đơn đường bay chỉ dùng `AirStall`.
+- [x] **T-14 · Hàng chờ xếp chuyến & tài nguyên rảnh** — `GET /api/trips/unplanned-horses`: ngựa thuộc đơn `Approved` chưa nằm trên chuyến nào, mọi Coordinator đều thấy. `GET /api/trips/available-vehicles?from=&to=&mode=`, `/available-crew?from=&to=`: loại xe/người đã có chuyến trùng thời gian; đơn đường bay chỉ dùng `AirStall`.
 - [ ] **T-15 · Dự thảo chuyến** — `POST /api/trips` (Coordinator): xe, nhân sự (`TripCrew`, ít nhất 1 Driver, 1 Escort cho mỗi 3 ngựa), ngựa (`TripHorses`, lấy từ **một hoặc nhiều** đơn `Approved` cùng phương thức vận chuyển; ngược lại ngựa của một đơn có thể chia ra nhiều chuyến, không vượt sức chứa, không trùng ô chuồng), danh sách mốc. `PUT /api/trips/{id}` khi còn `Draft`.
 - [ ] **T-16 · Mốc lộ trình** — Thêm/sửa/xóa/đổi thứ tự `RouteCheckpoints` khi chuyến còn `Draft`; mốc đầu là `Origin`, mốc cuối là `Destination`, thời gian tăng dần.
 - [ ] **T-17 · Trình & duyệt kế hoạch** — `POST /api/trips/{id}/submit` (→ `PendingApproval`), `/approve` (Manager → `Scheduled`, báo tài xế/áp tải), `/reject` (lý do, tăng `PlanRejectionCount`; lần thứ 3 → `Cancelled`).

@@ -8,7 +8,9 @@ namespace RacehorseTransport.Services.Extensions
 {
     public static class QueryableExtensions
     {
-        // sort = "name,-createdAt": sắp theo name tăng dần rồi createdAt giảm dần
+        // sort = "name,-createdAt": sắp theo name tăng dần rồi createdAt giảm dần.
+        // defaultSortField là khóa chính: dùng khi không truyền sort, và luôn được thêm vào cuối làm tiêu chí phụ
+        // để các dòng trùng giá trị sắp xếp vẫn có thứ tự cố định (nếu không, phân trang có thể lặp hoặc sót dòng).
         public static IQueryable<T> ApplySort<T>(this IQueryable<T> query, string? sortQuery, string defaultSortField = "Id")
         {
             if (string.IsNullOrWhiteSpace(sortQuery))
@@ -25,10 +27,12 @@ namespace RacehorseTransport.Services.Extensions
 
             var sortParams = sortQuery.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             bool isFirst = true;
+            bool descending = false;
+            bool sortedByKey = false;
 
             foreach (var param in sortParams)
             {
-                bool descending = param.StartsWith("-");
+                descending = param.StartsWith("-");
                 string propertyName = descending ? param[1..] : param;
 
                 var prop = typeof(T).GetProperty(propertyName, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
@@ -39,6 +43,14 @@ namespace RacehorseTransport.Services.Extensions
 
                 query = OrderByProperty(query, prop.Name, descending, isFirst);
                 isFirst = false;
+                sortedByKey |= string.Equals(prop.Name, defaultSortField, StringComparison.OrdinalIgnoreCase);
+            }
+
+            // Tiêu chí phụ theo khóa chính, cùng chiều với tiêu chí cuối
+            var keyProp = typeof(T).GetProperty(defaultSortField, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
+            if (!isFirst && !sortedByKey && keyProp != null)
+            {
+                query = OrderByProperty(query, keyProp.Name, descending, isFirst: false);
             }
 
             return query;

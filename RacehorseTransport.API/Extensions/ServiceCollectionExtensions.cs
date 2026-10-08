@@ -62,6 +62,8 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<IPricingService, PricingService>();
             services.AddScoped<IBookingService, BookingService>();
             services.AddScoped<ITripService, TripService>();
+            services.AddScoped<ITripPlanningService, TripPlanningService>();
+            services.AddScoped<IDossierService, DossierService>();
             services.AddScoped<IDocumentTypeService, DocumentTypeService>();
 
             // Việc chạy nền

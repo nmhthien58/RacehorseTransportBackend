@@ -15,22 +15,43 @@ namespace RacehorseTransport.Services.Implementations
 {
     public class BookingService : IBookingService
     {
+        // Đơn ở các trạng thái này còn đang chạy: ngựa trong đơn chưa thể vào đơn khác trùng thời gian
+        private static readonly string[] OpenStatuses =
+        {
+            BookingStatuses.Submitted, BookingStatuses.Approved, BookingStatuses.Assigned
+        };
+
         private readonly IRepository<BookingRequest> _bookingRepo;
+        private readonly IRepository<BookingHorse> _bookingHorseRepo;
+        private readonly IRepository<Horse> _horseRepo;
+        private readonly IRepository<User> _userRepo;
+        private readonly IRepository<DigitalDossier> _dossierRepo;
         private readonly IPricingService _pricingService;
         private readonly INotificationService _notificationService;
+        private readonly ICodeGenerator _codeGenerator;
         private readonly IUnitOfWork _unitOfWork;
         private readonly BookingOptions _options;
 
         public BookingService(
             IRepository<BookingRequest> bookingRepo,
+            IRepository<BookingHorse> bookingHorseRepo,
+            IRepository<Horse> horseRepo,
+            IRepository<User> userRepo,
+            IRepository<DigitalDossier> dossierRepo,
             IPricingService pricingService,
             INotificationService notificationService,
+            ICodeGenerator codeGenerator,
             IUnitOfWork unitOfWork,
             IOptions<BookingOptions> options)
         {
             _bookingRepo = bookingRepo;
+            _bookingHorseRepo = bookingHorseRepo;
+            _horseRepo = horseRepo;
+            _userRepo = userRepo;
+            _dossierRepo = dossierRepo;
             _pricingService = pricingService;
             _notificationService = notificationService;
+            _codeGenerator = codeGenerator;
             _unitOfWork = unitOfWork;
             _options = options.Value;
         }
@@ -81,7 +102,7 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             // Sorting: mặc định đơn mới nhất lên đầu
-            query = query.ApplySort(string.IsNullOrWhiteSpace(options.Sort) ? "-createdAt" : options.Sort);
+            query = query.ApplySort(string.IsNullOrWhiteSpace(options.Sort) ? "-createdAt" : options.Sort, nameof(BookingRequest.BookingId));
 
             // Paging
             return await query.ToPagedResultAsync(options, b => b.ToSummaryModel());
@@ -113,6 +134,270 @@ namespace RacehorseTransport.Services.Implementations
             return booking.ToDetailModel(_pricingService.ParseLines(booking.QuoteBreakdown));
         }
 
+        // ---------------------------------------------------------------------------------------------
+        // Flow 1: khách tạo đơn -> Manager duyệt (kèm chọn Specialist) hoặc từ chối; khách hủy khi chưa duyệt
+        // ---------------------------------------------------------------------------------------------
+
+        public async Task<BookingDetailModel> CreateBookingAsync(CreateBookingModel model, CurrentUser currentUser)
+        {
+            if (model.DepartureDate <= DateTimeOffset.UtcNow)
+            {
+                throw new BusinessException("DepartureDate must be in the future.");
+            }
+
+            var horseIds = model.Horses.Select(h => h.HorseId).ToList();
+            if (horseIds.Count != horseIds.Distinct().Count())
+            {
+                throw new BusinessException("The same horse appears more than once in this booking.");
+            }
+
+            // Ngựa phải là của chính khách và còn hoạt động
+            var ownedHorses = await _horseRepo.GetQueryable()
+                .AsNoTracking()
+                .Where(h => horseIds.Contains(h.HorseId) && h.OwnerUserId == currentUser.UserId && h.IsActive)
+                .ToListAsync();
+
+            var missingIds = horseIds.Except(ownedHorses.Select(h => h.HorseId)).ToList();
+            if (missingIds.Count > 0)
+            {
+                throw new BusinessException($"Horse(s) with ID {string.Join(", ", missingIds)} were not found among your active horses.");
+            }
+
+            // Một con ngựa không thể nằm trong hai đơn đang chạy có thời gian giao nhau
+            var departureUtc = model.DepartureDate.ToUniversalTime();
+            var deliveryUtc = model.DeliveryDate.ToUniversalTime();
+
+            var busyHorseNames = await _bookingHorseRepo.GetQueryable()
+                .Where(bh => horseIds.Contains(bh.HorseId)
+                    && bh.Status != BookingHorseStatuses.Cancelled
+                    && OpenStatuses.Contains(bh.Booking!.Status)
+                    && bh.Booking.DepartureDate < deliveryUtc
+                    && bh.Booking.DeliveryDate > departureUtc)
+                .Select(bh => bh.Horse!.Name)
+                .Distinct()
+                .ToListAsync();
+
+            if (busyHorseNames.Count > 0)
+            {
+                throw new BusinessException($"These horses are already in another booking for an overlapping period: {string.Join(", ", busyHorseNames)}.");
+            }
+
+            // Báo giá (đồng thời kiểm tra phương thức, hạng chuồng, tuyến có giá, DistanceKm, ngày giao > ngày đi)
+            var quote = await _pricingService.CalculateQuoteAsync(new QuoteInputModel
+            {
+                TransportMode = model.TransportMode,
+                DropoffCountryCode = model.DropoffCountryCode,
+                DistanceKm = model.DistanceKm,
+                RequiresClimateControl = model.RequiresClimateControl,
+                DeclaredValue = model.DeclaredValue,
+                DepartureDate = model.DepartureDate,
+                DeliveryDate = model.DeliveryDate,
+                StallClasses = model.Horses.Select(h => h.StallClass).ToList()
+            });
+
+            int bookingId = await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                var booking = new BookingRequest
+                {
+                    BookingCode = await _codeGenerator.NextAsync(CodePrefixes.Booking),
+                    CustomerUserId = currentUser.UserId,
+                    PickupAddress = model.PickupAddress,
+                    PickupCountryCode = model.PickupCountryCode,
+                    DropoffAddress = model.DropoffAddress,
+                    DropoffCountryCode = model.DropoffCountryCode,
+                    DepartureDate = model.DepartureDate,
+                    DeliveryDate = model.DeliveryDate,
+                    TotalHorses = model.Horses.Count,
+                    SpecialInstructions = model.SpecialInstructions,
+                    TransportMode = model.TransportMode,
+                    DistanceKm = model.DistanceKm,
+                    IsExpress = quote.IsExpress,
+                    RequiresClimateControl = model.RequiresClimateControl,
+                    DeclaredValue = model.DeclaredValue,
+                    EstimatedCost = quote.Total,
+                    CurrencyCode = quote.CurrencyCode,
+                    QuoteBreakdown = _pricingService.SerializeLines(quote.Lines),
+                    Status = BookingStatuses.Submitted,
+                    BookingHorses = model.Horses.Select(h => new BookingHorse
+                    {
+                        HorseId = h.HorseId,
+                        StallClass = h.StallClass,
+                        Notes = h.Notes,
+                        Status = BookingHorseStatuses.Pending
+                    }).ToList()
+                };
+
+                await _bookingRepo.AddAsync(booking);
+
+                await _notificationService.SendToRoleAsync(
+                    UserRoles.LogisticsManager,
+                    $"New booking {booking.BookingCode}",
+                    $"A transport request for {booking.TotalHorses} horse(s) from {booking.PickupCountryCode} to {booking.DropoffCountryCode} is waiting for review.",
+                    NotificationReferenceTypes.Booking,
+                    booking.BookingId);
+
+                return booking.BookingId;
+            });
+
+            return await GetBookingByIdAsync(bookingId, currentUser);
+        }
+
+        // Duyệt đơn và chọn luôn Specialist phụ trách; mỗi con ngựa trong đơn được mở một bộ hồ sơ kiểm dịch.
+        public async Task<BookingDetailModel> ApproveBookingAsync(int id, int specialistUserId, CurrentUser currentUser)
+        {
+            var booking = await GetTrackedBookingAsync(id);
+            EnsureStatus(booking, BookingStatuses.Submitted, "approved");
+            var specialist = await GetActiveSpecialistAsync(specialistUserId);
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                booking.Status = BookingStatuses.Approved;
+                booking.ReviewedByUserId = currentUser.UserId;
+                booking.ReviewedAt = DateTimeOffset.UtcNow;
+                booking.AssignedSpecialistId = specialist.UserId;
+                booking.RejectionReason = null;
+
+                var dossiers = new List<DigitalDossier>();
+                foreach (var bookingHorse in booking.BookingHorses.Where(bh => bh.Status != BookingHorseStatuses.Cancelled))
+                {
+                    bookingHorse.Status = BookingHorseStatuses.Approved;
+                    dossiers.Add(new DigitalDossier
+                    {
+                        DossierCode = await _codeGenerator.NextAsync(CodePrefixes.Dossier),
+                        BookingHorseId = bookingHorse.BookingHorseId,
+                        SpecialistUserId = specialist.UserId,
+                        Status = DossierStatuses.Draft
+                    });
+                }
+
+                await _bookingRepo.UpdateAsync(booking);
+                await _dossierRepo.AddRangeAsync(dossiers);
+
+                await _notificationService.SendAsync(
+                    booking.CustomerUserId,
+                    $"Booking {booking.BookingCode} approved",
+                    $"Your transport request has been approved. {specialist.FullName} will handle the documents and quarantine clearance.",
+                    NotificationReferenceTypes.Booking,
+                    booking.BookingId);
+
+                await _notificationService.SendAsync(
+                    specialist.UserId,
+                    $"Booking {booking.BookingCode} assigned to you",
+                    $"You are responsible for the clearance dossiers of {dossiers.Count} horse(s) in this booking.",
+                    NotificationReferenceTypes.Booking,
+                    booking.BookingId);
+            });
+
+            return await GetBookingByIdAsync(id, currentUser);
+        }
+
+        public async Task<BookingDetailModel> RejectBookingAsync(int id, string reason, CurrentUser currentUser)
+        {
+            var booking = await GetTrackedBookingAsync(id);
+            EnsureStatus(booking, BookingStatuses.Submitted, "rejected");
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                booking.Status = BookingStatuses.Rejected;
+                booking.RejectionReason = reason.Trim();
+                booking.ReviewedByUserId = currentUser.UserId;
+                booking.ReviewedAt = DateTimeOffset.UtcNow;
+                CancelHorses(booking);
+
+                await _bookingRepo.UpdateAsync(booking);
+
+                await _notificationService.SendAsync(
+                    booking.CustomerUserId,
+                    $"Booking {booking.BookingCode} rejected",
+                    $"Your transport request was not accepted. Reason: {booking.RejectionReason}",
+                    NotificationReferenceTypes.Booking,
+                    booking.BookingId);
+            });
+
+            return await GetBookingByIdAsync(id, currentUser);
+        }
+
+        // Đổi Specialist của đơn đã duyệt: chuyển cả các bộ hồ sơ chưa thông quan sang người mới
+        public async Task<BookingDetailModel> ReassignSpecialistAsync(int id, int specialistUserId, CurrentUser currentUser)
+        {
+            var booking = await GetTrackedBookingAsync(id);
+            if (booking.Status != BookingStatuses.Approved && booking.Status != BookingStatuses.Assigned)
+            {
+                throw new BusinessException($"The specialist can only be changed on an approved booking (current status: {booking.Status}).");
+            }
+
+            var specialist = await GetActiveSpecialistAsync(specialistUserId);
+            int? previousSpecialistId = booking.AssignedSpecialistId;
+            if (previousSpecialistId == specialist.UserId)
+            {
+                throw new BusinessException($"{specialist.FullName} is already the specialist of this booking.");
+            }
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                booking.AssignedSpecialistId = specialist.UserId;
+
+                var bookingHorseIds = booking.BookingHorses.Select(bh => bh.BookingHorseId).ToList();
+                var openDossiers = await _dossierRepo.GetQueryable()
+                    .Where(d => bookingHorseIds.Contains(d.BookingHorseId) && d.Status != DossierStatuses.Cleared)
+                    .ToListAsync();
+
+                foreach (var dossier in openDossiers)
+                {
+                    dossier.SpecialistUserId = specialist.UserId;
+                }
+
+                await _bookingRepo.UpdateAsync(booking);
+
+                await _notificationService.SendAsync(
+                    specialist.UserId,
+                    $"Booking {booking.BookingCode} assigned to you",
+                    "You are now responsible for the clearance dossiers of this booking.",
+                    NotificationReferenceTypes.Booking,
+                    booking.BookingId);
+
+                if (previousSpecialistId.HasValue)
+                {
+                    await _notificationService.SendAsync(
+                        previousSpecialistId.Value,
+                        $"Booking {booking.BookingCode} reassigned",
+                        $"This booking has been handed over to {specialist.FullName}.",
+                        NotificationReferenceTypes.Booking,
+                        booking.BookingId);
+                }
+            });
+
+            return await GetBookingByIdAsync(id, currentUser);
+        }
+
+        // Khách tự hủy đơn của mình, chỉ khi đơn chưa được xét duyệt
+        public async Task<BookingDetailModel> CancelBookingAsync(int id, CurrentUser currentUser)
+        {
+            var booking = await GetTrackedBookingAsync(id);
+            if (booking.CustomerUserId != currentUser.UserId)
+            {
+                throw new ForbiddenException("You can only cancel your own bookings.");
+            }
+            EnsureStatus(booking, BookingStatuses.Submitted, "cancelled");
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                booking.Status = BookingStatuses.Cancelled;
+                CancelHorses(booking);
+
+                await _bookingRepo.UpdateAsync(booking);
+
+                await _notificationService.SendToRoleAsync(
+                    UserRoles.LogisticsManager,
+                    $"Booking {booking.BookingCode} cancelled",
+                    "The customer cancelled this transport request before it was reviewed.",
+                    NotificationReferenceTypes.Booking,
+                    booking.BookingId);
+            });
+
+            return await GetBookingByIdAsync(id, currentUser);
+        }
+
         public async Task<int> ExpireOverdueBookingsAsync()
         {
             var cutoff = DateTimeOffset.UtcNow.AddHours(-_options.ReviewSlaHours);
@@ -138,6 +423,45 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             return overdue.Count;
+        }
+
+        private async Task<BookingRequest> GetTrackedBookingAsync(int id)
+        {
+            var booking = await _bookingRepo.GetQueryable()
+                .Include(b => b.BookingHorses)
+                .FirstOrDefaultAsync(b => b.BookingId == id);
+
+            if (booking == null)
+            {
+                throw new NotFoundException($"Booking with ID {id} was not found.");
+            }
+            return booking;
+        }
+
+        private async Task<User> GetActiveSpecialistAsync(int specialistUserId)
+        {
+            var specialist = await _userRepo.GetByIdAsync(specialistUserId);
+            if (specialist == null || !specialist.IsActive || specialist.Role != UserRoles.TransportSpecialist)
+            {
+                throw new BusinessException($"User with ID {specialistUserId} is not an active transport specialist.");
+            }
+            return specialist;
+        }
+
+        private static void EnsureStatus(BookingRequest booking, string requiredStatus, string action)
+        {
+            if (booking.Status != requiredStatus)
+            {
+                throw new BusinessException($"Only a {requiredStatus} booking can be {action} (current status: {booking.Status}).");
+            }
+        }
+
+        private static void CancelHorses(BookingRequest booking)
+        {
+            foreach (var bookingHorse in booking.BookingHorses)
+            {
+                bookingHorse.Status = BookingHorseStatuses.Cancelled;
+            }
         }
 
         // Ai thấy đơn nào:

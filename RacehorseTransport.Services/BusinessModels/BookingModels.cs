@@ -8,6 +8,29 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset? DepartureTo { get; set; }
     }
 
+    public class CreateBookingModel
+    {
+        public string PickupAddress { get; set; } = string.Empty;
+        public string PickupCountryCode { get; set; } = string.Empty;
+        public string DropoffAddress { get; set; } = string.Empty;
+        public string DropoffCountryCode { get; set; } = string.Empty;
+        public DateTimeOffset DepartureDate { get; set; }
+        public DateTimeOffset DeliveryDate { get; set; }
+        public string TransportMode { get; set; } = string.Empty;
+        public int? DistanceKm { get; set; }
+        public bool RequiresClimateControl { get; set; }
+        public decimal? DeclaredValue { get; set; }
+        public string? SpecialInstructions { get; set; }
+        public List<CreateBookingHorseModel> Horses { get; set; } = new();
+    }
+
+    public class CreateBookingHorseModel
+    {
+        public int HorseId { get; set; }
+        public string StallClass { get; set; } = string.Empty;
+        public string? Notes { get; set; }
+    }
+
     // Dòng trong danh sách đơn
     public class BookingSummaryModel
     {

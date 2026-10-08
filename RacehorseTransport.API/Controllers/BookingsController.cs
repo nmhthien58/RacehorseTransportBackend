@@ -4,6 +4,7 @@ using RacehorseTransport.API.Helpers;
 using RacehorseTransport.API.Mappers;
 using RacehorseTransport.API.RequestModels;
 using RacehorseTransport.API.ResponseModels;
+using RacehorseTransport.Repositories.Constants;
 using RacehorseTransport.Services.Interfaces;
 
 namespace RacehorseTransport.API.Controllers
@@ -14,6 +15,8 @@ namespace RacehorseTransport.API.Controllers
     [Authorize]
     public class BookingsController : ControllerBase
     {
+        private const string ReviewRoles = UserRoles.LogisticsManager + "," + UserRoles.Admin;
+
         private readonly IBookingService _bookingService;
         private readonly IPricingService _pricingService;
 
@@ -50,6 +53,81 @@ namespace RacehorseTransport.API.Controllers
         {
             var booking = await _bookingService.GetBookingByIdAsync(id, User.ToCurrentUser());
             return Ok(ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse()));
+        }
+
+        /// <summary>
+        /// Submit a transport request for one or more of the customer's own horses. The price is calculated by the server.
+        /// </summary>
+        [HttpPost]
+        [Authorize(Roles = UserRoles.Customer)]
+        [ProducesResponseType(typeof(ApiResponse<BookingDetailResponse>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> Create([FromBody] CreateBookingRequest request)
+        {
+            var created = await _bookingService.CreateBookingAsync(request.ToBusinessModel(), User.ToCurrentUser());
+            var response = created.ToResponse();
+
+            return CreatedAtAction(
+                nameof(GetById),
+                new { id = response.BookingId },
+                ApiResponse<BookingDetailResponse>.SuccessResult(response, "Booking submitted successfully"));
+        }
+
+        /// <summary>
+        /// Approve a submitted booking and choose the specialist in charge. Opens one clearance dossier per horse.
+        /// </summary>
+        [HttpPost("{id:int}/approve")]
+        [Authorize(Roles = ReviewRoles)]
+        [ProducesResponseType(typeof(ApiResponse<BookingDetailResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> Approve(int id, [FromBody] AssignSpecialistRequest request)
+        {
+            var booking = await _bookingService.ApproveBookingAsync(id, request.SpecialistUserId!.Value, User.ToCurrentUser());
+            return Ok(ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse(), "Booking approved successfully"));
+        }
+
+        /// <summary>
+        /// Reject a submitted booking with a reason.
+        /// </summary>
+        [HttpPost("{id:int}/reject")]
+        [Authorize(Roles = ReviewRoles)]
+        [ProducesResponseType(typeof(ApiResponse<BookingDetailResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> Reject(int id, [FromBody] RejectBookingRequest request)
+        {
+            var booking = await _bookingService.RejectBookingAsync(id, request.Reason, User.ToCurrentUser());
+            return Ok(ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse(), "Booking rejected successfully"));
+        }
+
+        /// <summary>
+        /// Change the specialist in charge of an approved booking (open dossiers move to the new specialist).
+        /// </summary>
+        [HttpPost("{id:int}/reassign-specialist")]
+        [Authorize(Roles = ReviewRoles)]
+        [ProducesResponseType(typeof(ApiResponse<BookingDetailResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ReassignSpecialist(int id, [FromBody] AssignSpecialistRequest request)
+        {
+            var booking = await _bookingService.ReassignSpecialistAsync(id, request.SpecialistUserId!.Value, User.ToCurrentUser());
+            return Ok(ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse(), "Specialist reassigned successfully"));
+        }
+
+        /// <summary>
+        /// Cancel own booking while it has not been reviewed yet.
+        /// </summary>
+        [HttpPost("{id:int}/cancel")]
+        [Authorize(Roles = UserRoles.Customer)]
+        [ProducesResponseType(typeof(ApiResponse<BookingDetailResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> Cancel(int id)
+        {
+            var booking = await _bookingService.CancelBookingAsync(id, User.ToCurrentUser());
+            return Ok(ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse(), "Booking cancelled successfully"));
         }
 
         /// <summary>

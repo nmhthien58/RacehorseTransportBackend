@@ -67,7 +67,7 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(t => t.TripHorses);
 
             // Sorting: mặc định chuyến khởi hành gần nhất lên đầu
-            query = query.ApplySort(string.IsNullOrWhiteSpace(options.Sort) ? "-plannedStartDate" : options.Sort);
+            query = query.ApplySort(string.IsNullOrWhiteSpace(options.Sort) ? "-plannedStartDate" : options.Sort, nameof(Trip.TripId));
 
             // Paging
             return await query.ToPagedResultAsync(options, t => t.ToSummaryModel());

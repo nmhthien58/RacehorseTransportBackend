@@ -15,11 +15,61 @@ namespace RacehorseTransport.API.Controllers
     [Authorize(Roles = UserRoles.Staff)]
     public class TripsController : ControllerBase
     {
-        private readonly ITripService _tripService;
+        // Lập kế hoạch chuyến là việc của Coordinator; Manager và Admin xem được để duyệt
+        private const string PlanningRoles = UserRoles.FleetCoordinator + "," + UserRoles.LogisticsManager + "," + UserRoles.Admin;
 
-        public TripsController(ITripService tripService)
+        private readonly ITripService _tripService;
+        private readonly ITripPlanningService _planningService;
+
+        public TripsController(ITripService tripService, ITripPlanningService planningService)
         {
             _tripService = tripService;
+            _planningService = planningService;
+        }
+
+        /// <summary>
+        /// Planning queue: horses of approved bookings that are not on any trip yet.
+        /// </summary>
+        [HttpGet("unplanned-horses")]
+        [Authorize(Roles = PlanningRoles)]
+        [ProducesResponseType(typeof(ApiResponse<List<UnplannedHorseResponse>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetUnplannedHorses([FromQuery] string? transportMode = null, [FromQuery] int? bookingId = null)
+        {
+            var horses = await _planningService.GetUnplannedHorsesAsync(transportMode, bookingId);
+            var items = horses.Select(h => h.ToResponse()).ToList();
+
+            return Ok(ApiResponse<List<UnplannedHorseResponse>>.SuccessResult(items));
+        }
+
+        /// <summary>
+        /// Vehicles that are not in maintenance and not booked on another trip between 'from' and 'to'.
+        /// </summary>
+        [HttpGet("available-vehicles")]
+        [Authorize(Roles = PlanningRoles)]
+        [ProducesResponseType(typeof(ApiResponse<List<AvailableVehicleResponse>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetAvailableVehicles([FromQuery] AvailabilityQueryRequest query)
+        {
+            var vehicles = await _planningService.GetAvailableVehiclesAsync(query.From!.Value, query.To!.Value, query.TransportMode);
+            var items = vehicles.Select(v => v.ToResponse()).ToList();
+
+            return Ok(ApiResponse<List<AvailableVehicleResponse>>.SuccessResult(items));
+        }
+
+        /// <summary>
+        /// Drivers / escorts that are active and not assigned to another trip between 'from' and 'to'.
+        /// </summary>
+        [HttpGet("available-crew")]
+        [Authorize(Roles = PlanningRoles)]
+        [ProducesResponseType(typeof(ApiResponse<List<UserResponse>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetAvailableCrew([FromQuery] AvailabilityQueryRequest query)
+        {
+            var crew = await _planningService.GetAvailableCrewAsync(query.From!.Value, query.To!.Value);
+            var items = crew.Select(u => u.ToResponse()).ToList();
+
+            return Ok(ApiResponse<List<UserResponse>>.SuccessResult(items));
         }
 
         /// <summary>

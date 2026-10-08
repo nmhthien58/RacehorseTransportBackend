@@ -21,6 +21,30 @@ namespace RacehorseTransport.API.Mappers
             };
         }
 
+        public static CreateBookingModel ToBusinessModel(this CreateBookingRequest request)
+        {
+            return new CreateBookingModel
+            {
+                PickupAddress = request.PickupAddress.Trim(),
+                PickupCountryCode = request.PickupCountryCode.Trim().ToUpperInvariant(),
+                DropoffAddress = request.DropoffAddress.Trim(),
+                DropoffCountryCode = request.DropoffCountryCode.Trim().ToUpperInvariant(),
+                DepartureDate = request.DepartureDate!.Value,
+                DeliveryDate = request.DeliveryDate!.Value,
+                TransportMode = request.TransportMode.Trim(),
+                DistanceKm = request.DistanceKm,
+                RequiresClimateControl = request.RequiresClimateControl,
+                DeclaredValue = request.DeclaredValue,
+                SpecialInstructions = string.IsNullOrWhiteSpace(request.SpecialInstructions) ? null : request.SpecialInstructions.Trim(),
+                Horses = request.Horses.Select(h => new CreateBookingHorseModel
+                {
+                    HorseId = h.HorseId,
+                    StallClass = h.StallClass.Trim(),
+                    Notes = string.IsNullOrWhiteSpace(h.Notes) ? null : h.Notes.Trim()
+                }).ToList()
+            };
+        }
+
         public static QuoteInputModel ToBusinessModel(this QuotePreviewRequest request)
         {
             return new QuoteInputModel
