@@ -1,0 +1,93 @@
+### Mở file này bằng Visual Studio / VS Code (REST Client) rồi bấm "Send Request" từng khối.
+### Mật khẩu tài khoản seed: xem phần đầu file database/02_seed.sql
+
+@baseUrl = http://localhost:5080
+@password = <điền mật khẩu seed vào đây, đừng commit>
+
+### Health check
+GET {{baseUrl}}/health
+
+### Đăng nhập (đổi email để thử role khác)
+# mai.nguyen@clearance.com      -> TransportSpecialist
+# bao.tran@logistics.com        -> LogisticsManager
+# nam.le@fleet.com              -> FleetCoordinator
+# duc.pham@transport.com        -> DriverEscort
+# jane.smith@racehorseowner.com -> Customer
+# admin@logistics.com           -> Admin
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "mai.nguyen@clearance.com",
+  "password": "{{password}}"
+}
+
+###
+@accessToken = {{login.response.body.data.accessToken}}
+@refreshToken = {{login.response.body.data.refreshToken}}
+
+### Thông tin người đang đăng nhập
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{accessToken}}
+
+### Đổi refresh token lấy access token mới
+POST {{baseUrl}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### Đăng ký tài khoản Customer
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Nguyễn Văn A",
+  "email": "customer.a@example.com",
+  "password": "{{password}}",
+  "phoneNumber": "+84900000001"
+}
+
+### ---------- Document types (CRUD mẫu) ----------
+
+### Danh sách có tìm kiếm / sắp xếp / phân trang
+GET {{baseUrl}}/api/document-types?search=&sort=-code&page=1&size=10
+Authorization: Bearer {{accessToken}}
+
+### Danh sách đầy đủ cho dropdown (có cache)
+GET {{baseUrl}}/api/document-types/lookup
+Authorization: Bearer {{accessToken}}
+
+### Chi tiết
+GET {{baseUrl}}/api/document-types/1
+Authorization: Bearer {{accessToken}}
+
+### Tạo mới (chỉ TransportSpecialist / Admin)
+POST {{baseUrl}}/api/document-types
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "code": "IMPORT_PERMIT",
+  "name": "Giấy phép nhập khẩu",
+  "description": "Do cơ quan thú y nước đến cấp",
+  "isMandatory": true
+}
+
+### Cập nhật
+PUT {{baseUrl}}/api/document-types/5
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "code": "IMPORT_PERMIT",
+  "name": "Giấy phép nhập khẩu động vật",
+  "description": "Do cơ quan thú y nước đến cấp",
+  "isMandatory": false
+}
+
+### Xóa
+DELETE {{baseUrl}}/api/document-types/5
+Authorization: Bearer {{accessToken}}

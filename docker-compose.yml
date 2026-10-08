@@ -1,0 +1,33 @@
+# Dịch vụ phụ trợ cho môi trường dev (tùy chọn, dùng khi không muốn cài trực tiếp lên máy).
+#   docker compose up -d postgres     -> PostgreSQL ở cổng 5433, tự chạy database/01_schema.sql và 02_seed.sql lần đầu
+#   docker compose up -d redis        -> Redis ở cổng 6379
+# Chuỗi kết nối tương ứng (đặt trong appsettings.Local.json):
+#   "DefaultConnection": "Host=localhost;Port=5433;Database=racehorse_transport;Username=postgres;Password=postgres"
+#   "Redis": "localhost:6379"
+# Mật khẩu ở đây chỉ dành cho container dev trên máy cá nhân.
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: racehorse-postgres
+    environment:
+      POSTGRES_DB: racehorse_transport
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - racehorse-pgdata:/var/lib/postgresql/data
+      - ./database/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./database/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: racehorse-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    restart: unless-stopped
+
+volumes:
+  racehorse-pgdata:
