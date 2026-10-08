@@ -130,11 +130,11 @@ Làm sau khi T-05 và T-26 xong. Tạo project `RacehorseTransport.Tests` (xUnit
 
 ### M2 – Flow 1: Tạo & duyệt yêu cầu vận chuyển · REQUIRED
 
-- [ ] **T-05 · Báo giá** — `IPricingService` tính giá bằng C# từ bảng `pricing.price_items` (công thức ở phụ lục cuối file); `POST /api/bookings/quote-preview` cho khách xem giá trước khi gửi (không ghi DB); lưu các dòng báo giá vào `QuoteBreakdown` (jsonb). Cache bảng giá, xóa cache khi B-03 sửa giá.
+- [x] **T-05 · Báo giá** — `IPricingService` tính giá bằng C# từ bảng `pricing.price_items` (công thức ở phụ lục cuối file); `POST /api/bookings/quote-preview` cho khách xem giá trước khi gửi (không ghi DB); lưu các dòng báo giá vào `QuoteBreakdown` (jsonb). Cache bảng giá, xóa cache khi B-03 sửa giá.
 - [ ] **T-06 · Tạo đơn** — `POST /api/bookings` (Customer đã xác thực email): kiểm tra ngựa thuộc về khách, ngựa chưa nằm trong đơn khác trùng thời gian, `DeliveryDate > DepartureDate`, đơn đường bộ phải có `DistanceKm`, `IsExpress` khi khởi hành dưới 7 ngày. Tạo `BookingHorses`, tính giá, báo cho Manager.
-- [ ] **T-07 · Xem đơn** — `GET /api/bookings` (khách: đơn của mình; Specialist: đơn mình phụ trách; Manager/Coordinator: tất cả; lọc theo trạng thái, ngày), `GET /api/bookings/{id}` trả đủ ngựa, báo giá, Specialist phụ trách, tiến độ hồ sơ, và **từng con ngựa đang ở chuyến nào** (một đơn có thể đi nhiều chuyến).
+- [x] **T-07 · Xem đơn** — `GET /api/bookings` (khách: đơn của mình; Specialist: đơn mình phụ trách; Manager/Coordinator: tất cả; lọc theo trạng thái, ngày), `GET /api/bookings/{id}` trả đủ ngựa, báo giá, Specialist phụ trách, tiến độ hồ sơ, và **từng con ngựa đang ở chuyến nào** (một đơn có thể đi nhiều chuyến).
 - [ ] **T-08 · Duyệt đơn** — `POST /api/bookings/{id}/approve` (Manager, **bắt buộc chọn Specialist phụ trách** ngay trong thao tác duyệt → `Approved`, tự tạo `DigitalDossier` cho từng ngựa), `/reject` (bắt buộc lý do), `/reassign-specialist` (Manager đổi người), `/cancel` (khách, chỉ khi `Submitted`). Không phân công Coordinator theo đơn. Mỗi bước gửi thông báo.
-- [ ] **T-09 · Tự hết hạn** — `BackgroundService` chuyển đơn `Submitted` quá 48 giờ sang `Expired`.
+- [x] **T-09 · Tự hết hạn** — `BackgroundService` chuyển đơn `Submitted` quá 48 giờ sang `Expired`.
 
 ### M3 – Flow 2: Hồ sơ pháp lý & kiểm dịch · REQUIRED
 
@@ -149,7 +149,7 @@ Làm sau khi T-05 và T-26 xong. Tạo project `RacehorseTransport.Tests` (xUnit
 - [ ] **T-15 · Dự thảo chuyến** — `POST /api/trips` (Coordinator): xe, nhân sự (`TripCrew`, ít nhất 1 Driver, 1 Escort cho mỗi 3 ngựa), ngựa (`TripHorses`, lấy từ **một hoặc nhiều** đơn `Approved` cùng phương thức vận chuyển; ngược lại ngựa của một đơn có thể chia ra nhiều chuyến, không vượt sức chứa, không trùng ô chuồng), danh sách mốc. `PUT /api/trips/{id}` khi còn `Draft`.
 - [ ] **T-16 · Mốc lộ trình** — Thêm/sửa/xóa/đổi thứ tự `RouteCheckpoints` khi chuyến còn `Draft`; mốc đầu là `Origin`, mốc cuối là `Destination`, thời gian tăng dần.
 - [ ] **T-17 · Trình & duyệt kế hoạch** — `POST /api/trips/{id}/submit` (→ `PendingApproval`), `/approve` (Manager → `Scheduled`, báo tài xế/áp tải), `/reject` (lý do, tăng `PlanRejectionCount`; lần thứ 3 → `Cancelled`).
-- [ ] **T-18 · Màn hình tài xế** — `GET /api/trips/my` (chuyến mình có tên trong `TripCrew`), `GET /api/trips/{id}` đủ lịch trình, ngựa phụ trách, yêu cầu chăm sóc, các mốc.
+- [x] **T-18 · Màn hình tài xế** — `GET /api/trips` (tài xế / áp tải chỉ thấy chuyến mình có tên trong `TripCrew`; nhân sự khác thấy tất cả; lọc theo trạng thái, ngày), `GET /api/trips/{id}` đủ lịch trình, đoàn xe, ngựa phụ trách kèm yêu cầu chăm sóc, các mốc, và các đơn trên chuyến.
 
 ### M5 – Flow 4: Trạng thái & nhật ký lộ trình · REQUIRED
 

@@ -20,7 +20,7 @@ namespace RacehorseTransport.API
             // Chi tiết từng phần nằm trong Extensions/ServiceCollectionExtensions.cs
             builder.Services.AddRepositories(builder.Configuration);
             builder.Services.AddCaching(builder.Configuration);
-            builder.Services.AddBusinessServices();
+            builder.Services.AddBusinessServices(builder.Configuration);
             builder.Services.AddJwtAuthentication(builder.Configuration);
             builder.Services.AddApiControllers();
             builder.Services.AddFrontendCors(builder.Configuration);

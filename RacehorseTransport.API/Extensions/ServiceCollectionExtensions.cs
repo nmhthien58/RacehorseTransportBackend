@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using RacehorseTransport.API.BackgroundJobs;
 using RacehorseTransport.API.ResponseModels;
 using RacehorseTransport.Repositories.Context;
 using RacehorseTransport.Repositories.Implementations;
@@ -43,8 +44,10 @@ namespace RacehorseTransport.API.Extensions
         }
 
         // 2. Services (nghiệp vụ). MỖI SERVICE MỚI PHẢI ĐĂNG KÝ THÊM 1 DÒNG Ở ĐÂY.
-        public static IServiceCollection AddBusinessServices(this IServiceCollection services)
+        public static IServiceCollection AddBusinessServices(this IServiceCollection services, IConfiguration configuration)
         {
+            services.Configure<BookingOptions>(configuration.GetSection(BookingOptions.SectionName));
+
             // Hạ tầng dùng chung
             services.AddScoped<ICacheService, DistributedCacheService>();
             services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
@@ -56,7 +59,13 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IHorseService, HorseService>();
+            services.AddScoped<IPricingService, PricingService>();
+            services.AddScoped<IBookingService, BookingService>();
+            services.AddScoped<ITripService, TripService>();
             services.AddScoped<IDocumentTypeService, DocumentTypeService>();
+
+            // Việc chạy nền
+            services.AddHostedService<BookingExpiryJob>();
 
             return services;
         }

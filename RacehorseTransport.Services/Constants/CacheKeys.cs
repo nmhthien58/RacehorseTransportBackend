@@ -5,6 +5,9 @@ namespace RacehorseTransport.Services.Constants
     {
         public const string DocumentTypesAll = "master:document-types:all";
 
+        // Bảng giá đang hiệu lực, dùng cho báo giá. Mọi thao tác thêm/sửa/bật/tắt price_items phải xóa khóa này.
+        public const string PriceItemsAll = "master:price-items:active";
+
         public static string RefreshToken(string tokenHash) => $"auth:refresh:{tokenHash}";
     }
 }
