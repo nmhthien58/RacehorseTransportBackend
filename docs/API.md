@@ -677,7 +677,106 @@ Ghi nhật ký:
 
 ---
 
-## 11. Danh mục
+## 11. Flow 5 – Sự cố và nắn tuyến
+
+```
+Reported ──đề xuất──> PlanProposed ──duyệt──> Approved ──đóng──> Resolved
+                          ▲   │                  │
+                          │   └──từ chối──> Rejected (đề xuất lại)
+                          └──────────────────────┘
+                                                 └─ nắn tuyến (chuyến thành EmergencyRerouting)
+```
+
+| Method | Đường dẫn | Ai được gọi | Mô tả |
+|---|---|---|---|
+| POST | `/api/trips/{tripId}/incidents` | Đoàn xe của chuyến, Admin | Báo sự cố khi chuyến đang trên đường |
+| GET | `/api/trips/{tripId}/incidents` | Nhân sự | Mọi sự cố của một chuyến, mới nhất trước |
+| GET | `/api/incidents` | Mọi người đã đăng nhập | Danh sách. Lọc: `status`, `severity`, `tripId`, `search` |
+| GET | `/api/incidents/{id}` | Như trên | Chi tiết |
+| POST | `/api/incidents/{id}/propose` | Coordinator, Admin | Đề xuất phương án (khi `Reported` hoặc `Rejected`) |
+| POST | `/api/incidents/{id}/approve` | Manager, Admin | Duyệt phương án |
+| POST | `/api/incidents/{id}/reject` | Manager, Admin | Từ chối: `{ "reason": "..." }` |
+| POST | `/api/incidents/{id}/apply-reroute` | Coordinator, Admin | Nắn tuyến (khi `Approved`). Trả về chi tiết chuyến |
+| POST | `/api/incidents/{id}/resolve` | Coordinator, Admin | Đóng sự cố (khi `Approved`) |
+
+Ai thấy sự cố nào: khách thấy sự cố trên chuyến có ngựa của mình; tài xế / áp tải thấy sự cố của chuyến mình đi; các vai trò còn lại thấy tất cả.
+
+Báo sự cố:
+
+```json
+{
+  "incidentType": "MechanicalBreakdown",
+  "severity": "Major",
+  "location": "QL1A km 120, Lạng Sơn",
+  "description": "Hỏng hệ thống treo khí nén, xe không thể đi tiếp",
+  "affectedTripHorseId": 3
+}
+```
+
+`affectedTripHorseId` không bắt buộc. Người lập chuyến, các Manager và khách có ngựa trên chuyến nhận thông báo ngay (`referenceType = Incident`).
+
+Đề xuất phương án:
+
+```json
+{
+  "proposedAction": "Đổi xe dự phòng, đi vòng qua cửa khẩu Tân Thanh",
+  "revisedRouteNotes": "Đã liên hệ trạm thú y Tân Thanh",
+  "additionalCost": 400
+}
+```
+
+Lý do từ chối không lưu trong sự cố: nó được gửi cho người lập chuyến qua thông báo.
+
+Nắn tuyến:
+
+```json
+{
+  "insertAfterCheckpointId": 12,
+  "deactivateCheckpointIds": [13],
+  "newCheckpoints": [
+    { "checkpointName": "Cửa khẩu Tân Thanh", "checkpointType": "BorderGate", "address": "Lạng Sơn", "plannedTime": "2026-11-07T15:00:00+07:00", "mandatoryRestMinutes": 90 }
+  ]
+}
+```
+
+- `deactivateCheckpointIds`: các mốc chưa tới cần bỏ. Mốc bị bỏ vẫn còn trong chi tiết chuyến với `isActive: false`, `status: "Cancelled"`. Không bỏ được điểm đi, điểm giao, hay mốc đã tới.
+- `newCheckpoints`: theo đúng thứ tự đi, chỉ nhận `RestStop` hoặc `BorderGate`.
+- `insertAfterCheckpointId`: bỏ trống thì chèn ngay sau mốc gần nhất đoàn xe đã tới.
+- Gọi lại được nhiều lần khi sự cố còn `Approved`. Thứ tự các mốc còn hiệu lực được đánh lại từ 1.
+- Chuyến chuyển `EmergencyRerouting`; đoàn xe vẫn check-in mốc bình thường. Khi đóng sự cố (`resolve`), chuyến trở lại `InTransit`.
+
+Response sự cố:
+
+```json
+{
+  "incidentId": 2,
+  "incidentCode": "INC-2026-0002",
+  "tripId": 1,
+  "tripCode": "TRP-2026-0001",
+  "tripStatus": "EmergencyRerouting",
+  "incidentType": "MechanicalBreakdown",
+  "severity": "Major",
+  "status": "Approved",
+  "location": "QL1A km 120, Lạng Sơn",
+  "description": "Hỏng hệ thống treo khí nén, xe không thể đi tiếp",
+  "affectedTripHorseId": 3,
+  "affectedHorseName": "Red Flash",
+  "reportedByUserId": 4,
+  "reportedByName": "Phạm Văn Đức",
+  "reportedAt": "2026-11-07T04:10:00+00:00",
+  "proposedAction": "Đổi xe dự phòng, đi vòng qua cửa khẩu Tân Thanh",
+  "revisedRouteNotes": "Đã liên hệ trạm thú y Tân Thanh",
+  "additionalCost": 400,
+  "approvedByUserId": 1,
+  "approvedByName": "Trần Quốc Bảo",
+  "approvedAt": "2026-11-07T04:40:00+00:00",
+  "resolvedAt": null
+}
+```
+
+---
+
+## 12. Danh mục
 
 Loại giấy tờ:
 
@@ -690,7 +789,7 @@ Loại giấy tờ:
 
 ---
 
-## 12. Chưa có
+## 13. Chưa có
 
 Các phần dưới đây chưa có API. Frontend có thể dựng giao diện trước, nhưng chưa nối được.
 
@@ -700,7 +799,6 @@ Các phần dưới đây chưa có API. Frontend có thể dựng giao diện t
 | Quản lý phương tiện | Hiện chỉ có `GET /api/trips/available-vehicles` |
 | Quy định giấy tờ theo quốc gia, bảng giá | Dữ liệu có sẵn và đang được dùng để tính; chưa có màn hình quản trị |
 | Danh sách enum cho dropdown | Tạm dùng bảng ở mục 3 |
-| Sự cố và nắn tuyến (Flow 5) | |
 | Bàn giao e-POD, đóng chuyến, báo cáo (Flow 6) | |
 | Xác thực email, quên mật khẩu | |
 

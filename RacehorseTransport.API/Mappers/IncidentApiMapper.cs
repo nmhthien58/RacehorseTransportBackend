@@ -1,0 +1,84 @@
+using RacehorseTransport.API.RequestModels;
+using RacehorseTransport.API.ResponseModels;
+using RacehorseTransport.Services.BusinessModels;
+
+namespace RacehorseTransport.API.Mappers
+{
+    public static class IncidentApiMapper
+    {
+        public static IncidentFilterOptions ToBusinessOptions(this IncidentQueryRequest request)
+        {
+            return new IncidentFilterOptions
+            {
+                Search = request.Search,
+                Sort = request.Sort,
+                Page = request.Page,
+                Size = request.Size,
+                Status = request.Status,
+                Severity = request.Severity,
+                TripId = request.TripId
+            };
+        }
+
+        public static ReportIncidentModel ToBusinessModel(this ReportIncidentRequest request)
+        {
+            return new ReportIncidentModel
+            {
+                IncidentType = request.IncidentType.Trim(),
+                Severity = request.Severity.Trim(),
+                Location = request.Location.Trim(),
+                Description = request.Description.Trim(),
+                AffectedTripHorseId = request.AffectedTripHorseId
+            };
+        }
+
+        public static ProposeIncidentPlanModel ToBusinessModel(this ProposeIncidentPlanRequest request)
+        {
+            return new ProposeIncidentPlanModel
+            {
+                ProposedAction = request.ProposedAction.Trim(),
+                RevisedRouteNotes = string.IsNullOrWhiteSpace(request.RevisedRouteNotes) ? null : request.RevisedRouteNotes.Trim(),
+                AdditionalCost = request.AdditionalCost
+            };
+        }
+
+        public static ApplyRerouteModel ToBusinessModel(this ApplyRerouteRequest request)
+        {
+            return new ApplyRerouteModel
+            {
+                InsertAfterCheckpointId = request.InsertAfterCheckpointId,
+                DeactivateCheckpointIds = request.DeactivateCheckpointIds,
+                NewCheckpoints = request.NewCheckpoints.Select(c => c.ToBusinessModel()).ToList()
+            };
+        }
+
+        public static IncidentResponse ToResponse(this IncidentModel model)
+        {
+            return new IncidentResponse
+            {
+                IncidentId = model.IncidentId,
+                IncidentCode = model.IncidentCode,
+                TripId = model.TripId,
+                TripCode = model.TripCode,
+                TripStatus = model.TripStatus,
+                IncidentType = model.IncidentType,
+                Severity = model.Severity,
+                Status = model.Status,
+                Location = model.Location,
+                Description = model.Description,
+                AffectedTripHorseId = model.AffectedTripHorseId,
+                AffectedHorseName = model.AffectedHorseName,
+                ReportedByUserId = model.ReportedByUserId,
+                ReportedByName = model.ReportedByName,
+                ReportedAt = model.ReportedAt,
+                ProposedAction = model.ProposedAction,
+                RevisedRouteNotes = model.RevisedRouteNotes,
+                AdditionalCost = model.AdditionalCost,
+                ApprovedByUserId = model.ApprovedByUserId,
+                ApprovedByName = model.ApprovedByName,
+                ApprovedAt = model.ApprovedAt,
+                ResolvedAt = model.ResolvedAt
+            };
+        }
+    }
+}

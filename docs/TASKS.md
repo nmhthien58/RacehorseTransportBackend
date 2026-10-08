@@ -160,8 +160,8 @@ Làm sau khi T-05 và T-26 xong. Tạo project `RacehorseTransport.Tests` (xUnit
 
 ### M6 – Flow 5: Sự cố & nắn tuyến · OPTIONAL
 
-- [ ] **T-23 · Báo sự cố** — `POST /api/trips/{id}/incidents` (loại, mức độ, vị trí, mô tả, ngựa bị ảnh hưởng); `GET` danh sách/chi tiết. Báo ngay cho Coordinator, Manager và khách.
-- [ ] **T-24 · Phương án & phê duyệt** — Coordinator `/propose` (phương án, ghi chú tuyến mới, chi phí phát sinh → `PlanProposed`); Manager `/approve` hoặc `/reject`; `/apply-reroute` (tắt mốc cũ `IsActive = false`, thêm mốc mới, chuyến → `EmergencyRerouting`); `/resolve` (chuyến → `InTransit`).
+- [x] **T-23 · Báo sự cố** — `POST /api/trips/{id}/incidents` (loại, mức độ, vị trí, mô tả, ngựa bị ảnh hưởng); `GET` danh sách/chi tiết. Báo ngay cho Coordinator, Manager và khách.
+- [x] **T-24 · Phương án & phê duyệt** — Coordinator `/propose` (phương án, ghi chú tuyến mới, chi phí phát sinh → `PlanProposed`); Manager `/approve` hoặc `/reject`; `/apply-reroute` (tắt mốc cũ `IsActive = false`, thêm mốc mới, chuyến → `EmergencyRerouting`); `/resolve` (chuyến → `InTransit`).
 
 ### M7 – Flow 6: Bàn giao & nghiệm thu · OPTIONAL
 
