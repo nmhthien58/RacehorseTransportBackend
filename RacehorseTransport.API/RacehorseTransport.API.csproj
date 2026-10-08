@@ -18,4 +18,9 @@
     <ProjectReference Include="..\RacehorseTransport.Services\RacehorseTransport.Services.csproj" />
   </ItemGroup>
 
+  <!-- Cấu hình riêng của máy dev (có mật khẩu, khóa) không bao giờ đi theo bản publish -->
+  <ItemGroup>
+    <Content Update="appsettings.Local.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
 </Project>

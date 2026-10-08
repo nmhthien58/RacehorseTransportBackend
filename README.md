@@ -13,6 +13,8 @@ Hệ thống số hóa toàn bộ quá trình đưa một con ngựa đua từ t
 
 Danh sách công việc, phân công và các quyết định nghiệp vụ đã chốt: [docs/TASKS.md](docs/TASKS.md).
 
+Hướng dẫn đưa database lên Supabase và API lên Railway: [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## 1. Nghiệp vụ
 
 ### Người dùng

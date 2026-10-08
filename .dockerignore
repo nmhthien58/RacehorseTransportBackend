@@ -1,0 +1,16 @@
+# Không đưa vào image: kết quả build cũ, git, tài liệu, script DB
+**/bin/
+**/obj/
+.git/
+.vs/
+.vscode/
+docs/
+database/
+*.md
+docker-compose.yml
+
+# Cấu hình riêng của từng máy (chứa mật khẩu, khóa): tuyệt đối không vào image
+**/appsettings.Local.json
+
+# Image SDK đã có sẵn .NET 8; bỏ file ghim phiên bản SDK của máy dev để không lệch bản
+global.json
