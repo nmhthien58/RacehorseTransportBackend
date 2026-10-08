@@ -180,7 +180,7 @@ Cần có: .NET SDK 8 và PostgreSQL 15 trở lên (cài trên máy, hoặc ch�
 
 | Script | Nội dung |
 |---|---|
-| `01_schema.sql` | 10 schema, 19 bảng, toàn bộ ràng buộc |
+| `01_schema.sql` | 10 schema, 20 bảng, toàn bộ ràng buộc |
 | `02_seed.sql` | Danh mục, bảng giá, 6 tài khoản dev, một kịch bản đã chạy trọn 6 luồng |
 | `00_reset.sql` | (Tùy chọn) Xóa sạch để dựng lại: chạy `00` → `01` → `02` |
 | `03_update_*.sql` | Cập nhật cho database đã dựng từ trước (thêm cột mới). Database dựng mới bằng `01` không cần chạy |
@@ -228,7 +228,7 @@ Tài khoản seed (mật khẩu chung ghi ở đầu file `database/02_seed.sql`
 
 > Các tài khoản seed và khóa JWT trong `appsettings.Development.json` chỉ dành cho môi trường dev. Trên bản deploy phải đổi mật khẩu các tài khoản này và đặt khóa JWT riêng qua biến môi trường `Jwt__Key`.
 
-**Redis (tùy chọn).** Để trống `ConnectionStrings:Redis` thì API dùng cache trong bộ nhớ, đủ để phát triển. Muốn dùng Redis: `docker compose up -d redis` rồi đặt `"Redis": "localhost:6379"` trong `appsettings.Local.json`. Khi dùng cache trong bộ nhớ, refresh token mất mỗi lần khởi động lại API (phải đăng nhập lại).
+**Redis (tùy chọn).** Để trống `ConnectionStrings:Redis` thì API dùng cache trong bộ nhớ, đủ để phát triển. Muốn dùng Redis: `docker compose up -d redis` rồi đặt `"Redis": "localhost:6379"` trong `appsettings.Local.json`.
 
 ## 5. Quy ước khi code
 
@@ -256,6 +256,10 @@ Lỗi validation của RequestModel tự trả 400 kèm danh sách lỗi, không
 **Phân quyền.** `[Authorize]` cho mọi endpoint cần đăng nhập; siết theo role bằng `[Authorize(Roles = UserRoles.LogisticsManager)]`. Nhiều `[Authorize]` chồng nhau (class + action) phải thỏa **tất cả**, nên khi các action cần role khác nhau thì đặt role ở từng action. Quyền theo từng bản ghi (vd: khách chỉ sửa ngựa của mình) kiểm tra trong service, bằng `CurrentUser` lấy từ `User.ToCurrentUser()`.
 
 **File.** Request nghiệp vụ có file (ảnh ngựa, giấy tờ hồ sơ, ảnh nhật ký) nhận `multipart/form-data` với `[FromForm]` và một trường `IFormFile`. Controller đổi file thành `FileUploadModel` (`request.Photo.ToUploadModel()`) rồi truyền xuống service; service kiểm tra nghiệp vụ xong mới gọi `IFileStorageService.UploadAsync`, để request sai không để lại file rác. DB chỉ lưu `path` (không lưu URL), vì bucket để riêng tư và link xem có thời hạn. Trước khi trả model ra ngoài, service đổi `path` thành link xem bằng `_fileStorage.ResolveViewUrlsAsync(models, m => m.PhotoUrl, (m, url) => m.PhotoUrl = url)`: cả danh sách chỉ tốn một lần gọi storage và link được cache. `FilesController` (upload riêng một file, cấp link cho một `path`) vẫn còn trong code nhưng đang ẩn khỏi Swagger vì chưa có chỗ nào dùng.
+
+**Email.** Service nghiệp vụ gọi `IEmailService.Queue(địa chỉ, tên, EmailTemplateNames.X, giá trị)`: mail được xếp hàng và `EmailDispatchJob` gửi ở nền, nên lời gọi không chờ và không ném lỗi. Mẫu mail là các file `.html` trong `RacehorseTransport.Services/EmailTemplates/` (dòng đầu `Subject: ...`, chỗ điền viết `{{Tên}}`); thêm mẫu mới thì thêm file và một hằng số trong `EmailTemplateNames`. Muốn một thông báo gửi kèm email cho khách thì truyền `emailCustomers: true` vào `INotificationService.SendAsync`. Cách gửi (`Smtp` / `Brevo` / không gửi) chọn bằng `Email:Provider`; khi không cấu hình, link xác thực được ghi ra log.
+
+**Xác thực email.** Action nào khách phải xác thực email mới dùng được thì gắn `[RequireVerifiedEmail]` (trả 403 kèm hướng dẫn). Token dùng một lần (refresh token, xác thực email, đặt lại mật khẩu) nằm ở bảng `identity.user_tokens`, chỉ lưu mã băm.
 
 **Trạng thái.** Dùng hằng số trong `DomainConstants.cs` (`BookingStatuses.Approved`), không gõ chuỗi trực tiếp.
 

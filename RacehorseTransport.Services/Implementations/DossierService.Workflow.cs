@@ -57,7 +57,7 @@ namespace RacehorseTransport.Services.Implementations
                     $"Documents needed for {dossier.BookingHorse.Horse!.Name}",
                     message,
                     NotificationReferenceTypes.Dossier,
-                    dossier.DossierId);
+                    dossier.DossierId, emailCustomers: true);
             });
 
             return await GetDossierByIdAsync(dossierId, currentUser);
@@ -219,7 +219,7 @@ namespace RacehorseTransport.Services.Implementations
                         ? $"'{docName}' was rejected for the third time and can no longer be resubmitted online. Our specialist will contact you. Reason: {document.CorrectionNote}"
                         : $"'{docName}' needs to be corrected and uploaded again ({document.RejectionCount}/{DocumentStatuses.MaxRejectionCount}). Reason: {document.CorrectionNote}",
                     NotificationReferenceTypes.Dossier,
-                    dossier.DossierId);
+                    dossier.DossierId, emailCustomers: true);
 
                 if (limitReached)
                 {
@@ -311,7 +311,7 @@ namespace RacehorseTransport.Services.Implementations
                         ? $"Clearance number {dossier.ClearanceNumber}. Other horses in this booking are still being processed."
                         : "Every horse in this booking has completed quarantine and customs clearance.",
                     NotificationReferenceTypes.Dossier,
-                    dossier.DossierId);
+                    dossier.DossierId, emailCustomers: true);
 
                 if (!othersPending)
                 {
@@ -350,7 +350,7 @@ namespace RacehorseTransport.Services.Implementations
                     $"Clearance issue for {dossier.BookingHorse.Horse!.Name}",
                     $"There is a problem with the clearance dossier: {dossier.IssueReason}",
                     NotificationReferenceTypes.Dossier,
-                    dossier.DossierId);
+                    dossier.DossierId, emailCustomers: true);
 
                 await _notificationService.SendToRoleAsync(
                     UserRoles.LogisticsManager,

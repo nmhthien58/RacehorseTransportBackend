@@ -37,4 +37,27 @@ namespace RacehorseTransport.API.RequestModels
         [Required(ErrorMessage = "RefreshToken is required.")]
         public string RefreshToken { get; set; } = string.Empty;
     }
+
+    public class VerifyEmailRequest
+    {
+        [Required(ErrorMessage = "Token is required.")]
+        public string Token { get; set; } = string.Empty;
+    }
+
+    public class ForgotPasswordRequest
+    {
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Email format is invalid.")]
+        public string Email { get; set; } = string.Empty;
+    }
+
+    public class ResetPasswordRequest
+    {
+        [Required(ErrorMessage = "Token is required.")]
+        public string Token { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "NewPassword is required.")]
+        [StringLength(64, MinimumLength = 8, ErrorMessage = "NewPassword must be between 8 and 64 characters.")]
+        public string NewPassword { get; set; } = string.Empty;
+    }
 }

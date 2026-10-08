@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RacehorseTransport.API.Filters;
 using RacehorseTransport.API.Helpers;
 using RacehorseTransport.API.Mappers;
 using RacehorseTransport.API.RequestModels;
@@ -62,6 +63,7 @@ namespace RacehorseTransport.API.Controllers
         [RequestSizeLimit(SupabaseFileStorageService.MaxFileSizeBytes + 1024 * 1024)]
         [ProducesResponseType(typeof(ApiResponse<HorseResponse>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [RequireVerifiedEmail]
         public async Task<IActionResult> Create([FromForm] CreateHorseRequest request)
         {
             using var photo = request.Photo.ToUploadModel();
@@ -85,6 +87,7 @@ namespace RacehorseTransport.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        [RequireVerifiedEmail]
         public async Task<IActionResult> Update(int id, [FromForm] UpdateHorseRequest request)
         {
             using var photo = request.Photo.ToUploadModel();
@@ -102,6 +105,7 @@ namespace RacehorseTransport.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        [RequireVerifiedEmail]
         public async Task<IActionResult> Delete(int id)
         {
             await _horseService.DeleteHorseAsync(id, User.ToCurrentUser());

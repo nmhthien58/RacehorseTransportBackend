@@ -90,6 +90,9 @@ INSERT INTO identity.users (user_id, full_name, email, password_hash, phone_numb
 (5, 'Jane Smith',        'jane.smith@racehorseowner.com', '$2b$11$TnDrEeOPp7Ni9YMVwIVSq.rPey.BcO0yibgrIxaflXe4t3Q9XmoYK', '+84988111222', 'Customer'),
 (6, 'Quản trị hệ thống', 'admin@logistics.com',           '$2b$11$TnDrEeOPp7Ni9YMVwIVSq.rPey.BcO0yibgrIxaflXe4t3Q9XmoYK', '+84912000000', 'Admin');
 
+-- Tài khoản dev coi như đã xác thực email
+UPDATE identity.users SET email_verified_at = created_at;
+
 -- ---------- B.2 Ngựa của Jane Smith ----------
 INSERT INTO racehorse.horses (horse_id, owner_user_id, name, breed, gender, date_of_birth, color, microchip_number, passport_number, special_care_requirements) VALUES
 (1, 5, 'Red Flash (Tia Chớp Đỏ)',  'Thoroughbred', 'Stallion', '2020-04-15', 'Hồng sắc', '982000412345671', 'FEI-VN-2023-01', 'Cần lót đệm rơm dày, nhiệt độ cabin 16-19°C'),

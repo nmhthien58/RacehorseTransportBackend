@@ -160,7 +160,7 @@ namespace RacehorseTransport.Services.Implementations
                         ? $"The horses have arrived at {checkpoint.CheckpointName} and are ready for handover."
                         : $"The transport reached {checkpoint.CheckpointName} ({checkpoint.CheckpointType}).",
                     NotificationReferenceTypes.Trip,
-                    trip.TripId);
+                    trip.TripId, emailCustomers: isDestination);
             });
 
             await _trackingService.InvalidateTripAsync(trip.TripId);

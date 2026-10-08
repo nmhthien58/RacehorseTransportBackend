@@ -8,6 +8,7 @@ namespace RacehorseTransport.API.ResponseModels
         public string? PhoneNumber { get; set; }
         public string Role { get; set; } = string.Empty;
         public bool IsActive { get; set; }
+        public bool EmailVerified { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
     }
 

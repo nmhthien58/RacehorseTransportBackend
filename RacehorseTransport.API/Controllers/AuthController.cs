@@ -112,5 +112,57 @@ namespace RacehorseTransport.API.Controllers
             await _authService.ChangePasswordAsync(User.GetUserId(), request.CurrentPassword, request.NewPassword);
             return Ok(ApiResponse<object?>.SuccessResult(null, "Password changed successfully"));
         }
+
+        /// <summary>
+        /// Confirm an email address with the token from the verification email.
+        /// </summary>
+        [HttpPost("verify-email")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(ApiResponse<UserResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request)
+        {
+            var user = await _authService.VerifyEmailAsync(request.Token);
+            return Ok(ApiResponse<UserResponse>.SuccessResult(user.ToResponse(), "Email verified successfully"));
+        }
+
+        /// <summary>
+        /// Send the verification email again to the logged-in user (at most once a minute).
+        /// </summary>
+        [HttpPost("resend-verification")]
+        [Authorize]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ResendVerification()
+        {
+            await _authService.ResendVerificationAsync(User.GetUserId());
+            return Ok(ApiResponse<object?>.SuccessResult(null, "Verification email sent"));
+        }
+
+        /// <summary>
+        /// Request a password reset email. Always answers 200, whether or not the email is registered.
+        /// </summary>
+        [HttpPost("forgot-password")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            await _authService.ForgotPasswordAsync(request.Email);
+            return Ok(ApiResponse<object?>.SuccessResult(null, "If this email is registered, a password reset link has been sent."));
+        }
+
+        /// <summary>
+        /// Set a new password with the token from the password reset email. All existing sessions are signed out.
+        /// </summary>
+        [HttpPost("reset-password")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            await _authService.ResetPasswordAsync(request.Token, request.NewPassword);
+            return Ok(ApiResponse<object?>.SuccessResult(null, "Password reset successfully"));
+        }
     }
 }

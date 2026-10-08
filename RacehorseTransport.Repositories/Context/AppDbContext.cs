@@ -15,6 +15,7 @@ namespace RacehorseTransport.Repositories.Context
         }
 
         public virtual DbSet<User> Users { get; set; } = null!;
+        public virtual DbSet<UserToken> UserTokens { get; set; } = null!;
         public virtual DbSet<Horse> Horses { get; set; } = null!;
         public virtual DbSet<BookingRequest> BookingRequests { get; set; } = null!;
         public virtual DbSet<BookingHorse> BookingHorses { get; set; } = null!;
@@ -42,6 +43,13 @@ namespace RacehorseTransport.Repositories.Context
             {
                 entity.ToTable("users", "identity");
                 entity.HasKey(e => e.UserId);
+            });
+
+            modelBuilder.Entity<UserToken>(entity =>
+            {
+                entity.ToTable("user_tokens", "identity");
+                entity.HasKey(e => e.TokenId);
+                entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId);
             });
 
             // ---------- racehorse ----------

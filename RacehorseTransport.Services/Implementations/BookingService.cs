@@ -278,7 +278,7 @@ namespace RacehorseTransport.Services.Implementations
                     $"Booking {booking.BookingCode} approved",
                     $"Your transport request has been approved. {specialist.FullName} will handle the documents and quarantine clearance.",
                     NotificationReferenceTypes.Booking,
-                    booking.BookingId);
+                    booking.BookingId, emailCustomers: true);
 
                 await _notificationService.SendAsync(
                     specialist.UserId,
@@ -311,7 +311,7 @@ namespace RacehorseTransport.Services.Implementations
                     $"Booking {booking.BookingCode} rejected",
                     $"Your transport request was not accepted. Reason: {booking.RejectionReason}",
                     NotificationReferenceTypes.Booking,
-                    booking.BookingId);
+                    booking.BookingId, emailCustomers: true);
             });
 
             return await GetBookingByIdAsync(id, currentUser);

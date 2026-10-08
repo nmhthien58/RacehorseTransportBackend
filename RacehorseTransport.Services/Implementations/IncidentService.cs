@@ -217,7 +217,7 @@ namespace RacehorseTransport.Services.Implementations
                     $"An incident was reported on trip {trip.TripCode}",
                     $"{created.IncidentType} at {created.Location}. Our team is working on it and will keep you updated.",
                     NotificationReferenceTypes.Incident,
-                    created.IncidentId);
+                    created.IncidentId, emailCustomers: true);
 
                 return created;
             });

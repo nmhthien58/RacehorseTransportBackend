@@ -19,6 +19,13 @@ namespace RacehorseTransport.Repositories.Constants
         public static readonly string[] All = { Customer, LogisticsManager, TransportSpecialist, FleetCoordinator, DriverEscort, Admin };
     }
 
+    public static class UserTokenTypes
+    {
+        public const string Refresh = "Refresh";
+        public const string EmailVerification = "EmailVerification";
+        public const string PasswordReset = "PasswordReset";
+    }
+
     public static class HorseGenders
     {
         public const string Stallion = "Stallion";
