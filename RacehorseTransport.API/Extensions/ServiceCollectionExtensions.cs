@@ -69,6 +69,7 @@ namespace RacehorseTransport.API.Extensions
             services.Configure<BookingOptions>(configuration.GetSection(BookingOptions.SectionName));
             services.Configure<SupabaseOptions>(configuration.GetSection(SupabaseOptions.SectionName));
             services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
+            services.Configure<GoogleOptions>(configuration.GetSection(GoogleOptions.SectionName));
 
             // Hạ tầng dùng chung
             services.AddScoped<ICacheService, DistributedCacheService>();
@@ -78,13 +79,16 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<INotificationService, NotificationService>();
             services.AddHttpClient<IFileStorageService, SupabaseFileStorageService>(client => client.Timeout = TimeSpan.FromSeconds(30));
 
+            // Đăng nhập bằng Google: kiểm tra ID token bằng khóa công khai của Google
+            services.AddHttpClient<IGoogleTokenValidator, GoogleIdTokenValidator>(client => client.Timeout = TimeSpan.FromSeconds(15));
+
             // Email: mail được xếp hàng rồi EmailDispatchJob gửi ở nền. Cách gửi chọn bằng Email:Provider.
             services.AddSingleton<IEmailQueue, EmailQueue>();
             services.AddScoped<IEmailService, EmailService>();
             string emailProvider = configuration[$"{EmailOptions.SectionName}:Provider"] ?? string.Empty;
-            if (emailProvider.Equals(EmailProviders.Brevo, StringComparison.OrdinalIgnoreCase))
+            if (emailProvider.Equals(EmailProviders.GmailApi, StringComparison.OrdinalIgnoreCase))
             {
-                services.AddHttpClient<IEmailSender, BrevoEmailSender>(client => client.Timeout = TimeSpan.FromSeconds(30));
+                services.AddHttpClient<IEmailSender, GmailApiEmailSender>(client => client.Timeout = TimeSpan.FromSeconds(30));
             }
             else if (emailProvider.Equals(EmailProviders.Smtp, StringComparison.OrdinalIgnoreCase))
             {

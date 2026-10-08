@@ -32,6 +32,13 @@ namespace RacehorseTransport.API.RequestModels
         public string Password { get; set; } = string.Empty;
     }
 
+    public class GoogleLoginRequest
+    {
+        // ID token (chuỗi "credential") nhận từ nút "Đăng nhập bằng Google" ở frontend
+        [Required(ErrorMessage = "IdToken is required.")]
+        public string IdToken { get; set; } = string.Empty;
+    }
+
     public class RefreshTokenRequest
     {
         [Required(ErrorMessage = "RefreshToken is required.")]

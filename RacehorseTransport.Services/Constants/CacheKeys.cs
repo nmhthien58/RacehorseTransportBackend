@@ -11,6 +11,12 @@ namespace RacehorseTransport.Services.Constants
         // Màn hình theo dõi của một đơn. Xóa qua ITrackingService.InvalidateTripAsync mỗi khi hành trình thay đổi.
         public static string BookingTracking(int bookingId) => $"tracking:booking:{bookingId}";
 
+        // Khóa công khai Google dùng để ký ID token (đăng nhập bằng Google)
+        public const string GoogleSigningKeys = "google:signing-keys";
+
+        // Access token ngắn hạn để gọi Gmail API
+        public const string GmailAccessToken = "google:gmail-access-token";
+
         // Link xem có thời hạn của một file đã lưu
         public static string FileViewUrl(string path) => $"files:view-url:{path}";
     }

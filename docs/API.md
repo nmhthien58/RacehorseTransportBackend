@@ -474,8 +474,8 @@ Response `201` — phần `data`:
 ```json
 {
   "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "accessTokenExpiresAt": "2026-10-08T07:44:33+00:00",
-  "refreshToken": "UmhNaDC2...",
+  "accessTokenExpiresAt": "2026-10-08T08:07:09+00:00",
+  "refreshToken": "L5Muy7kt...",
   "user": {
     "userId": 7,
     "fullName": "Lê Minh Anh",
@@ -484,7 +484,7 @@ Response `201` — phần `data`:
     "role": "Customer",
     "isActive": true,
     "emailVerified": false,
-    "createdAt": "2026-10-08T06:44:33+00:00"
+    "createdAt": "2026-10-08T07:07:09+00:00"
   }
 }
 ```
@@ -526,8 +526,8 @@ Response `200` — phần `data`:
 ```json
 {
   "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "accessTokenExpiresAt": "2026-10-08T07:44:33+00:00",
-  "refreshToken": "OWOMdrGW...",
+  "accessTokenExpiresAt": "2026-10-08T08:07:09+00:00",
+  "refreshToken": "Okn-hvM7...",
   "user": {
     "userId": 5,
     "fullName": "Jane Smith",
@@ -536,7 +536,7 @@ Response `200` — phần `data`:
     "role": "Customer",
     "isActive": true,
     "emailVerified": true,
-    "createdAt": "2026-10-08T06:44:33+00:00"
+    "createdAt": "2026-10-08T07:07:09+00:00"
   }
 }
 ```
@@ -555,6 +555,97 @@ Lỗi thường gặp:
 | 401 | `Email or password is incorrect.` | Sai email hoặc mật khẩu |
 | 403 | `This account has been deactivated.` | Tài khoản đã bị Admin khóa |
 | 400 | `Validation failed` | Thiếu email / mật khẩu, email sai định dạng |
+
+### POST /api/auth/google — Đăng nhập bằng Google
+
+Đăng nhập bằng tài khoản Google thay cho email và mật khẩu. Luồng hoạt động:
+
+1. Frontend hiện nút "Đăng nhập bằng Google" (thư viện của Google). Người dùng bấm và chọn tài khoản.
+2. Google trả cho frontend một chuỗi gọi là **ID token** (trong code là `credential`).
+3. Frontend gửi chuỗi đó tới API này. Server kiểm tra với Google rồi trả về `accessToken`, `refreshToken`, `user` **giống hệt đăng nhập thường**; từ đây mọi thứ như cũ.
+
+Server xử lý theo email của tài khoản Google:
+
+- Email **chưa có** tài khoản: tạo tài khoản `Customer` mới, `emailVerified` là `true` ngay (Google đã xác nhận email).
+- Email **đã có** tài khoản (khách hoặc nhân sự): đăng nhập vào đúng tài khoản đó, và đánh dấu email đã xác thực nếu trước đó chưa.
+
+- **Ai gọi được:** ai cũng gọi được, không cần đăng nhập
+- **Dữ liệu gửi lên:** JSON
+
+Các trường gửi lên:
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `idToken` | chuỗi | Có | Chuỗi `credential` Google trả về cho frontend |
+
+Ví dụ request:
+
+```json
+{
+  "idToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6Ij..."
+}
+```
+
+Response `200` — phần `data` (cùng dạng với đăng nhập thường):
+
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "accessTokenExpiresAt": "2026-10-08T08:07:09+00:00",
+  "refreshToken": "aT2iNok5...",
+  "user": {
+    "userId": 8,
+    "fullName": "Phạm Anh Thư",
+    "email": "thu.pham@gmail.com",
+    "phoneNumber": null,
+    "role": "Customer",
+    "isActive": true,
+    "emailVerified": true,
+    "createdAt": "2026-10-08T07:07:09+00:00"
+  }
+}
+```
+
+Cách làm ở frontend (React + Vite). Cài thư viện: `npm install @react-oauth/google`. Thêm vào file `.env` của frontend: `VITE_GOOGLE_CLIENT_ID=<Client ID do backend cung cấp>`.
+
+```js
+// main.jsx: bọc ứng dụng một lần
+import { GoogleOAuthProvider } from "@react-oauth/google";
+
+<GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+  <App />
+</GoogleOAuthProvider>
+
+// Trang đăng nhập
+import { GoogleLogin } from "@react-oauth/google";
+import api from "./api";
+
+<GoogleLogin
+  onSuccess={async ({ credential }) => {
+    const res = await api.post("/api/auth/google", { idToken: credential });
+    const { accessToken, refreshToken, user } = res.data.data;
+    localStorage.setItem("accessToken", accessToken);
+    localStorage.setItem("refreshToken", refreshToken);
+    // chuyển trang theo user.role, giống sau khi đăng nhập thường
+  }}
+  onError={() => alert("Đăng nhập Google không thành công")}
+/>
+```
+
+Lưu ý:
+
+- Nút Google chỉ hoạt động trên các địa chỉ frontend đã được khai báo trong Google Cloud (hiện có `http://localhost:5173`). Khi frontend có địa chỉ deploy, báo backend để thêm vào.
+- Tài khoản tạo qua Google **không có mật khẩu**. Muốn đăng nhập bằng mật khẩu thì dùng "Quên mật khẩu" để đặt một mật khẩu.
+- Đăng xuất vẫn gọi `POST /api/auth/logout` như thường.
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 401 | `Google sign-in failed: the Google token is invalid or has expired.` | Chuỗi gửi lên không phải ID token hợp lệ của Google, đã quá hạn (khoảng 1 giờ), hoặc được cấp cho một ứng dụng khác (sai Client ID) |
+| 401 | `Google sign-in failed: this Google account has no verified email address.` | Tài khoản Google chưa xác nhận email |
+| 403 | `This account has been deactivated.` | Tài khoản tương ứng đã bị Admin khóa |
+| 400 | `Google sign-in is not configured on this server.` | Backend chưa cấu hình Client ID |
 
 ### POST /api/auth/refresh — Xin token mới
 
@@ -625,7 +716,7 @@ Response `200` — phần `data`:
   "role": "Customer",
   "isActive": true,
   "emailVerified": true,
-  "createdAt": "2026-10-08T06:44:33+00:00"
+  "createdAt": "2026-10-08T07:07:09+00:00"
 }
 ```
 
@@ -663,7 +754,7 @@ Response `200` — phần `data`:
   "role": "Customer",
   "isActive": true,
   "emailVerified": true,
-  "createdAt": "2026-10-08T06:44:33+00:00"
+  "createdAt": "2026-10-08T07:07:09+00:00"
 }
 ```
 
@@ -731,7 +822,7 @@ Response `200` — phần `data`:
   "role": "Customer",
   "isActive": true,
   "emailVerified": true,
-  "createdAt": "2026-10-08T06:44:33+00:00"
+  "createdAt": "2026-10-08T07:07:09+00:00"
 }
 ```
 
@@ -830,14 +921,14 @@ Một tài khoản (`user`) có dạng:
 
 ```json
 {
-  "userId": 8,
+  "userId": 9,
   "fullName": "Trần Thị Hoa",
   "email": "hoa.tran@transport.com",
   "phoneNumber": "+84912000007",
   "role": "DriverEscort",
   "isActive": true,
   "emailVerified": true,
-  "createdAt": "2026-10-08T06:44:34+00:00"
+  "createdAt": "2026-10-08T07:07:10+00:00"
 }
 ```
 
@@ -881,7 +972,7 @@ Response `200` — phần `data`:
     "role": "DriverEscort",
     "isActive": true,
     "emailVerified": true,
-    "createdAt": "2026-10-08T06:44:33+00:00"
+    "createdAt": "2026-10-08T07:07:09+00:00"
   }
 ]
 ```
@@ -1077,17 +1168,17 @@ Response `200` — phần `data`:
     "role": "TransportSpecialist",
     "isActive": true,
     "emailVerified": true,
-    "createdAt": "2026-10-08T06:44:33+00:00"
+    "createdAt": "2026-10-08T07:07:09+00:00"
   },
   {
-    "userId": 9,
+    "userId": 10,
     "fullName": "Vũ Đức Long",
     "email": "long.vu@clearance.com",
     "phoneNumber": "+84912000008",
     "role": "TransportSpecialist",
     "isActive": true,
     "emailVerified": true,
-    "createdAt": "2026-10-08T06:44:34+00:00"
+    "createdAt": "2026-10-08T07:07:10+00:00"
   }
 ]
 ```
@@ -1113,9 +1204,9 @@ Một con ngựa (`horse`) có dạng:
   "dateOfBirth": "2019-05-20",
   "color": "Xám",
   "specialCareRequirements": "Dễ say xe, cần cỏ tươi",
-  "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/horses/2026/10/e00815....png?token=eyJ...",
+  "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/horses/2026/10/ea5856....png?token=eyJ...",
   "isActive": true,
-  "createdAt": "2026-10-08T06:44:35+00:00"
+  "createdAt": "2026-10-08T07:07:10+00:00"
 }
 ```
 
@@ -1490,7 +1581,7 @@ Response `201` — phần `data`:
   "status": "Submitted",
   "assignedSpecialistId": null,
   "assignedSpecialistName": null,
-  "createdAt": "2026-10-08T06:44:35+00:00",
+  "createdAt": "2026-10-08T07:07:11+00:00",
   "customerEmail": "jane.smith@racehorseowner.com",
   "customerPhone": "+84988111222",
   "specialInstructions": "Giữ cabin 17 độ",
@@ -1585,7 +1676,7 @@ Response `200` — phần `data`:
     "status": "Submitted",
     "assignedSpecialistId": null,
     "assignedSpecialistName": null,
-    "createdAt": "2026-10-08T06:44:35+00:00"
+    "createdAt": "2026-10-08T07:07:11+00:00"
   }
 ]
 ```
@@ -1634,7 +1725,7 @@ Response `200` — phần `data`:
   "status": "Approved",
   "assignedSpecialistId": 2,
   "assignedSpecialistName": "Nguyễn Thị Mai",
-  "createdAt": "2026-10-08T06:44:35+00:00",
+  "createdAt": "2026-10-08T07:07:11+00:00",
   "customerEmail": "jane.smith@racehorseowner.com",
   "customerPhone": "+84988111222",
   "specialInstructions": "Giữ cabin 17 độ",
@@ -1645,7 +1736,7 @@ Response `200` — phần `data`:
   "rejectionReason": null,
   "reviewedByUserId": 1,
   "reviewedByName": "Trần Quốc Bảo",
-  "reviewedAt": "2026-10-08T06:44:35+00:00",
+  "reviewedAt": "2026-10-08T07:07:11+00:00",
   "quoteLines": [
     {
       "code": "FREIGHT_SHARED",
@@ -1815,7 +1906,7 @@ Ví dụ request:
 
 ```json
 {
-  "specialistUserId": 9
+  "specialistUserId": 10
 }
 ```
 
@@ -1902,7 +1993,7 @@ Response `200` — phần `data`:
     "specialistName": "Nguyễn Thị Mai",
     "clearanceNumber": null,
     "clearedAt": null,
-    "createdAt": "2026-10-08T06:44:35+00:00"
+    "createdAt": "2026-10-08T07:07:11+00:00"
   }
 ]
 ```
@@ -1940,7 +2031,7 @@ Response `200` — phần `data`:
   "specialistName": "Nguyễn Thị Mai",
   "clearanceNumber": null,
   "clearedAt": null,
-  "createdAt": "2026-10-08T06:44:35+00:00",
+  "createdAt": "2026-10-08T07:07:11+00:00",
   "passportNumber": "FEI-VN-2023-02",
   "issueReason": null,
   "checklist": [
@@ -1961,14 +2052,14 @@ Response `200` — phần `data`:
         "docTypeCode": "COGGINS_EIA",
         "docTypeName": "Chứng nhận xét nghiệm Coggins âm tính",
         "documentNumber": "DOC-4-2",
-        "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/f8a257....pdf?token=eyJ...",
+        "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/2c7b6f....pdf?token=eyJ...",
         "status": "Pending",
         "correctionNote": null,
         "expiryDate": "2027-12-31",
         "rejectionCount": 0,
         "uploadedByUserId": 5,
         "uploadedByName": "Jane Smith",
-        "uploadedAt": "2026-10-08T06:44:35+00:00",
+        "uploadedAt": "2026-10-08T07:07:11+00:00",
         "reviewedByName": null,
         "reviewedAt": null
       }
@@ -1997,14 +2088,14 @@ Response `200` — phần `data`:
       "docTypeCode": "COGGINS_EIA",
       "docTypeName": "Chứng nhận xét nghiệm Coggins âm tính",
       "documentNumber": "DOC-4-2",
-      "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/f8a257....pdf?token=eyJ...",
+      "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/2c7b6f....pdf?token=eyJ...",
       "status": "Pending",
       "correctionNote": null,
       "expiryDate": "2027-12-31",
       "rejectionCount": 0,
       "uploadedByUserId": 5,
       "uploadedByName": "Jane Smith",
-      "uploadedAt": "2026-10-08T06:44:35+00:00",
+      "uploadedAt": "2026-10-08T07:07:11+00:00",
       "reviewedByName": null,
       "reviewedAt": null
     }
@@ -2364,7 +2455,7 @@ Response `200` — phần `data`:
     "capacityHorses": 6,
     "hasClimateControl": true,
     "hasGpsTracker": true,
-    "lastSanitizationDate": "2026-10-08T06:44:33+00:00"
+    "lastSanitizationDate": "2026-10-08T07:07:09+00:00"
   }
 ]
 ```
@@ -2396,7 +2487,7 @@ Response `200` — phần `data`:
     "role": "DriverEscort",
     "isActive": true,
     "emailVerified": true,
-    "createdAt": "2026-10-08T06:44:33+00:00"
+    "createdAt": "2026-10-08T07:07:09+00:00"
   }
 ]
 ```
@@ -2464,7 +2555,7 @@ Ví dụ request:
       "isLead": true
     },
     {
-      "userId": 8,
+      "userId": 9,
       "crewRole": "Escort",
       "duty": "Chăm sóc ngựa trên đường"
     }
@@ -2829,7 +2920,7 @@ Response `200` — phần `data`:
         "duty": null
       },
       {
-        "userId": 8,
+        "userId": 9,
         "fullName": "Trần Thị Hoa",
         "phoneNumber": "+84912000077",
         "crewRole": "Escort",
@@ -2865,7 +2956,7 @@ Response `200` — phần `data`:
   "vehicleType": "HorseTruck_AirSuspension",
   "plannedStartDate": "2026-11-06T23:00:00+00:00",
   "plannedEndDate": "2026-11-09T11:00:00+00:00",
-  "actualStartDate": "2026-10-08T06:44:36+00:00",
+  "actualStartDate": "2026-10-08T07:07:12+00:00",
   "actualEndDate": null,
   "horseCount": 2,
   "crew": [
@@ -2878,7 +2969,7 @@ Response `200` — phần `data`:
       "duty": null
     },
     {
-      "userId": 8,
+      "userId": 9,
       "fullName": "Trần Thị Hoa",
       "phoneNumber": "+84912000077",
       "crewRole": "Escort",
@@ -2893,7 +2984,7 @@ Response `200` — phần `data`:
   "plannedByName": "Lê Hoàng Nam",
   "approvedByUserId": 1,
   "approvedByName": "Trần Quốc Bảo",
-  "approvedAt": "2026-10-08T06:44:36+00:00",
+  "approvedAt": "2026-10-08T07:07:12+00:00",
   "planRejectionCount": 1,
   "planRejectionReason": null,
   "delayMinutes": 0,
@@ -2902,7 +2993,7 @@ Response `200` — phần `data`:
   "closedByName": null,
   "closedAt": null,
   "executiveRemarks": null,
-  "createdAt": "2026-10-08T06:44:36+00:00",
+  "createdAt": "2026-10-08T07:07:12+00:00",
   "horses": [
     {
       "tripHorseId": 7,
@@ -2931,8 +3022,8 @@ Response `200` — phần `data`:
       "address": "Ba Vì, Hà Nội",
       "plannedTime": "2026-11-06T23:00:00+00:00",
       "mandatoryRestMinutes": 0,
-      "actualArrivalTime": "2026-10-08T06:44:36+00:00",
-      "actualDepartureTime": "2026-10-08T06:44:36+00:00",
+      "actualArrivalTime": "2026-10-08T07:07:12+00:00",
+      "actualDepartureTime": "2026-10-08T07:07:12+00:00",
       "status": "Departed",
       "isActive": true
     },
@@ -2944,8 +3035,8 @@ Response `200` — phần `data`:
       "address": "Lạng Sơn",
       "plannedTime": "2026-11-07T05:00:00+00:00",
       "mandatoryRestMinutes": 0,
-      "actualArrivalTime": "2026-10-08T06:44:36+00:00",
-      "actualDepartureTime": "2026-10-08T06:44:36+00:00",
+      "actualArrivalTime": "2026-10-08T07:07:12+00:00",
+      "actualDepartureTime": "2026-10-08T07:07:12+00:00",
       "status": "Departed",
       "isActive": true
     }
@@ -3173,10 +3264,10 @@ Response `201` — phần `data`:
   "stressLevel": "Calm",
   "needsAttention": false,
   "notes": "Ăn uống bình thường",
-  "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/f86feb....jpg?token=eyJ...",
+  "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/884aa4....jpg?token=eyJ...",
   "recordedByUserId": 4,
   "recordedByName": "Phạm Văn Đức",
-  "loggedAt": "2026-10-08T06:44:36+00:00"
+  "loggedAt": "2026-10-08T07:07:12+00:00"
 }
 ```
 
@@ -3235,7 +3326,7 @@ Response `200` — phần `data`:
     "leadDriverPhone": "+84912000004",
     "plannedStartDate": "2026-11-06T23:00:00+00:00",
     "plannedEndDate": "2026-11-09T11:00:00+00:00",
-    "actualStartDate": "2026-10-08T06:44:36+00:00",
+    "actualStartDate": "2026-10-08T07:07:12+00:00",
     "actualEndDate": null,
     "horseCount": 2,
     "checkpointsTotal": 4,
@@ -3295,7 +3386,7 @@ Response `200` — phần `data`:
       "leadDriverName": "Phạm Văn Đức",
       "plannedStartDate": "2026-11-06T23:00:00+00:00",
       "plannedEndDate": "2026-11-09T11:00:00+00:00",
-      "actualStartDate": "2026-10-08T06:44:36+00:00",
+      "actualStartDate": "2026-10-08T07:07:12+00:00",
       "actualEndDate": null,
       "delayMinutes": 0,
       "handoverCompleted": false,
@@ -3307,8 +3398,8 @@ Response `200` — phần `data`:
           "checkpointType": "Origin",
           "address": "Ba Vì, Hà Nội",
           "plannedTime": "2026-11-06T23:00:00+00:00",
-          "actualArrivalTime": "2026-10-08T06:44:36+00:00",
-          "actualDepartureTime": "2026-10-08T06:44:36+00:00",
+          "actualArrivalTime": "2026-10-08T07:07:12+00:00",
+          "actualDepartureTime": "2026-10-08T07:07:12+00:00",
           "status": "Departed",
           "delayMinutes": 0
         },
@@ -3319,8 +3410,8 @@ Response `200` — phần `data`:
           "checkpointType": "BorderGate",
           "address": "Lạng Sơn",
           "plannedTime": "2026-11-07T05:00:00+00:00",
-          "actualArrivalTime": "2026-10-08T06:44:36+00:00",
-          "actualDepartureTime": "2026-10-08T06:44:36+00:00",
+          "actualArrivalTime": "2026-10-08T07:07:12+00:00",
+          "actualDepartureTime": "2026-10-08T07:07:12+00:00",
           "status": "Departed",
           "delayMinutes": 0
         }
@@ -3344,10 +3435,10 @@ Response `200` — phần `data`:
             "stressLevel": "Calm",
             "needsAttention": false,
             "notes": "Ăn uống bình thường",
-            "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/f86feb....jpg?token=eyJ...",
+            "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/884aa4....jpg?token=eyJ...",
             "recordedByUserId": 4,
             "recordedByName": "Phạm Văn Đức",
-            "loggedAt": "2026-10-08T06:44:36+00:00"
+            "loggedAt": "2026-10-08T07:07:12+00:00"
           },
           "logs": [
             {
@@ -3363,10 +3454,10 @@ Response `200` — phần `data`:
               "stressLevel": "Calm",
               "needsAttention": false,
               "notes": "Ăn uống bình thường",
-              "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/f86feb....jpg?token=eyJ...",
+              "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/884aa4....jpg?token=eyJ...",
               "recordedByUserId": 4,
               "recordedByName": "Phạm Văn Đức",
-              "loggedAt": "2026-10-08T06:44:36+00:00"
+              "loggedAt": "2026-10-08T07:07:12+00:00"
             }
           ]
         }
@@ -3374,7 +3465,7 @@ Response `200` — phần `data`:
     }
   ],
   "horsesAwaitingPlanning": [],
-  "generatedAt": "2026-10-08T06:44:36+00:00"
+  "generatedAt": "2026-10-08T07:07:12+00:00"
 }
 ```
 
@@ -3447,7 +3538,7 @@ Một sự cố (`incident`) có dạng:
   "affectedHorseName": "Red Flash (Tia Chớp Đỏ)",
   "reportedByUserId": 4,
   "reportedByName": "Phạm Văn Đức",
-  "reportedAt": "2026-10-08T06:44:36+00:00",
+  "reportedAt": "2026-10-08T07:07:12+00:00",
   "proposedAction": "Đổi xe dự phòng, nghỉ thêm tại trạm thú y Bằng Tường",
   "revisedRouteNotes": "Đã liên hệ trạm thú y Bằng Tường",
   "additionalCost": 650,
@@ -3779,11 +3870,11 @@ Một biên bản bàn giao (`handover`) có dạng:
   "bookingCode": "BKG-2026-0002",
   "customerName": "Jane Smith",
   "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
-  "handoverDateTime": "2026-10-08T06:44:37+00:00",
+  "handoverDateTime": "2026-10-08T07:07:12+00:00",
   "recipientName": "Jane Smith",
   "recipientPhone": "+84988111222",
   "recipientIdCard": "PASSPORT-US-991283",
-  "signatureUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/signatures/2026/10/256928....png?token=eyJ...",
+  "signatureUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/signatures/2026/10/29ff9f....png?token=eyJ...",
   "overallCondition": "Excellent",
   "remarks": "Hai con ngựa đến nơi an toàn, không trầy xước.",
   "driverUserId": 4,
@@ -4231,7 +4322,7 @@ Tiến độ từng phần xem ở [TASKS.md](TASKS.md).
 
 ## 15. Bảng tra nhanh mọi endpoint
 
-Tổng cộng 83 endpoint. Chi tiết từng cái xem ở mục tương ứng.
+Tổng cộng 84 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 
 **4. Đăng nhập và tài khoản của tôi**
 
@@ -4239,6 +4330,7 @@ Tổng cộng 83 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 |---|---|---|---|
 | POST | `/api/auth/register` | Đăng ký tài khoản khách hàng | Ai cũng gọi được, không cần đăng nhập |
 | POST | `/api/auth/login` | Đăng nhập | Ai cũng gọi được, không cần đăng nhập |
+| POST | `/api/auth/google` | Đăng nhập bằng Google | Ai cũng gọi được, không cần đăng nhập |
 | POST | `/api/auth/refresh` | Xin token mới | Ai cũng gọi được, không cần `accessToken` |
 | POST | `/api/auth/logout` | Đăng xuất | Mọi người đã đăng nhập |
 | GET | `/api/auth/me` | Xem hồ sơ của tôi | Mọi người đã đăng nhập |

@@ -6,6 +6,7 @@ namespace RacehorseTransport.Services.Interfaces
     {
         Task<AuthResultModel> RegisterCustomerAsync(RegisterModel model);
         Task<AuthResultModel> LoginAsync(string email, string password);
+        Task<AuthResultModel> LoginWithGoogleAsync(string idToken);
         Task<AuthResultModel> RefreshAsync(string refreshToken);
         Task LogoutAsync(string refreshToken);
         Task<UserModel> GetProfileAsync(int userId);

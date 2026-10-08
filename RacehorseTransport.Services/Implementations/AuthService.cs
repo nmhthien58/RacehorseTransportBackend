@@ -21,6 +21,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IPasswordHasher _passwordHasher;
         private readonly ITokenService _tokenService;
         private readonly IEmailService _emailService;
+        private readonly IGoogleTokenValidator _googleTokenValidator;
         private readonly JwtOptions _jwtOptions;
         private readonly EmailOptions _emailOptions;
 
@@ -30,6 +31,7 @@ namespace RacehorseTransport.Services.Implementations
             IPasswordHasher passwordHasher,
             ITokenService tokenService,
             IEmailService emailService,
+            IGoogleTokenValidator googleTokenValidator,
             IOptions<JwtOptions> jwtOptions,
             IOptions<EmailOptions> emailOptions)
         {
@@ -38,6 +40,7 @@ namespace RacehorseTransport.Services.Implementations
             _passwordHasher = passwordHasher;
             _tokenService = tokenService;
             _emailService = emailService;
+            _googleTokenValidator = googleTokenValidator;
             _jwtOptions = jwtOptions.Value;
             _emailOptions = emailOptions.Value;
         }
@@ -85,6 +88,45 @@ namespace RacehorseTransport.Services.Implementations
             if (!user.IsActive)
             {
                 throw new ForbiddenException("This account has been deactivated.");
+            }
+
+            return await IssueTokensAsync(user);
+        }
+
+        // Đăng nhập bằng Google: frontend gửi ID token nhận từ Google, server kiểm tra rồi cấp token của hệ thống.
+        // Email đã có tài khoản (khách hoặc nhân sự) thì đăng nhập vào tài khoản đó; chưa có thì tạo tài khoản Customer.
+        // Google đã xác nhận email nên tài khoản được coi là đã xác thực email.
+        public async Task<AuthResultModel> LoginWithGoogleAsync(string idToken)
+        {
+            var google = await _googleTokenValidator.ValidateAsync(idToken);
+
+            var user = await _userRepo.GetQueryable().FirstOrDefaultAsync(u => u.Email == google.Email);
+
+            if (user == null)
+            {
+                user = new User
+                {
+                    FullName = Truncate(string.IsNullOrWhiteSpace(google.FullName) ? google.Email.Split('@')[0] : google.FullName.Trim(), 100),
+                    Email = google.Email,
+                    // Tài khoản tạo qua Google không có mật khẩu dùng được; muốn có thì dùng "quên mật khẩu" để đặt
+                    PasswordHash = _passwordHasher.Hash(_tokenService.CreateRefreshToken()),
+                    Role = UserRoles.Customer,
+                    EmailVerifiedAt = DateTimeOffset.UtcNow
+                };
+                await _userRepo.AddAsync(user);
+            }
+            else
+            {
+                if (!user.IsActive)
+                {
+                    throw new ForbiddenException("This account has been deactivated.");
+                }
+
+                if (user.EmailVerifiedAt == null)
+                {
+                    user.EmailVerifiedAt = DateTimeOffset.UtcNow;
+                    await _userRepo.UpdateAsync(user);
+                }
             }
 
             return await IssueTokensAsync(user);
@@ -254,6 +296,11 @@ namespace RacehorseTransport.Services.Implementations
         }
 
         // ---------------------------------------------------------------------------------------------
+
+        private static string Truncate(string value, int maxLength)
+        {
+            return value.Length <= maxLength ? value : value[..maxLength];
+        }
 
         private async Task<User> GetUserAsync(int userId)
         {

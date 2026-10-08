@@ -50,6 +50,21 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
+        /// Log in with a Google ID token (the "credential" returned by Google Identity Services). Creates a Customer account on first use.
+        /// </summary>
+        [HttpPost("google")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(ApiResponse<AuthResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> LoginWithGoogle([FromBody] GoogleLoginRequest request)
+        {
+            var result = await _authService.LoginWithGoogleAsync(request.IdToken);
+            return Ok(ApiResponse<AuthResponse>.SuccessResult(result.ToResponse(), "Logged in successfully"));
+        }
+
+        /// <summary>
         /// Exchange a refresh token for a new access token (the old refresh token stops working).
         /// </summary>
         [HttpPost("refresh")]

@@ -5,8 +5,11 @@ namespace RacehorseTransport.Services.Options
     {
         public const string SectionName = "Email";
 
-        // Cách gửi: "Smtp" (ví dụ Gmail; dùng khi chạy ở máy), "Brevo" (gọi API qua HTTPS; dùng cho bản deploy
-        // vì nhiều nền tảng chặn cổng SMTP). Bỏ trống = không gửi, chỉ ghi log.
+        // Cách gửi:
+        //   "GmailApi": gọi Gmail API qua HTTPS bằng thông tin trong section "Google". Dùng được ở mọi nơi, kể cả
+        //               nền tảng chặn cổng SMTP như Railway.
+        //   "Smtp":     SMTP (ví dụ Gmail + app password). Chỉ dùng được ở nơi không chặn cổng 587.
+        //   bỏ trống:   không gửi, chỉ ghi log (kèm link xác thực / đặt lại mật khẩu).
         public string Provider { get; set; } = string.Empty;
 
         public string FromAddress { get; set; } = string.Empty;
@@ -19,7 +22,6 @@ namespace RacehorseTransport.Services.Options
         public int PasswordResetTokenMinutes { get; set; } = 60;
 
         public SmtpOptions Smtp { get; set; } = new();
-        public BrevoOptions Brevo { get; set; } = new();
     }
 
     public class SmtpOptions
@@ -31,15 +33,28 @@ namespace RacehorseTransport.Services.Options
         public string Password { get; set; } = string.Empty; // Gmail: app password 16 ký tự, không phải mật khẩu đăng nhập
     }
 
-    public class BrevoOptions
-    {
-        public string ApiUrl { get; set; } = "https://api.brevo.com/v3/smtp/email";
-        public string ApiKey { get; set; } = string.Empty;
-    }
-
     public static class EmailProviders
     {
+        public const string GmailApi = "GmailApi";
         public const string Smtp = "Smtp";
-        public const string Brevo = "Brevo";
+    }
+
+    // Đọc từ section "Google": một OAuth client (loại Web application) trên Google Cloud dùng cho cả hai việc:
+    // đăng nhập bằng Google và gửi mail qua Gmail API. Cách tạo: docs/DEPLOY.md, mục Google.
+    public class GoogleOptions
+    {
+        public const string SectionName = "Google";
+
+        // Dạng xxx.apps.googleusercontent.com. Không phải bí mật: frontend cũng dùng giá trị này.
+        public string ClientId { get; set; } = string.Empty;
+
+        // Hai giá trị dưới chỉ cần cho việc gửi mail (Email:Provider = GmailApi). BÍ MẬT, không commit.
+        public string ClientSecret { get; set; } = string.Empty;
+        public string GmailRefreshToken { get; set; } = string.Empty; // cấp cho tài khoản Gmail của đồ án, quyền gmail.send
+
+        // Địa chỉ của Google; chỉ đổi khi test
+        public string TokenUrl { get; set; } = "https://oauth2.googleapis.com/token";
+        public string CertsUrl { get; set; } = "https://www.googleapis.com/oauth2/v3/certs";
+        public string GmailSendUrl { get; set; } = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
     }
 }

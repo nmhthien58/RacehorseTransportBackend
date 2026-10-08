@@ -127,6 +127,7 @@ Làm sau khi T-05 và T-26 xong. Tạo project `RacehorseTransport.Tests` (xUnit
 - [x] **T-29 · Gửi email** — `IEmailService` gửi qua SMTP của một tài khoản Gmail lập riêng cho đồ án (cấu hình trong `appsettings.Local.json`), dùng mẫu của B-06. Gửi ở nền: mail lỗi thì ghi log, không làm hỏng request.
 - [x] **T-30 · Xác thực email & quên mật khẩu** — Đăng ký xong gửi link xác thực; `POST /api/auth/verify-email`, `/resend-verification`, `/forgot-password`, `/reset-password`. Token dùng một lần, có hạn. Tài khoản chưa xác thực **vẫn đăng nhập được** nhưng bị chặn ở các tính năng (thêm ngựa, tạo đơn, nộp giấy tờ) bằng policy `VerifiedEmail`, trả 403 kèm thông báo yêu cầu xác thực. Tài khoản nhân sự do Admin tạo coi như đã xác thực. Cần thêm vào schema: cột `identity.users.email_verified_at` và bảng `identity.user_tokens` (chuyển luôn refresh token về bảng này để không phụ thuộc Redis).
 - [x] **T-31 · Thông báo qua email** — `INotificationService` gửi kèm email cho **khách hàng** ở các sự kiện chính (duyệt/từ chối đơn, cần bổ sung giấy tờ, đã thông quan, sự cố, đã tới điểm giao). Nhân sự chỉ nhận chuông trong ứng dụng.
+- [x] **T-32 · Đăng nhập bằng Google** — `POST /api/auth/google` nhận ID token từ nút Google của frontend, kiểm tra chữ ký và Client ID ngay tại server, rồi cấp token của hệ thống. Email chưa có thì tạo tài khoản Customer đã xác thực; email đã có thì đăng nhập vào tài khoản đó.
 
 ### M2 – Flow 1: Tạo & duyệt yêu cầu vận chuyển · REQUIRED
 
@@ -210,7 +211,7 @@ Không task nào của Tú chặn việc của Thiên. Chiều ngược lại:
 **Tài khoản và hạ tầng**
 
 9. **Chưa xác thực email vẫn đăng nhập được**, nhưng không dùng được các tính năng bên trong (thêm ngựa, tạo đơn, nộp giấy tờ).
-10. **Có làm**: xác thực email, quên mật khẩu, thông báo qua email (gửi bằng SMTP Gmail của tài khoản lập riêng cho đồ án). **Chưa làm**: thanh toán / đặt cọc.
+10. **Có làm**: xác thực email, quên mật khẩu, thông báo qua email (gửi từ Gmail của tài khoản lập riêng cho đồ án, qua Gmail API vì Railway chặn cổng SMTP), đăng nhập bằng Google. **Chưa làm**: thanh toán / đặt cọc.
 11. **File lưu trên Supabase Storage**, cùng project Supabase mới của nhóm với database.
 12. **Thông báo của API bằng tiếng Anh.**
 

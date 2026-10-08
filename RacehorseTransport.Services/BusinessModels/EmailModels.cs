@@ -8,6 +8,13 @@ namespace RacehorseTransport.Services.BusinessModels
         public string HtmlBody { get; set; } = string.Empty;
     }
 
+    // Người dùng lấy ra từ ID token của Google (email đã được Google xác nhận)
+    public class GoogleUserInfo
+    {
+        public string Email { get; set; } = string.Empty;
+        public string? FullName { get; set; }
+    }
+
     // Tên các mẫu email = tên file trong RacehorseTransport.Services/EmailTemplates (không có đuôi .html)
     public static class EmailTemplateNames
     {

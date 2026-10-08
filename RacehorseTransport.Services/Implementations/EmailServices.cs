@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Net.Mail;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -151,39 +150,6 @@ namespace RacehorseTransport.Services.Implementations
             mail.To.Add(new MailAddress(message.ToAddress, message.ToName));
 
             await client.SendMailAsync(mail, cancellationToken);
-        }
-    }
-
-    // Gửi qua API của Brevo bằng HTTPS (không cần cổng SMTP)
-    public class BrevoEmailSender : IEmailSender
-    {
-        private readonly HttpClient _http;
-        private readonly EmailOptions _options;
-
-        public BrevoEmailSender(HttpClient http, IOptions<EmailOptions> options)
-        {
-            _http = http;
-            _options = options.Value;
-        }
-
-        public async Task SendAsync(EmailMessage message, CancellationToken cancellationToken)
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Post, _options.Brevo.ApiUrl);
-            request.Headers.Add("api-key", _options.Brevo.ApiKey);
-            request.Content = JsonContent.Create(new
-            {
-                sender = new { name = _options.FromName, email = _options.FromAddress },
-                to = new[] { new { email = message.ToAddress, name = string.IsNullOrWhiteSpace(message.ToName) ? message.ToAddress : message.ToName } },
-                subject = message.Subject,
-                htmlContent = message.HtmlBody
-            });
-
-            using var response = await _http.SendAsync(request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                string detail = await response.Content.ReadAsStringAsync(cancellationToken);
-                throw new InvalidOperationException($"Email API returned {(int)response.StatusCode}: {detail}");
-            }
         }
     }
 
