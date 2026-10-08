@@ -21,9 +21,10 @@ Tài liệu này hướng dẫn gọi API của hệ thống vận chuyển ng�
 9. [Flow 3 – Lập kế hoạch chuyến](#9-flow-3--lập-kế-hoạch-chuyến)
 10. [Flow 4 – Chạy chuyến và theo dõi](#10-flow-4--chạy-chuyến-và-theo-dõi)
 11. [Flow 5 – Sự cố và nắn tuyến](#11-flow-5--sự-cố-và-nắn-tuyến)
-12. [Danh mục loại giấy tờ](#12-danh-mục-loại-giấy-tờ)
-13. [Những phần chưa có API](#13-những-phần-chưa-có-api)
-14. [Bảng tra nhanh mọi endpoint](#14-bảng-tra-nhanh-mọi-endpoint)
+12. [Flow 6 – Bàn giao, đóng chuyến và báo cáo](#12-flow-6--bàn-giao-đóng-chuyến-và-báo-cáo)
+13. [Danh mục loại giấy tờ](#13-danh-mục-loại-giấy-tờ)
+14. [Những phần chưa có API](#14-những-phần-chưa-có-api)
+15. [Bảng tra nhanh mọi endpoint](#15-bảng-tra-nhanh-mọi-endpoint)
 
 ---
 
@@ -318,13 +319,14 @@ Ví dụ: `GET /api/horses?search=golden&sort=-createdAt&page=1&size=20`.
 
 Phần lớn API nhận **JSON**: gửi object bình thường, axios tự đặt header.
 
-Ba nhóm API có kèm file thì nhận **`multipart/form-data`** (kiểu dữ liệu của form có file), không nhận JSON:
+Bốn nhóm API có kèm file thì nhận **`multipart/form-data`** (kiểu dữ liệu của form có file), không nhận JSON:
 
 | API | Trường chứa file | Bắt buộc | Loại file |
 |---|---|---|---|
 | `POST /api/horses`, `PUT /api/horses/{id}` | `photo` | Không | `jpg`, `jpeg`, `png` |
 | `POST /api/dossiers/{id}/documents` | `file` | Có | `pdf`, `jpg`, `jpeg`, `png` |
 | `POST /api/trips/{id}/welfare-logs` | `photo` | Không | `jpg`, `jpeg`, `png` |
+| `POST /api/trips/{tripId}/handover` | `signature` | Có | `jpg`, `jpeg`, `png` |
 
 Cách gửi: tạo `FormData`, thêm từng trường bằng `append`, thêm file lấy từ ô `<input type="file">`.
 
@@ -407,6 +409,8 @@ Các trường dưới đây chỉ nhận đúng những giá trị liệt kê, 
 | `incidentType` (loại sự cố) | `MechanicalBreakdown` hỏng xe · `BorderCongestion` tắc biên · `EquineHealthIssue` sức khỏe ngựa · `Weather` thời tiết · `ClimateControlFailure` hỏng điều hòa · `CustomsHold` bị giữ ở hải quan · `Other` khác |
 | `severity` (mức độ sự cố) | `Minor` nhẹ · `Moderate` vừa · `Major` nặng · `Critical` nghiêm trọng |
 | Trạng thái sự cố | `Reported` mới báo · `PlanProposed` đã có phương án chờ duyệt · `Approved` phương án được duyệt · `Rejected` phương án bị từ chối · `Resolved` đã xử lý xong |
+| `overallCondition` (tình trạng khi bàn giao) | `Excellent` tốt · `NormalFatigue` mệt bình thường · `Injured` bị thương |
+| `onTimeStatus` (kết quả đúng giờ của chuyến) | `OnTime` đúng giờ · `Delayed_AcceptableForceMajeure` trễ do bất khả kháng · `Delayed_OperationalFault` trễ do lỗi vận hành |
 | Loại phương tiện (`assetType`) | `HorseTruck_AirSuspension` · `HorseVan` · `AirStall` |
 
 ---
@@ -456,8 +460,8 @@ Response `201` — phần `data`:
 ```json
 {
   "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "accessTokenExpiresAt": "2026-10-08T07:12:57+00:00",
-  "refreshToken": "l63oQ6ar...",
+  "accessTokenExpiresAt": "2026-10-08T07:29:18+00:00",
+  "refreshToken": "dH_6JMTx...",
   "user": {
     "userId": 7,
     "fullName": "Lê Minh Anh",
@@ -465,7 +469,7 @@ Response `201` — phần `data`:
     "phoneNumber": "+84901234567",
     "role": "Customer",
     "isActive": true,
-    "createdAt": "2026-10-08T06:12:57+00:00"
+    "createdAt": "2026-10-08T06:29:18+00:00"
   }
 }
 ```
@@ -507,8 +511,8 @@ Response `200` — phần `data`:
 ```json
 {
   "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "accessTokenExpiresAt": "2026-10-08T07:12:57+00:00",
-  "refreshToken": "KHVM4G8p...",
+  "accessTokenExpiresAt": "2026-10-08T07:29:18+00:00",
+  "refreshToken": "6ygoIUQC...",
   "user": {
     "userId": 5,
     "fullName": "Jane Smith",
@@ -516,7 +520,7 @@ Response `200` — phần `data`:
     "phoneNumber": "+84988111222",
     "role": "Customer",
     "isActive": true,
-    "createdAt": "2026-10-08T06:12:48+00:00"
+    "createdAt": "2026-10-08T06:29:18+00:00"
   }
 }
 ```
@@ -604,7 +608,7 @@ Response `200` — phần `data`:
   "phoneNumber": "+84988111222",
   "role": "Customer",
   "isActive": true,
-  "createdAt": "2026-10-08T06:12:48+00:00"
+  "createdAt": "2026-10-08T06:29:18+00:00"
 }
 ```
 
@@ -641,7 +645,7 @@ Response `200` — phần `data`:
   "phoneNumber": "+84909999888",
   "role": "Customer",
   "isActive": true,
-  "createdAt": "2026-10-08T06:12:57+00:00"
+  "createdAt": "2026-10-08T06:29:18+00:00"
 }
 ```
 
@@ -693,7 +697,7 @@ Một tài khoản (`user`) có dạng:
   "phoneNumber": "+84912000007",
   "role": "DriverEscort",
   "isActive": true,
-  "createdAt": "2026-10-08T06:12:58+00:00"
+  "createdAt": "2026-10-08T06:29:19+00:00"
 }
 ```
 
@@ -735,7 +739,7 @@ Response `200` — phần `data`:
     "phoneNumber": "+84912000004",
     "role": "DriverEscort",
     "isActive": true,
-    "createdAt": "2026-10-08T06:12:48+00:00"
+    "createdAt": "2026-10-08T06:29:18+00:00"
   }
 ]
 ```
@@ -930,7 +934,7 @@ Response `200` — phần `data`:
     "phoneNumber": "+84912000002",
     "role": "TransportSpecialist",
     "isActive": true,
-    "createdAt": "2026-10-08T06:12:48+00:00"
+    "createdAt": "2026-10-08T06:29:18+00:00"
   },
   {
     "userId": 9,
@@ -939,7 +943,7 @@ Response `200` — phần `data`:
     "phoneNumber": "+84912000008",
     "role": "TransportSpecialist",
     "isActive": true,
-    "createdAt": "2026-10-08T06:12:58+00:00"
+    "createdAt": "2026-10-08T06:29:19+00:00"
   }
 ]
 ```
@@ -965,9 +969,9 @@ Một con ngựa (`horse`) có dạng:
   "dateOfBirth": "2019-05-20",
   "color": "Xám",
   "specialCareRequirements": "Dễ say xe, cần cỏ tươi",
-  "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/horses/2026/10/1521c8....png?token=eyJ...",
+  "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/horses/2026/10/244ec1....png?token=eyJ...",
   "isActive": true,
-  "createdAt": "2026-10-08T06:12:59+00:00"
+  "createdAt": "2026-10-08T06:29:19+00:00"
 }
 ```
 
@@ -1339,7 +1343,7 @@ Response `201` — phần `data`:
   "status": "Submitted",
   "assignedSpecialistId": null,
   "assignedSpecialistName": null,
-  "createdAt": "2026-10-08T06:12:59+00:00",
+  "createdAt": "2026-10-08T06:29:19+00:00",
   "customerEmail": "jane.smith@racehorseowner.com",
   "customerPhone": "+84988111222",
   "specialInstructions": "Giữ cabin 17 độ",
@@ -1433,7 +1437,7 @@ Response `200` — phần `data`:
     "status": "Submitted",
     "assignedSpecialistId": null,
     "assignedSpecialistName": null,
-    "createdAt": "2026-10-08T06:12:59+00:00"
+    "createdAt": "2026-10-08T06:29:19+00:00"
   }
 ]
 ```
@@ -1482,7 +1486,7 @@ Response `200` — phần `data`:
   "status": "Approved",
   "assignedSpecialistId": 2,
   "assignedSpecialistName": "Nguyễn Thị Mai",
-  "createdAt": "2026-10-08T06:12:59+00:00",
+  "createdAt": "2026-10-08T06:29:19+00:00",
   "customerEmail": "jane.smith@racehorseowner.com",
   "customerPhone": "+84988111222",
   "specialInstructions": "Giữ cabin 17 độ",
@@ -1493,7 +1497,7 @@ Response `200` — phần `data`:
   "rejectionReason": null,
   "reviewedByUserId": 1,
   "reviewedByName": "Trần Quốc Bảo",
-  "reviewedAt": "2026-10-08T06:12:59+00:00",
+  "reviewedAt": "2026-10-08T06:29:19+00:00",
   "quoteLines": [
     {
       "code": "FREIGHT_SHARED",
@@ -1750,7 +1754,7 @@ Response `200` — phần `data`:
     "specialistName": "Nguyễn Thị Mai",
     "clearanceNumber": null,
     "clearedAt": null,
-    "createdAt": "2026-10-08T06:12:59+00:00"
+    "createdAt": "2026-10-08T06:29:19+00:00"
   }
 ]
 ```
@@ -1788,7 +1792,7 @@ Response `200` — phần `data`:
   "specialistName": "Nguyễn Thị Mai",
   "clearanceNumber": null,
   "clearedAt": null,
-  "createdAt": "2026-10-08T06:12:59+00:00",
+  "createdAt": "2026-10-08T06:29:19+00:00",
   "passportNumber": "FEI-VN-2023-02",
   "issueReason": null,
   "checklist": [
@@ -1809,14 +1813,14 @@ Response `200` — phần `data`:
         "docTypeCode": "COGGINS_EIA",
         "docTypeName": "Chứng nhận xét nghiệm Coggins âm tính",
         "documentNumber": "DOC-4-2",
-        "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/8cc34f....pdf?token=eyJ...",
+        "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/ea30d7....pdf?token=eyJ...",
         "status": "Pending",
         "correctionNote": null,
         "expiryDate": "2027-12-31",
         "rejectionCount": 0,
         "uploadedByUserId": 5,
         "uploadedByName": "Jane Smith",
-        "uploadedAt": "2026-10-08T06:12:59+00:00",
+        "uploadedAt": "2026-10-08T06:29:19+00:00",
         "reviewedByName": null,
         "reviewedAt": null
       }
@@ -1845,14 +1849,14 @@ Response `200` — phần `data`:
       "docTypeCode": "COGGINS_EIA",
       "docTypeName": "Chứng nhận xét nghiệm Coggins âm tính",
       "documentNumber": "DOC-4-2",
-      "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/8cc34f....pdf?token=eyJ...",
+      "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/ea30d7....pdf?token=eyJ...",
       "status": "Pending",
       "correctionNote": null,
       "expiryDate": "2027-12-31",
       "rejectionCount": 0,
       "uploadedByUserId": 5,
       "uploadedByName": "Jane Smith",
-      "uploadedAt": "2026-10-08T06:12:59+00:00",
+      "uploadedAt": "2026-10-08T06:29:19+00:00",
       "reviewedByName": null,
       "reviewedAt": null
     }
@@ -2211,7 +2215,7 @@ Response `200` — phần `data`:
     "capacityHorses": 6,
     "hasClimateControl": true,
     "hasGpsTracker": true,
-    "lastSanitizationDate": "2026-10-08T06:12:48+00:00"
+    "lastSanitizationDate": "2026-10-08T06:29:18+00:00"
   }
 ]
 ```
@@ -2242,7 +2246,7 @@ Response `200` — phần `data`:
     "phoneNumber": "+84912000004",
     "role": "DriverEscort",
     "isActive": true,
-    "createdAt": "2026-10-08T06:12:48+00:00"
+    "createdAt": "2026-10-08T06:29:18+00:00"
   }
 ]
 ```
@@ -2711,7 +2715,7 @@ Response `200` — phần `data`:
   "vehicleType": "HorseTruck_AirSuspension",
   "plannedStartDate": "2026-11-06T23:00:00+00:00",
   "plannedEndDate": "2026-11-09T11:00:00+00:00",
-  "actualStartDate": "2026-10-08T06:13:00+00:00",
+  "actualStartDate": "2026-10-08T06:29:20+00:00",
   "actualEndDate": null,
   "horseCount": 2,
   "crew": [
@@ -2739,7 +2743,7 @@ Response `200` — phần `data`:
   "plannedByName": "Lê Hoàng Nam",
   "approvedByUserId": 1,
   "approvedByName": "Trần Quốc Bảo",
-  "approvedAt": "2026-10-08T06:13:00+00:00",
+  "approvedAt": "2026-10-08T06:29:20+00:00",
   "planRejectionCount": 1,
   "planRejectionReason": null,
   "delayMinutes": 0,
@@ -2748,7 +2752,7 @@ Response `200` — phần `data`:
   "closedByName": null,
   "closedAt": null,
   "executiveRemarks": null,
-  "createdAt": "2026-10-08T06:13:00+00:00",
+  "createdAt": "2026-10-08T06:29:20+00:00",
   "horses": [
     {
       "tripHorseId": 7,
@@ -2777,8 +2781,8 @@ Response `200` — phần `data`:
       "address": "Ba Vì, Hà Nội",
       "plannedTime": "2026-11-06T23:00:00+00:00",
       "mandatoryRestMinutes": 0,
-      "actualArrivalTime": "2026-10-08T06:13:00+00:00",
-      "actualDepartureTime": "2026-10-08T06:13:00+00:00",
+      "actualArrivalTime": "2026-10-08T06:29:20+00:00",
+      "actualDepartureTime": "2026-10-08T06:29:20+00:00",
       "status": "Departed",
       "isActive": true
     },
@@ -2790,8 +2794,8 @@ Response `200` — phần `data`:
       "address": "Lạng Sơn",
       "plannedTime": "2026-11-07T05:00:00+00:00",
       "mandatoryRestMinutes": 0,
-      "actualArrivalTime": "2026-10-08T06:13:00+00:00",
-      "actualDepartureTime": "2026-10-08T06:13:00+00:00",
+      "actualArrivalTime": "2026-10-08T06:29:20+00:00",
+      "actualDepartureTime": "2026-10-08T06:29:20+00:00",
       "status": "Departed",
       "isActive": true
     }
@@ -2823,7 +2827,7 @@ Response `200` — phần `data`:
 | `plannedByName` | Điều phối viên lập chuyến |
 | `approvedByName`, `approvedAt` | Quản lý duyệt kế hoạch |
 | `planRejectionCount`, `planRejectionReason` | Số lần kế hoạch bị trả về và lý do gần nhất |
-| `delayMinutes`, `onTimeStatus`, `kpiScore`, `closedByName`, `closedAt`, `executiveRemarks` | Kết quả khi đóng chuyến (Flow 6, chưa có API) |
+| `delayMinutes`, `onTimeStatus`, `kpiScore`, `closedByName`, `closedAt`, `executiveRemarks` | Kết quả khi đóng chuyến (mục 12). Trước khi đóng, các trường này mang giá trị mặc định |
 | `crew[]` | Đoàn xe: `userId`, `fullName`, `phoneNumber`, `crewRole`, `isLead`, `duty` |
 | `horses[]` | Ngựa trên chuyến |
 | `horses[].tripHorseId` | Mã "ngựa trên chuyến", dùng khi ghi nhật ký và báo sự cố |
@@ -2835,7 +2839,7 @@ Response `200` — phần `data`:
 | `checkpoints[].plannedTime`, `actualArrivalTime`, `actualDepartureTime` | Giờ dự kiến và giờ thực tế |
 | `checkpoints[].status` | Trạng thái mốc (mục 3) |
 | `checkpoints[].isActive` | `false` là mốc đã bị bỏ khi nắn tuyến; nên hiện mờ hoặc gạch ngang |
-| `bookings[]` | Các đơn có ngựa trên chuyến: khách, điểm giao, `horseCountOnTrip`, `handoverCompleted` |
+| `bookings[]` | Các đơn có ngựa trên chuyến: khách, điểm giao, `horseCountOnTrip`, và `handoverCompleted` (đơn đã có biên bản bàn giao chưa, mục 12) |
 
 Lỗi thường gặp:
 
@@ -3019,10 +3023,10 @@ Response `201` — phần `data`:
   "stressLevel": "Calm",
   "needsAttention": false,
   "notes": "Ăn uống bình thường",
-  "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/2e69af....jpg?token=eyJ...",
+  "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/60bbdd....jpg?token=eyJ...",
   "recordedByUserId": 4,
   "recordedByName": "Phạm Văn Đức",
-  "loggedAt": "2026-10-08T06:13:00+00:00"
+  "loggedAt": "2026-10-08T06:29:20+00:00"
 }
 ```
 
@@ -3081,7 +3085,7 @@ Response `200` — phần `data`:
     "leadDriverPhone": "+84912000004",
     "plannedStartDate": "2026-11-06T23:00:00+00:00",
     "plannedEndDate": "2026-11-09T11:00:00+00:00",
-    "actualStartDate": "2026-10-08T06:13:00+00:00",
+    "actualStartDate": "2026-10-08T06:29:20+00:00",
     "actualEndDate": null,
     "horseCount": 2,
     "checkpointsTotal": 4,
@@ -3141,7 +3145,7 @@ Response `200` — phần `data`:
       "leadDriverName": "Phạm Văn Đức",
       "plannedStartDate": "2026-11-06T23:00:00+00:00",
       "plannedEndDate": "2026-11-09T11:00:00+00:00",
-      "actualStartDate": "2026-10-08T06:13:00+00:00",
+      "actualStartDate": "2026-10-08T06:29:20+00:00",
       "actualEndDate": null,
       "delayMinutes": 0,
       "handoverCompleted": false,
@@ -3153,8 +3157,8 @@ Response `200` — phần `data`:
           "checkpointType": "Origin",
           "address": "Ba Vì, Hà Nội",
           "plannedTime": "2026-11-06T23:00:00+00:00",
-          "actualArrivalTime": "2026-10-08T06:13:00+00:00",
-          "actualDepartureTime": "2026-10-08T06:13:00+00:00",
+          "actualArrivalTime": "2026-10-08T06:29:20+00:00",
+          "actualDepartureTime": "2026-10-08T06:29:20+00:00",
           "status": "Departed",
           "delayMinutes": 0
         },
@@ -3165,8 +3169,8 @@ Response `200` — phần `data`:
           "checkpointType": "BorderGate",
           "address": "Lạng Sơn",
           "plannedTime": "2026-11-07T05:00:00+00:00",
-          "actualArrivalTime": "2026-10-08T06:13:00+00:00",
-          "actualDepartureTime": "2026-10-08T06:13:00+00:00",
+          "actualArrivalTime": "2026-10-08T06:29:20+00:00",
+          "actualDepartureTime": "2026-10-08T06:29:20+00:00",
           "status": "Departed",
           "delayMinutes": 0
         }
@@ -3190,10 +3194,10 @@ Response `200` — phần `data`:
             "stressLevel": "Calm",
             "needsAttention": false,
             "notes": "Ăn uống bình thường",
-            "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/2e69af....jpg?token=eyJ...",
+            "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/60bbdd....jpg?token=eyJ...",
             "recordedByUserId": 4,
             "recordedByName": "Phạm Văn Đức",
-            "loggedAt": "2026-10-08T06:13:00+00:00"
+            "loggedAt": "2026-10-08T06:29:20+00:00"
           },
           "logs": [
             {
@@ -3209,10 +3213,10 @@ Response `200` — phần `data`:
               "stressLevel": "Calm",
               "needsAttention": false,
               "notes": "Ăn uống bình thường",
-              "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/2e69af....jpg?token=eyJ...",
+              "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/60bbdd....jpg?token=eyJ...",
               "recordedByUserId": 4,
               "recordedByName": "Phạm Văn Đức",
-              "loggedAt": "2026-10-08T06:13:00+00:00"
+              "loggedAt": "2026-10-08T06:29:20+00:00"
             }
           ]
         }
@@ -3220,7 +3224,7 @@ Response `200` — phần `data`:
     }
   ],
   "horsesAwaitingPlanning": [],
-  "generatedAt": "2026-10-08T06:13:00+00:00"
+  "generatedAt": "2026-10-08T06:29:20+00:00"
 }
 ```
 
@@ -3293,7 +3297,7 @@ Một sự cố (`incident`) có dạng:
   "affectedHorseName": "Red Flash (Tia Chớp Đỏ)",
   "reportedByUserId": 4,
   "reportedByName": "Phạm Văn Đức",
-  "reportedAt": "2026-10-08T06:13:01+00:00",
+  "reportedAt": "2026-10-08T06:29:20+00:00",
   "proposedAction": "Đổi xe dự phòng, nghỉ thêm tại trạm thú y Bằng Tường",
   "revisedRouteNotes": "Đã liên hệ trạm thú y Bằng Tường",
   "additionalCost": 650,
@@ -3595,7 +3599,298 @@ Lỗi thường gặp:
 
 ---
 
-## 12. Danh mục loại giấy tờ
+## 12. Flow 6 – Bàn giao, đóng chuyến và báo cáo
+
+Khi chuyến đã tới điểm giao (`ArrivedDestination`), đoàn xe **bàn giao** ngựa cho người nhận và lập **biên bản bàn giao điện tử** (e-POD): quét mã vi mạch từng con ngựa, ghi tình trạng, và lấy chữ ký vẽ tay của người nhận trên màn hình điện thoại. Một chuyến chở ngựa của nhiều đơn thì **mỗi đơn một biên bản**. Khi mọi đơn trên chuyến đã ký, quản lý **đóng chuyến**: hệ thống chốt số phút trễ, điểm KPI và chi phí thực tế.
+
+Vòng đời:
+
+```
+ArrivedDestination ──(đoàn xe lập biên bản cho từng đơn)──> đủ biên bản ──(quản lý đóng chuyến)──> Completed
+
+Khi chuyến Completed: xe được giải phóng; đơn nào đã giao hết ngựa thì chuyển sang Completed.
+```
+
+Thứ tự gọi thông thường:
+
+1. Tài xế: `GET /api/trips/{id}` để xem `bookings[]` (các đơn phải giao) và `horses[]` (mã vi mạch từng con).
+2. Tài xế: với mỗi đơn, `POST /api/trips/{tripId}/handover`.
+3. Quản lý: khi mọi `bookings[].handoverCompleted` là `true`, gọi `POST /api/trips/{tripId}/close`.
+4. Quản lý: `GET /api/reports/summary` để xem báo cáo.
+
+Một biên bản bàn giao (`handover`) có dạng:
+
+```json
+{
+  "handoverId": 2,
+  "tripId": 3,
+  "tripCode": "TRP-2026-0003",
+  "bookingId": 2,
+  "bookingCode": "BKG-2026-0002",
+  "customerName": "Jane Smith",
+  "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
+  "handoverDateTime": "2026-10-08T06:29:20+00:00",
+  "recipientName": "Jane Smith",
+  "recipientPhone": "+84988111222",
+  "recipientIdCard": "PASSPORT-US-991283",
+  "signatureUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/signatures/2026/10/b5cda1....png?token=eyJ...",
+  "overallCondition": "Excellent",
+  "remarks": "Hai con ngựa đến nơi an toàn, không trầy xước.",
+  "driverUserId": 4,
+  "driverName": "Phạm Văn Đức",
+  "horses": [
+    {
+      "tripHorseId": 7,
+      "horseId": 1,
+      "horseName": "Red Flash (Tia Chớp Đỏ)",
+      "microchipNumber": "982000412345671"
+    },
+    {
+      "tripHorseId": 8,
+      "horseId": 2,
+      "horseName": "Golden Pegasus (Kim Mã)",
+      "microchipNumber": "982000412345672"
+    }
+  ]
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `handoverId` | Mã biên bản |
+| `tripId`, `tripCode` | Chuyến |
+| `bookingId`, `bookingCode`, `customerName`, `dropoffAddress` | Đơn được bàn giao |
+| `handoverDateTime` | Thời điểm bàn giao |
+| `recipientName`, `recipientPhone`, `recipientIdCard` | Người nhận: họ tên, số điện thoại, số giấy tờ tùy thân |
+| `signatureUrl` | Link ảnh chữ ký, dùng được ngay (mục 2.5) |
+| `overallCondition` | Tình trạng ngựa khi giao: `Excellent` tốt · `NormalFatigue` mệt bình thường sau chuyến đi · `Injured` bị thương |
+| `remarks` | Ghi chú |
+| `driverUserId`, `driverName` | Người lập biên bản |
+| `horses[]` | Các con ngựa của đơn được giao trong biên bản |
+
+### POST /api/trips/{tripId}/handover — Lập biên bản bàn giao (e-POD)
+
+Lập biên bản bàn giao cho **một** đơn trên chuyến đã tới đích. Mã vi mạch quét được phải khớp đúng các con ngựa của đơn đó trên chuyến: thiếu một con hoặc thừa một mã lạ đều bị từ chối. Khách nhận thông báo; khi đây là biên bản cuối cùng của chuyến, quản lý được báo để đóng chuyến.
+
+- **Ai gọi được:** Đoàn xe của chuyến, Admin
+- **Dữ liệu gửi lên:** `multipart/form-data` (xem mục 2.5)
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `tripId` | Mã chuyến |
+
+Các trường gửi lên:
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `bookingId` | số | Có | Đơn được bàn giao, lấy từ `bookings[].bookingId` của chuyến |
+| `recipientName` | chuỗi | Có | Họ tên người nhận, tối đa 100 ký tự |
+| `recipientPhone` | chuỗi | Có | Số điện thoại người nhận |
+| `recipientIdCard` | chuỗi | Có | Số CMND / CCCD / hộ chiếu của người nhận, tối đa 50 ký tự |
+| `overallCondition` | chuỗi | Có | `Excellent`, `NormalFatigue` hoặc `Injured` |
+| `remarks` | chuỗi | Không | Ghi chú, tối đa 2000 ký tự |
+| `microchipNumbers` | nhiều giá trị | Có | Mã vi mạch của **từng** con ngựa được giao. Thêm trường này nhiều lần, mỗi lần một mã (xem ví dụ) |
+| `signature` | file | Có | Ảnh chữ ký của người nhận: `jpg`, `jpeg`, `png`, tối đa 10 MB |
+
+Ví dụ request:
+
+```js
+const form = new FormData();
+form.append("bookingId", "2");
+form.append("recipientName", "Jane Smith");
+form.append("recipientPhone", "+84988111222");
+form.append("recipientIdCard", "PASSPORT-US-991283");
+form.append("overallCondition", "Excellent");
+form.append("remarks", "Hai con ngựa đến nơi an toàn, không trầy xước.");
+
+// Mỗi mã vi mạch một lần append, cùng tên trường
+for (const chip of ["982000412345671", "982000412345672"]) {
+  form.append("microchipNumbers", chip);
+}
+
+// Chữ ký vẽ trên <canvas>: đổi thành file ảnh rồi gửi
+const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+form.append("signature", blob, "chu-ky.png");
+
+const res = await api.post(`/api/trips/${tripId}/handover`, form);
+```
+
+Response `201`: `data` là biên bản vừa lập (dạng như trên).
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Horses can only be handed over after the trip has arrived at the destination (current status: InTransit).` | Chuyến chưa tới mốc `Destination` |
+| 400 | `Microchip check failed. Not scanned: Golden Pegasus (Kim Mã) (982000412345672).` | Thiếu mã vi mạch của một con ngựa; `message` nêu tên con còn thiếu |
+| 400 | `Microchip check failed. These microchips do not belong to booking BKG-2026-0002 on this trip: 999.` | Có mã vi mạch không thuộc đơn này |
+| 400 | `Booking BKG-2026-0002 has already been handed over on trip TRP-2026-0003.` | Đơn này đã có biên bản trên chuyến |
+| 400 | `Booking with ID 9 has no horses on trip TRP-2026-0003.` | Đơn không có ngựa trên chuyến này |
+| 400 | `Signature is required.` | Không gửi ảnh chữ ký |
+| 403 | `Only the crew assigned to this trip can record a handover.` | Người gọi không thuộc đoàn xe |
+
+### GET /api/trips/{tripId}/handovers — Các biên bản bàn giao của một chuyến
+
+Mọi biên bản đã lập trên một chuyến, theo thứ tự thời gian.
+
+- **Ai gọi được:** Mọi nhân sự; tài xế / áp tải chỉ xem được chuyến của mình
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `tripId` | Mã chuyến |
+
+Response `200`: `data` là mảng biên bản; mảng rỗng nếu chưa bàn giao đơn nào.
+
+### GET /api/bookings/{bookingId}/handovers — Các biên bản bàn giao của một đơn
+
+Khách dùng API này để xem biên bản của đơn mình: ai nhận, lúc nào, chữ ký, tình trạng ngựa. Một đơn chia ra nhiều chuyến thì có nhiều biên bản.
+
+- **Ai gọi được:** Chủ đơn; nhân sự được xem đơn đó (như `GET /api/bookings/{id}`)
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `bookingId` | Mã đơn |
+
+Response `200`: `data` là mảng biên bản.
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 403 | `You do not have access to this booking.` | Đơn của khách khác |
+
+### POST /api/trips/{tripId}/close — Đóng chuyến và chốt KPI
+
+Đóng một chuyến đã tới đích sau khi **mọi đơn trên chuyến đã có biên bản bàn giao**. Hệ thống tự tính và lưu kết quả; không sửa lại được.
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `tripId` | Mã chuyến |
+
+Các trường gửi lên:
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `executiveRemarks` | chuỗi | Không | Nhận xét của quản lý về chuyến đi, tối đa 2000 ký tự |
+
+Ví dụ request:
+
+```json
+{
+  "executiveRemarks": "Trễ do hỏng xe, đã xử lý đúng quy trình."
+}
+```
+
+Không có nhận xét thì gửi `{}`.
+
+Response `200` — `data` là **chi tiết chuyến** (dạng của `GET /api/trips/{id}`) với `overallStatus` là `Completed`. Các trường kết quả:
+
+| Trường | Ý nghĩa |
+|---|---|
+| `delayMinutes` | Số phút tới đích trễ so với `plannedEndDate` (đến sớm tính là 0) |
+| `onTimeStatus` | `OnTime` đúng giờ · `Delayed_AcceptableForceMajeure` trễ vì lý do bất khả kháng · `Delayed_OperationalFault` trễ do lỗi vận hành |
+| `kpiScore` | Điểm KPI của chuyến, từ 50 đến 100 |
+| `actualCost` | Chi phí thực tế = `plannedCost` + chi phí phát sinh của các sự cố đã được duyệt |
+| `closedByName`, `closedAt` | Ai đóng chuyến và lúc nào |
+| `executiveRemarks` | Nhận xét vừa nhập |
+
+Cách tính KPI:
+
+| Trường hợp | `onTimeStatus` | `kpiScore` |
+|---|---|---|
+| Trễ không quá 30 phút | `OnTime` | 100 |
+| Trễ hơn 30 phút, chuyến có sự cố đã được duyệt phương án (`Approved` hoặc `Resolved`) | `Delayed_AcceptableForceMajeure` | 100 |
+| Trễ hơn 30 phút, không có sự cố nào được duyệt | `Delayed_OperationalFault` | 100 trừ 5 điểm cho mỗi 30 phút trễ, thấp nhất 50. Ví dụ trễ 125 phút: 80 điểm |
+
+Sau khi đóng: xe trở lại trạng thái rảnh; mỗi đơn đã giao hết ngựa (và không còn chuyến nào dang dở) chuyển sang `Completed` và khách nhận thông báo.
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `The trip cannot be closed: handover is not signed for BKG-2026-0002.` | Còn đơn chưa có biên bản; `message` nêu mã đơn |
+| 400 | `Only a trip that has arrived at the destination can be closed (current status: InTransit).` | Chuyến chưa tới đích, hoặc đã đóng rồi |
+
+### GET /api/reports/summary — Báo cáo tổng hợp
+
+Số liệu tổng hợp của các chuyến **đã đóng** trong một khoảng thời gian: doanh thu, chi phí, tỉ lệ đúng giờ, KPI trung bình và số sự cố theo loại. Dùng cho màn hình dashboard của quản lý.
+
+- **Ai gọi được:** LogisticsManager, Admin
+
+Tham số query (gắn sau dấu `?`):
+
+| Tham số | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `from` | ngày giờ | Không | Chỉ tính chuyến đóng từ thời điểm này. Bỏ trống là không giới hạn |
+| `to` | ngày giờ | Không | Chỉ tính chuyến đóng tới thời điểm này. Bỏ trống là không giới hạn |
+
+Ví dụ: `GET /api/reports/summary?from=2026-10-01T00:00:00%2B07:00&to=2026-10-31T23:59:59%2B07:00`. Không truyền gì thì tính toàn bộ.
+
+Response `200` — phần `data`:
+
+```json
+{
+  "from": "2026-10-06T23:00:00+00:00",
+  "to": "2026-10-08T23:00:00+00:00",
+  "currencyCode": "USD",
+  "completedTrips": 2,
+  "completedBookings": 2,
+  "horsesDelivered": 4,
+  "revenue": 14288.48,
+  "operatingCost": 9100,
+  "grossProfit": 5188.48,
+  "onTimeTrips": 0,
+  "delayedForceMajeureTrips": 1,
+  "delayedOperationalFaultTrips": 1,
+  "onTimeRate": 0,
+  "averageKpiScore": 90,
+  "averageDelayMinutes": 152,
+  "totalIncidents": 1,
+  "incidentAdditionalCost": 400,
+  "incidentsByType": [
+    {
+      "incidentType": "MechanicalBreakdown",
+      "count": 1
+    }
+  ]
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `completedTrips` | Số chuyến đã đóng trong kỳ |
+| `completedBookings` | Số đơn đã hoàn tất có chuyến đóng trong kỳ |
+| `horsesDelivered` | Số ngựa đã chở trên các chuyến đó |
+| `revenue` | Doanh thu: tổng giá (`estimatedCost`) của các đơn đã hoàn tất |
+| `operatingCost` | Tổng chi phí thực tế (`actualCost`) của các chuyến |
+| `grossProfit` | `revenue` trừ `operatingCost` |
+| `onTimeTrips`, `delayedForceMajeureTrips`, `delayedOperationalFaultTrips` | Số chuyến theo từng `onTimeStatus`; dùng vẽ biểu đồ tròn |
+| `onTimeRate` | Tỉ lệ chuyến đúng giờ, tính theo phần trăm (0–100) |
+| `averageKpiScore`, `averageDelayMinutes` | KPI trung bình và số phút trễ trung bình |
+| `totalIncidents` | Số sự cố **được báo** trong kỳ |
+| `incidentAdditionalCost` | Tổng chi phí phát sinh của các sự cố đã được duyệt |
+| `incidentsByType[]` | Số sự cố theo từng loại, nhiều nhất trước |
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `'to' must not be before 'from'.` | `to` nhỏ hơn `from` |
+
+---
+
+## 13. Danh mục loại giấy tờ
 
 Danh mục các loại giấy tờ dùng trong hồ sơ kiểm dịch (hộ chiếu ngựa, chứng nhận sức khỏe...). Mọi người đọc được; chuyên viên thủ tục và Admin quản lý.
 
@@ -3769,7 +4064,7 @@ Lỗi thường gặp:
 
 ---
 
-## 13. Những phần chưa có API
+## 14. Những phần chưa có API
 
 Các phần dưới đây backend chưa làm. Frontend có thể dựng giao diện trước nhưng chưa nối được.
 
@@ -3779,16 +4074,15 @@ Các phần dưới đây backend chưa làm. Frontend có thể dựng giao di�
 | Quản lý phương tiện | Hiện chỉ có `GET /api/trips/available-vehicles` |
 | Quy định giấy tờ theo quốc gia, bảng giá | Dữ liệu có sẵn và đang được dùng để tính; chưa có màn hình quản trị |
 | API trả danh sách enum cho dropdown | Tạm dùng bảng ở mục 3 |
-| Bàn giao e-POD, đóng chuyến, báo cáo (Flow 6) | Chưa làm |
 | Xác thực email, quên mật khẩu | Chưa làm |
 
 Tiến độ từng phần xem ở [TASKS.md](TASKS.md).
 
 ---
 
-## 14. Bảng tra nhanh mọi endpoint
+## 15. Bảng tra nhanh mọi endpoint
 
-Tổng cộng 74 endpoint. Chi tiết từng cái xem ở mục tương ứng.
+Tổng cộng 79 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 
 **4. Đăng nhập và tài khoản của tôi**
 
@@ -3898,7 +4192,17 @@ Tổng cộng 74 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/incidents/{id}/apply-reroute` | Nắn tuyến | FleetCoordinator, Admin |
 | POST | `/api/incidents/{id}/resolve` | Đóng sự cố | FleetCoordinator, Admin |
 
-**12. Danh mục loại giấy tờ**
+**12. Flow 6 – Bàn giao, đóng chuyến và báo cáo**
+
+| Method | Đường dẫn | Việc | Ai gọi được |
+|---|---|---|---|
+| POST | `/api/trips/{tripId}/handover` | Lập biên bản bàn giao (e-POD) | Đoàn xe của chuyến, Admin |
+| GET | `/api/trips/{tripId}/handovers` | Các biên bản bàn giao của một chuyến | Mọi nhân sự; tài xế / áp tải chỉ xem được chuyến của mình |
+| GET | `/api/bookings/{bookingId}/handovers` | Các biên bản bàn giao của một đơn | Chủ đơn; nhân sự được xem đơn đó (như `GET /api/bookings/{id}`) |
+| POST | `/api/trips/{tripId}/close` | Đóng chuyến và chốt KPI | LogisticsManager, Admin |
+| GET | `/api/reports/summary` | Báo cáo tổng hợp | LogisticsManager, Admin |
+
+**13. Danh mục loại giấy tờ**
 
 | Method | Đường dẫn | Việc | Ai gọi được |
 |---|---|---|---|

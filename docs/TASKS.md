@@ -165,9 +165,9 @@ Làm sau khi T-05 và T-26 xong. Tạo project `RacehorseTransport.Tests` (xUnit
 
 ### M7 – Flow 6: Bàn giao & nghiệm thu · OPTIONAL
 
-- [ ] **T-25 · Đến đích & e-POD** — Việc "đã tới điểm giao" đã có ở T-20 (check-in mốc `Destination` chuyển chuyến sang `ArrivedDestination`), nên task này chỉ còn `POST /api/trips/{id}/handover` (người nhận, ảnh chữ ký vẽ tay trên màn hình, tình trạng, đối chiếu mã microchip từng ngựa). Tài xế tạo biên bản trên ứng dụng mobile. Chuyến ghép nhiều đơn thì **mỗi đơn một biên bản**; chuyến chỉ đóng được khi mọi đơn trên chuyến đã ký.
-- [ ] **T-26 · Đóng chuyến** — `POST /api/trips/{id}/close` (Manager): chốt KPI bằng C# trong một transaction (quy tắc ở phụ lục cuối file); trả về KPI, số phút trễ, chi phí thực tế.
-- [ ] **T-27 · Báo cáo** — `GET /api/reports/summary?from=&to=`: doanh thu, chi phí vận hành, tỉ lệ đúng giờ, KPI trung bình, số sự cố theo loại.
+- [x] **T-25 · Đến đích & e-POD** — Việc "đã tới điểm giao" đã có ở T-20 (check-in mốc `Destination` chuyển chuyến sang `ArrivedDestination`), nên task này chỉ còn `POST /api/trips/{id}/handover` (người nhận, ảnh chữ ký vẽ tay trên màn hình, tình trạng, đối chiếu mã microchip từng ngựa). Tài xế tạo biên bản trên ứng dụng mobile. Chuyến ghép nhiều đơn thì **mỗi đơn một biên bản**; chuyến chỉ đóng được khi mọi đơn trên chuyến đã ký.
+- [x] **T-26 · Đóng chuyến** — `POST /api/trips/{id}/close` (Manager): chốt KPI bằng C# trong một transaction (quy tắc ở phụ lục cuối file); trả về KPI, số phút trễ, chi phí thực tế.
+- [x] **T-27 · Báo cáo** — `GET /api/reports/summary?from=&to=`: doanh thu, chi phí vận hành, tỉ lệ đúng giờ, KPI trung bình, số sự cố theo loại.
 
 ---
 
