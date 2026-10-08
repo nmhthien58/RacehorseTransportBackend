@@ -14,3 +14,8 @@ docker-compose.yml
 
 # Image SDK đã có sẵn .NET 8; bỏ file ghim phiên bản SDK của máy dev để không lệch bản
 global.json
+
+# Biến môi trường thật: không vào image
+.env
+.env.*
+

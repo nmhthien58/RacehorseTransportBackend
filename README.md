@@ -196,6 +196,8 @@ Chọn một trong ba cách:
 }
 ```
 
+**Đổi qua lại giữa database ở máy và Supabase.** `appsettings.Local.json` giữ cả hai chuỗi kết nối (`Local`, `Supabase`); dòng `"Database": { "Use": "Local" }` chọn chuỗi nào được dùng. Đổi thành `"Supabase"` rồi chạy lại, hoặc chọn tạm cho một lần chạy: `dotnet run --project RacehorseTransport.API -- --Database:Use Supabase`. Dòng log `Database: ...` lúc khởi động cho biết đang nối vào đâu.
+
 Lưu file cần thêm section `Supabase` (`Url`, `ServiceKey`, `Bucket`) trong cùng file; xem `appsettings.Local.example.json`. Chưa điền thì mọi thứ vẫn chạy, chỉ riêng upload file báo lỗi.
 
 Với Supabase: bấm **Connect** trên dashboard, lấy thông số ở mục **Session pooler** (host, port, user dạng `postgres.<mã project>`), database là `postgres`, thêm `SSL Mode=Require`. Không dùng mục *Direct connection*: gói miễn phí chỉ cấp địa chỉ IPv6 cho mục đó, phần lớn mạng ở nhà không kết nối được.

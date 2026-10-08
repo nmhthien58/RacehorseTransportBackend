@@ -24,15 +24,11 @@ namespace RacehorseTransport.API.Extensions
         // 1. DbContext + Repositories
         public static IServiceCollection AddRepositories(this IServiceCollection services, IConfiguration configuration)
         {
-            if (string.IsNullOrWhiteSpace(configuration.GetConnectionString("DefaultConnection")))
-            {
-                throw new InvalidOperationException(
-                    "ConnectionStrings:DefaultConnection is empty. Copy appsettings.Local.example.json to appsettings.Local.json and fill in your PostgreSQL connection string.");
-            }
+            string connectionString = ResolveConnectionString(configuration);
 
             services.AddDbContext<AppDbContext>(options =>
             {
-                options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"))
+                options.UseNpgsql(connectionString)
                        .UseSnakeCaseNamingConvention(); // BookingId <-> booking_id
             });
 
@@ -41,6 +37,30 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<ICodeCounterRepository, CodeCounterRepository>();
 
             return services;
+        }
+
+        // Chọn database: "Database:Use" là TÊN một chuỗi trong ConnectionStrings (ví dụ "Local" hoặc "Supabase").
+        // Bỏ trống thì dùng "DefaultConnection" (bản deploy đặt biến ConnectionStrings__DefaultConnection).
+        public static string ResolveConnectionString(IConfiguration configuration)
+        {
+            string name = configuration["Database:Use"] is { Length: > 0 } use ? use : "DefaultConnection";
+            string? connectionString = configuration.GetConnectionString(name);
+
+            if (string.IsNullOrWhiteSpace(connectionString) || connectionString.Contains('<'))
+            {
+                throw new InvalidOperationException(
+                    $"ConnectionStrings:{name} is empty or still has <placeholders>. Fill it in appsettings.Local.json (see appsettings.Local.example.json), or change Database:Use.");
+            }
+
+            return connectionString;
+        }
+
+        // Tên database đang dùng, để ghi ra log lúc khởi động (không bao giờ ghi mật khẩu)
+        public static string DescribeDatabase(IConfiguration configuration)
+        {
+            var builder = new Npgsql.NpgsqlConnectionStringBuilder(ResolveConnectionString(configuration));
+            string name = configuration["Database:Use"] is { Length: > 0 } use ? use : "DefaultConnection";
+            return $"{name} -> {builder.Database} @ {builder.Host}:{builder.Port}";
         }
 
         // 2. Services (nghiệp vụ). MỖI SERVICE MỚI PHẢI ĐĂNG KÝ THÊM 1 DÒNG Ở ĐÂY.

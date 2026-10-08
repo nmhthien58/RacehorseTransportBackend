@@ -28,6 +28,8 @@ namespace RacehorseTransport.API
 
             var app = builder.Build();
 
+            app.Logger.LogInformation("Database: {Database}", ServiceCollectionExtensions.DescribeDatabase(app.Configuration));
+
             // Configure HTTP request pipeline
             app.UseMiddleware<ExceptionHandlingMiddleware>();
 
