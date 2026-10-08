@@ -19,6 +19,17 @@ namespace RacehorseTransport.API.Mappers
             };
         }
 
+        public static UploadDocumentModel ToBusinessModel(this UploadDocumentRequest request)
+        {
+            return new UploadDocumentModel
+            {
+                DocTypeId = request.DocTypeId,
+                DocumentNumber = string.IsNullOrWhiteSpace(request.DocumentNumber) ? null : request.DocumentNumber.Trim(),
+                FilePath = request.FilePath.Trim(),
+                ExpiryDate = request.ExpiryDate
+            };
+        }
+
         public static DossierSummaryResponse ToResponse(this DossierSummaryModel model)
         {
             var response = new DossierSummaryResponse();

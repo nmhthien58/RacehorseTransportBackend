@@ -6,6 +6,15 @@ namespace RacehorseTransport.Services.BusinessModels
         public int? BookingId { get; set; }
     }
 
+    // Nộp (hoặc nộp lại) một giấy tờ. File được upload trước qua POST /api/files (category "documents").
+    public class UploadDocumentModel
+    {
+        public int DocTypeId { get; set; }
+        public string? DocumentNumber { get; set; }
+        public string FilePath { get; set; } = string.Empty;
+        public DateOnly? ExpiryDate { get; set; }
+    }
+
     // Dòng trong danh sách hồ sơ
     public class DossierSummaryModel
     {

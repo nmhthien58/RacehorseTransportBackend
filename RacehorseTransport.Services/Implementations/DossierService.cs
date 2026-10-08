@@ -10,20 +10,33 @@ using RacehorseTransport.Services.Mappers;
 
 namespace RacehorseTransport.Services.Implementations
 {
-    public class DossierService : IDossierService
+    // Phần xem nằm ở file này; phần nộp, thẩm định và thông quan nằm ở DossierService.Workflow.cs
+    public partial class DossierService : IDossierService
     {
         private readonly IRepository<DigitalDossier> _dossierRepo;
+        private readonly IRepository<DossierDocument> _documentRepo;
         private readonly IRepository<CountryDocRequirement> _requirementRepo;
         private readonly IRepository<DocumentType> _docTypeRepo;
+        private readonly IFileStorageService _fileStorage;
+        private readonly INotificationService _notificationService;
+        private readonly IUnitOfWork _unitOfWork;
 
         public DossierService(
             IRepository<DigitalDossier> dossierRepo,
+            IRepository<DossierDocument> documentRepo,
             IRepository<CountryDocRequirement> requirementRepo,
-            IRepository<DocumentType> docTypeRepo)
+            IRepository<DocumentType> docTypeRepo,
+            IFileStorageService fileStorage,
+            INotificationService notificationService,
+            IUnitOfWork unitOfWork)
         {
             _dossierRepo = dossierRepo;
+            _documentRepo = documentRepo;
             _requirementRepo = requirementRepo;
             _docTypeRepo = docTypeRepo;
+            _fileStorage = fileStorage;
+            _notificationService = notificationService;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<PagedBusinessResult<DossierSummaryModel>> GetDossiersAsync(DossierFilterOptions options, CurrentUser currentUser)

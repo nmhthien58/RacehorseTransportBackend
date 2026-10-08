@@ -120,7 +120,7 @@ Làm sau khi T-05 và T-26 xong. Tạo project `RacehorseTransport.Tests` (xUnit
 ### M1 – Nền tảng dùng chung
 
 - [x] **T-01 · Quản trị người dùng & hồ sơ cá nhân** — `PUT /api/auth/me` (sửa họ tên, số điện thoại). Admin tạo tài khoản nhân sự (`POST /api/users`), danh sách có lọc theo role (`GET /api/users?role=`), khóa/mở (`PATCH /api/users/{id}/active`), đặt lại mật khẩu. `PUT /api/auth/change-password` cho mọi người. `GET /api/users/staff?role=` cho Manager chọn người khi phân công.
-- [ ] **T-02 · Lưu file** — `IFileStorageService` đẩy file lên **Supabase Storage** (bucket riêng tư, trả link có chữ ký hết hạn vì giấy tờ là dữ liệu nhạy cảm; đổi nhà cung cấp không phải sửa nghiệp vụ); `POST /api/files` (multipart) trả về URL. Giới hạn dung lượng và đuôi file (pdf, jpg, png). Dùng cho giấy tờ, ảnh ngựa, ảnh nhật ký, chữ ký e-POD.
+- [x] **T-02 · Lưu file** — `IFileStorageService` đẩy file lên **Supabase Storage** (bucket riêng tư, trả link có chữ ký hết hạn vì giấy tờ là dữ liệu nhạy cảm; đổi nhà cung cấp không phải sửa nghiệp vụ); `POST /api/files` (multipart) trả về URL. Giới hạn dung lượng và đuôi file (pdf, jpg, png). Dùng cho giấy tờ, ảnh ngựa, ảnh nhật ký, chữ ký e-POD.
 - [x] **T-03 · Gửi thông báo** — `INotificationService.SendAsync(userId, title, message, referenceType, referenceId)` và `SendToRoleAsync(role, ...)`. Các luồng bên dưới đều gọi tới đây. *(B-05 phụ thuộc task này để có dữ liệu thử.)*
 - [x] **T-04 · Sinh mã** — `ICodeGenerator`: `BKG-2026-0001`, `DOS-…`, `TRP-…`, `INC-…`; không trùng khi hai request tới cùng lúc.
 - [x] **T-28 · Hồ sơ ngựa của khách** — `GET/POST/PUT/DELETE /api/horses`. Khách chỉ thấy và sửa ngựa của mình (`OwnerUserId` lấy từ token, không nhận từ client; của người khác → 403); nhân sự xem được tất cả. `MicrochipNumber`, `PassportNumber` không trùng. Xóa mềm (`IsActive = false`), không xóa được ngựa đang nằm trong đơn chưa kết thúc. Cần tài khoản đã xác thực email.
@@ -139,9 +139,9 @@ Làm sau khi T-05 và T-26 xong. Tạo project `RacehorseTransport.Tests` (xUnit
 ### M3 – Flow 2: Hồ sơ pháp lý & kiểm dịch · REQUIRED
 
 - [x] **T-10 · Xem hồ sơ** — `GET /api/dossiers` (Specialist: hồ sơ được giao; khách: hồ sơ ngựa của mình), `GET /api/dossiers/{id}` kèm **checklist** giấy tờ bắt buộc (Export của nước đi + Import của nước đến, lấy từ `CountryDocRequirements`) đối chiếu với giấy đã nộp.
-- [ ] **T-11 · Nộp giấy tờ** — Specialist `POST /api/dossiers/{id}/request-documents` (→ `AwaitingDocs`, báo khách). Khách `POST /api/dossiers/{id}/documents` (file + loại + số + ngày hết hạn), nộp lại giấy bị từ chối.
-- [ ] **T-12 · Thẩm định giấy tờ** — `POST /api/documents/{id}/approve`, `/reject` (kèm `CorrectionNote`). Kiểm tra hạn hiệu lực theo `ValidityDays`. Bị từ chối lần thứ 3 → hồ sơ sang `Issue`, báo Manager.
-- [ ] **T-13 · Nộp cơ quan & thông quan** — `POST /api/dossiers/{id}/submit-to-authorities` (chỉ khi đủ giấy bắt buộc đã duyệt), `/clear` (nhập `ClearanceNumber`), `/issue` (nhập lý do). Khi mọi hồ sơ của đơn đã `Cleared` → báo khách và các Coordinator.
+- [x] **T-11 · Nộp giấy tờ** — Specialist `POST /api/dossiers/{id}/request-documents` (→ `AwaitingDocs`, báo khách). Khách `POST /api/dossiers/{id}/documents` (file + loại + số + ngày hết hạn), nộp lại giấy bị từ chối.
+- [x] **T-12 · Thẩm định giấy tờ** — `POST /api/documents/{id}/approve`, `/reject` (kèm `CorrectionNote`). Kiểm tra hạn hiệu lực theo `ValidityDays`. Bị từ chối lần thứ 3 → hồ sơ sang `Issue`, báo Manager.
+- [x] **T-13 · Nộp cơ quan & thông quan** — `POST /api/dossiers/{id}/submit-to-authorities` (chỉ khi đủ giấy bắt buộc đã duyệt), `/clear` (nhập `ClearanceNumber`), `/issue` (nhập lý do). Khi mọi hồ sơ của đơn đã `Cleared` → báo khách và các Coordinator.
 
 ### M4 – Flow 3: Lộ trình & điều phối phương tiện · REQUIRED
 

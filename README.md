@@ -194,6 +194,8 @@ Chọn một trong ba cách:
 }
 ```
 
+Lưu file cần thêm section `Supabase` (`Url`, `ServiceKey`, `Bucket`) trong cùng file; xem `appsettings.Local.example.json`. Chưa điền thì mọi thứ vẫn chạy, chỉ riêng upload file báo lỗi.
+
 Với Supabase: bấm **Connect** trên dashboard, lấy thông số ở mục **Session pooler** (host, port, user dạng `postgres.<mã project>`), database là `postgres`, thêm `SSL Mode=Require`. Không dùng mục *Direct connection*: gói miễn phí chỉ cấp địa chỉ IPv6 cho mục đó, phần lớn mạng ở nhà không kết nối được.
 
 **Bước 3 – Chạy.**
@@ -243,6 +245,8 @@ Danh sách có thêm `pagination: { page, pageSize, totalItems, totalPages }`. T
 Lỗi validation của RequestModel tự trả 400 kèm danh sách lỗi, không cần kiểm tra `ModelState`.
 
 **Phân quyền.** `[Authorize]` cho mọi endpoint cần đăng nhập; siết theo role bằng `[Authorize(Roles = UserRoles.LogisticsManager)]`. Nhiều `[Authorize]` chồng nhau (class + action) phải thỏa **tất cả**, nên khi các action cần role khác nhau thì đặt role ở từng action. Quyền theo từng bản ghi (vd: khách chỉ sửa ngựa của mình) kiểm tra trong service, bằng `CurrentUser` lấy từ `User.ToCurrentUser()`.
+
+**File.** Client upload file bằng `POST /api/files` (multipart, kèm `category`: `documents`, `horses`, `welfare` hoặc `signatures`) và nhận về `path`. Các request nghiệp vụ gửi `path` đó (không gửi URL); DB cũng chỉ lưu `path`. Muốn hiển thị file thì gọi `GET /api/files/url?path=...` để lấy link xem có thời hạn, vì bucket để riêng tư.
 
 **Trạng thái.** Dùng hằng số trong `DomainConstants.cs` (`BookingStatuses.Approved`), không gõ chuỗi trực tiếp.
 

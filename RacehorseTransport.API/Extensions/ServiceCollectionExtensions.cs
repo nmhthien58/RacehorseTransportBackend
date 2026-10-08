@@ -47,6 +47,7 @@ namespace RacehorseTransport.API.Extensions
         public static IServiceCollection AddBusinessServices(this IServiceCollection services, IConfiguration configuration)
         {
             services.Configure<BookingOptions>(configuration.GetSection(BookingOptions.SectionName));
+            services.Configure<SupabaseOptions>(configuration.GetSection(SupabaseOptions.SectionName));
 
             // Hạ tầng dùng chung
             services.AddScoped<ICacheService, DistributedCacheService>();
@@ -54,6 +55,7 @@ namespace RacehorseTransport.API.Extensions
             services.AddSingleton<ITokenService, JwtTokenService>();
             services.AddScoped<ICodeGenerator, CodeGenerator>();
             services.AddScoped<INotificationService, NotificationService>();
+            services.AddHttpClient<IFileStorageService, SupabaseFileStorageService>(client => client.Timeout = TimeSpan.FromSeconds(30));
 
             // Nghiệp vụ
             services.AddScoped<IAuthService, AuthService>();
