@@ -12,5 +12,8 @@ namespace RacehorseTransport.Services.Constants
 
         // Màn hình theo dõi của một đơn. Xóa qua ITrackingService.InvalidateTripAsync mỗi khi hành trình thay đổi.
         public static string BookingTracking(int bookingId) => $"tracking:booking:{bookingId}";
+
+        // Link xem có thời hạn của một file đã lưu
+        public static string FileViewUrl(string path) => $"files:view-url:{path}";
     }
 }

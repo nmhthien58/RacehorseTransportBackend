@@ -113,6 +113,9 @@ namespace RacehorseTransport.Services.Implementations
             model.ApprovedCount = mandatory.Count(c => c.State == DocumentStatuses.Approved);
             model.IsReadyToSubmit = mandatory.Count > 0 && model.ApprovedCount == mandatory.Count;
 
+            // Checklist dùng lại chính các object trong model.Documents nên chỉ cần đổi một lần
+            await _fileStorage.ResolveViewUrlsAsync(model.Documents, d => d.FileUrl, (d, url) => d.FileUrl = url ?? string.Empty);
+
             return model;
         }
 

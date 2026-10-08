@@ -5,6 +5,7 @@ using RacehorseTransport.Repositories.Interfaces;
 using RacehorseTransport.Services.BusinessModels;
 using RacehorseTransport.Services.Constants;
 using RacehorseTransport.Services.Exceptions;
+using RacehorseTransport.Services.Extensions;
 using RacehorseTransport.Services.Interfaces;
 using RacehorseTransport.Services.Mappers;
 
@@ -28,14 +29,17 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IRepository<TripHorse> _tripHorseRepo;
         private readonly IRepository<HorseWelfareLog> _welfareLogRepo;
         private readonly ICacheService _cache;
+        private readonly IFileStorageService _fileStorage;
 
         public TrackingService(
             IRepository<Trip> tripRepo,
             IRepository<BookingRequest> bookingRepo,
             IRepository<TripHorse> tripHorseRepo,
             IRepository<HorseWelfareLog> welfareLogRepo,
-            ICacheService cache)
+            ICacheService cache,
+            IFileStorageService fileStorage)
         {
+            _fileStorage = fileStorage;
             _tripRepo = tripRepo;
             _bookingRepo = bookingRepo;
             _tripHorseRepo = tripHorseRepo;
@@ -107,10 +111,19 @@ namespace RacehorseTransport.Services.Implementations
                 throw new ForbiddenException("You do not have access to this booking.");
             }
 
-            return await _cache.GetOrSetAsync(
+            var tracking = await _cache.GetOrSetAsync(
                 CacheKeys.BookingTracking(bookingId),
                 () => BuildBookingTrackingAsync(bookingId),
                 TrackingCacheTtl);
+
+            // Bản cache giữ đường dẫn ảnh; link xem được gắn vào sau khi lấy ra
+            var logs = tracking.Trips
+                .SelectMany(t => t.Horses)
+                .SelectMany(h => h.LatestLog == null ? h.Logs : h.Logs.Append(h.LatestLog))
+                .ToList();
+            await _fileStorage.ResolveViewUrlsAsync(logs, l => l.PhotoUrl, (l, url) => l.PhotoUrl = url);
+
+            return tracking;
         }
 
         public async Task InvalidateTripAsync(int tripId)

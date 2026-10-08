@@ -5,6 +5,7 @@ using RacehorseTransport.Repositories.Interfaces;
 using RacehorseTransport.Services.BusinessModels;
 using RacehorseTransport.Services.Constants;
 using RacehorseTransport.Services.Exceptions;
+using RacehorseTransport.Services.Extensions;
 using RacehorseTransport.Services.Interfaces;
 using RacehorseTransport.Services.Mappers;
 
@@ -313,7 +314,9 @@ namespace RacehorseTransport.Services.Implementations
             await _trackingService.InvalidateTripAsync(tripId);
 
             var saved = await QueryLogs().FirstAsync(l => l.LogId == log.LogId);
-            return saved.ToBusinessModel();
+            var result = saved.ToBusinessModel();
+            await _fileStorage.ResolveViewUrlsAsync(new[] { result }, l => l.PhotoUrl, (l, url) => l.PhotoUrl = url);
+            return result;
         }
 
         // Đoàn xe của chuyến và các role vận hành xem được; khách hàng xem qua màn hình theo dõi đơn
@@ -329,7 +332,9 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             var logs = await query.OrderByDescending(l => l.LoggedAt).ThenByDescending(l => l.LogId).ToListAsync();
-            return logs.Select(l => l.ToBusinessModel()).ToList();
+            var result = logs.Select(l => l.ToBusinessModel()).ToList();
+            await _fileStorage.ResolveViewUrlsAsync(result, l => l.PhotoUrl, (l, url) => l.PhotoUrl = url);
+            return result;
         }
 
         // =============================================================================================

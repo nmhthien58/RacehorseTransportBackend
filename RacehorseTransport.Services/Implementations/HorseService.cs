@@ -61,7 +61,9 @@ namespace RacehorseTransport.Services.Implementations
             query = query.ApplySort(options.Sort, nameof(Horse.HorseId));
 
             // Paging
-            return await query.ToPagedResultAsync(options, h => h.ToBusinessModel());
+            var page = await query.ToPagedResultAsync(options, h => h.ToBusinessModel());
+            await _fileStorage.ResolveViewUrlsAsync(page.Items, h => h.PhotoUrl, (h, url) => h.PhotoUrl = url);
+            return page;
         }
 
         public async Task<HorseModel> GetHorseByIdAsync(int id, CurrentUser currentUser)
@@ -77,7 +79,7 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             EnsureCanAccess(horse, currentUser);
-            return horse.ToBusinessModel();
+            return await ToModelAsync(horse);
         }
 
         public async Task<HorseModel> CreateHorseAsync(HorseModel model, FileUploadModel? photo, CurrentUser currentUser)
@@ -102,7 +104,7 @@ namespace RacehorseTransport.Services.Implementations
             };
 
             await _horseRepo.AddAsync(horse);
-            return horse.ToBusinessModel();
+            return await ToModelAsync(horse);
         }
 
         public async Task<HorseModel> UpdateHorseAsync(int id, HorseModel model, FileUploadModel? photo, bool removePhoto, CurrentUser currentUser)
@@ -131,7 +133,7 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             await _horseRepo.UpdateAsync(horse);
-            return horse.ToBusinessModel();
+            return await ToModelAsync(horse);
         }
 
         // Xóa mềm: ngựa đã từng đi chuyến vẫn phải còn trong lịch sử đơn và hồ sơ
@@ -168,6 +170,14 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             return horse;
+        }
+
+        // DB lưu đường dẫn ảnh; model trả ra ngoài mang link xem được
+        private async Task<HorseModel> ToModelAsync(Horse horse)
+        {
+            var model = horse.ToBusinessModel();
+            await _fileStorage.ResolveViewUrlsAsync(new[] { model }, h => h.PhotoUrl, (h, url) => h.PhotoUrl = url);
+            return model;
         }
 
         // Gọi sau khi đã kiểm tra xong dữ liệu, để request sai không để lại file trên storage

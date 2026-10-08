@@ -13,10 +13,12 @@ namespace RacehorseTransport.Services.Implementations
     public class TripService : ITripService
     {
         private readonly IRepository<Trip> _tripRepo;
+        private readonly IFileStorageService _fileStorage;
 
-        public TripService(IRepository<Trip> tripRepo)
+        public TripService(IRepository<Trip> tripRepo, IFileStorageService fileStorage)
         {
             _tripRepo = tripRepo;
+            _fileStorage = fileStorage;
         }
 
         public async Task<PagedBusinessResult<TripSummaryModel>> GetTripsAsync(TripFilterOptions options, CurrentUser currentUser)
@@ -102,7 +104,9 @@ namespace RacehorseTransport.Services.Implementations
                 throw new ForbiddenException("You are not assigned to this trip.");
             }
 
-            return trip.ToDetailModel();
+            var model = trip.ToDetailModel();
+            await _fileStorage.ResolveViewUrlsAsync(model.Horses, h => h.PhotoUrl, (h, url) => h.PhotoUrl = url);
+            return model;
         }
 
         // Khách hàng không xem chuyến trực tiếp: họ theo dõi qua đơn của mình (tracking, T-22)

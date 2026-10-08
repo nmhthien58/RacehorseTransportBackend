@@ -22,8 +22,9 @@ Swagger luôn là nguồn chính xác nhất về tên trường và kiểu dữ
 8. [Flow 2 – Hồ sơ kiểm dịch](#8-flow-2--hồ-sơ-kiểm-dịch)
 9. [Flow 3 – Lập kế hoạch chuyến](#9-flow-3--lập-kế-hoạch-chuyến)
 10. [Flow 4 – Chạy chuyến và theo dõi](#10-flow-4--chạy-chuyến-và-theo-dõi)
-11. [Danh mục](#11-danh-mục)
-12. [Chưa có](#12-chưa-có)
+11. [Flow 5 – Sự cố và nắn tuyến](#11-flow-5--sự-cố-và-nắn-tuyến)
+12. [Danh mục](#12-danh-mục)
+13. [Chưa có](#13-chưa-có)
 
 ---
 
@@ -270,13 +271,10 @@ const { data } = (await api.post("/api/horses", form)).data;
 
 Không tự đặt header `Content-Type`; để trình duyệt / axios tự thêm kèm `boundary`.
 
-| Method | Đường dẫn | Mô tả |
-|---|---|---|
-| GET | `/api/files/url?path=...` | Lấy link xem mới cho một `path` |
+**Hiển thị file:** các trường `photoUrl` và `fileUrl` trong response là link xem được ngay; gắn thẳng vào `<img>` hoặc mở PDF, không phải gọi thêm API nào.
 
-**Hiển thị file:** các response nghiệp vụ trả về `path` (ở trường `fileUrl`, `photoUrl`), không phải link xem được. Gọi `GET /api/files/url?path=...` để lấy link có hạn 60 phút rồi mới gắn vào `<img>` hoặc mở PDF. Không lưu link này lâu dài.
-
-Dữ liệu mẫu có sẵn chứa vài giá trị bắt đầu bằng `https://`; với các giá trị đó dùng thẳng, không gọi `/api/files/url`.
+- Link có thời hạn (còn dùng được ít nhất 30 phút kể từ lúc nhận response), nên không lưu lại lâu dài; cần hiển thị lại thì gọi lại API lấy dữ liệu.
+- `photoUrl` là `null` khi không có ảnh. Nếu file không còn trên kho lưu trữ, `photoUrl` là `null` và `fileUrl` là chuỗi rỗng.
 
 ---
 
@@ -323,7 +321,7 @@ Mật khẩu từ 8 đến 64 ký tự. Admin không tự khóa hoặc tự đ�
 
 Ảnh khi sửa (`PUT`): gửi `photo` để thay ảnh; không gửi `photo` thì giữ ảnh đang có; gửi `removePhoto=true` để xóa ảnh.
 
-Response trả `photoUrl` là `path` của ảnh (xem "Hiển thị file" ở mục 4).
+Response trả `photoUrl` là link xem ảnh (xem "Hiển thị file" ở mục 4).
 
 ---
 
@@ -489,7 +487,7 @@ Mọi endpoint ghi ở trên trả về chi tiết hồ sơ sau khi thay đổi,
 
 - `checklist` là danh sách giấy tờ cần có, ghép từ quy định xuất khẩu của nước đi và nhập khẩu của nước đến. Dựng màn hình nộp giấy tờ từ danh sách này.
 - `state` của từng dòng: `Missing` (chưa nộp), `Pending` (chờ duyệt), `Approved`, `Rejected`.
-- `latestDocument` chứa `documentId` (dùng để duyệt / từ chối), `fileUrl` (là `path`), `correctionNote`, `rejectionCount`.
+- `latestDocument` chứa `documentId` (dùng để duyệt / từ chối), `fileUrl` (link xem file), `correctionNote`, `rejectionCount`.
 - `isReadyToSubmit` là `true` khi mọi giấy bắt buộc đã `Approved`; dùng để bật nút "Nộp cơ quan chức năng".
 
 ### Nộp giấy tờ

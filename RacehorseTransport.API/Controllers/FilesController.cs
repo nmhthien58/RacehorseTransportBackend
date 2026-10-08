@@ -7,9 +7,10 @@ using RacehorseTransport.Services.Interfaces;
 
 namespace RacehorseTransport.API.Controllers
 {
-    // Upload riêng một file và cấp link xem. Ảnh ngựa, giấy tờ hồ sơ và ảnh nhật ký được gửi kèm ngay trong
-    // request nghiệp vụ (multipart) nên không cần upload ở đây trước.
+    // Upload riêng một file và cấp link xem. Tạm ẩn khỏi Swagger vì hiện không cần tới: file được gửi kèm ngay trong
+    // request nghiệp vụ (multipart), và response nghiệp vụ trả sẵn link xem. Các endpoint vẫn hoạt động.
     [ApiController]
+    [ApiExplorerSettings(IgnoreApi = true)]
     [Route("api/files")]
     [Produces("application/json")]
     [Authorize]
@@ -25,8 +26,6 @@ namespace RacehorseTransport.API.Controllers
         /// <summary>
         /// Upload a file (pdf, jpg, png; up to 10 MB). Returns the stored path and a temporary view URL.
         /// </summary>
-        // Tạm ẩn khỏi Swagger: hiện không request nghiệp vụ nào cần upload riêng. Endpoint vẫn hoạt động.
-        [ApiExplorerSettings(IgnoreApi = true)]
         [HttpPost]
         [Consumes("multipart/form-data")]
         [RequestSizeLimit(SupabaseFileStorageService.MaxFileSizeBytes + 1024 * 1024)]

@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RacehorseTransport.Services.BusinessModels;
+using RacehorseTransport.Services.Constants;
 using RacehorseTransport.Services.Exceptions;
 using RacehorseTransport.Services.Interfaces;
 using RacehorseTransport.Services.Options;
@@ -32,12 +33,15 @@ namespace RacehorseTransport.Services.Implementations
 
         private readonly HttpClient _http;
         private readonly SupabaseOptions _options;
+        private readonly ICacheService _cache;
         private readonly ILogger<SupabaseFileStorageService> _logger;
 
-        public SupabaseFileStorageService(HttpClient http, IOptions<SupabaseOptions> options, ILogger<SupabaseFileStorageService> logger)
+        public SupabaseFileStorageService(
+            HttpClient http, IOptions<SupabaseOptions> options, ICacheService cache, ILogger<SupabaseFileStorageService> logger)
         {
             _http = http;
             _options = options.Value;
+            _cache = cache;
             _logger = logger;
         }
 
@@ -138,6 +142,83 @@ namespace RacehorseTransport.Services.Implementations
             };
         }
 
+        public async Task<IReadOnlyDictionary<string, string>> GetViewUrlsAsync(IEnumerable<string?> paths)
+        {
+            var result = new Dictionary<string, string>();
+            var toSign = new List<string>();
+
+            foreach (string path in paths.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p!).Distinct())
+            {
+                // Dữ liệu mẫu lưu sẵn link đầy đủ: dùng thẳng
+                if (path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    result[path] = path;
+                    continue;
+                }
+                if (!IsValidPath(path))
+                {
+                    continue;
+                }
+
+                string? cached = await _cache.GetAsync<string>(CacheKeys.FileViewUrl(path));
+                if (cached != null)
+                {
+                    result[path] = cached;
+                }
+                else
+                {
+                    toSign.Add(path);
+                }
+            }
+
+            if (toSign.Count == 0)
+            {
+                return result;
+            }
+
+            try
+            {
+                EnsureConfigured();
+
+                int expiresInSeconds = Math.Max(1, _options.SignedUrlMinutes) * 60;
+
+                // Ký cả danh sách trong một lần gọi
+                using var request = new HttpRequestMessage(
+                    HttpMethod.Post, $"{_options.Url.TrimEnd('/')}/storage/v1/object/sign/{_options.Bucket}");
+                Authorize(request);
+                request.Content = JsonContent.Create(new { expiresIn = expiresInSeconds, paths = toSign });
+
+                using var response = await _http.SendAsync(request);
+                await EnsureSuccessAsync(response, "sign");
+
+                var items = await response.Content.ReadFromJsonAsync<List<BatchSignItem>>() ?? new List<BatchSignItem>();
+
+                // Giữ trong cache nửa thời hạn, để link trả ra luôn còn dùng được ít nhất nửa thời hạn
+                var cacheTtl = TimeSpan.FromSeconds(expiresInSeconds / 2.0);
+
+                foreach (var item in items)
+                {
+                    if (string.IsNullOrEmpty(item.Path) || string.IsNullOrEmpty(item.SignedUrl))
+                    {
+                        continue; // file không còn trong storage
+                    }
+
+                    string relative = item.SignedUrl.StartsWith('/') ? item.SignedUrl : "/" + item.SignedUrl;
+                    string url = $"{_options.Url.TrimEnd('/')}/storage/v1{relative}";
+
+                    result[item.Path] = url;
+                    await _cache.SetAsync(CacheKeys.FileViewUrl(item.Path), url, cacheTtl);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Không có link ảnh thì response vẫn dùng được; không để lỗi storage làm hỏng cả request đọc dữ liệu
+                _logger.LogWarning(ex, "Could not create view URLs for {Count} file(s).", toSign.Count);
+            }
+
+            return result;
+        }
+
         public bool IsValidPath(string? path, string? category = null)
         {
             if (string.IsNullOrWhiteSpace(path))
@@ -213,6 +294,15 @@ namespace RacehorseTransport.Services.Implementations
 
         private class SignResponse
         {
+            [JsonPropertyName("signedURL")]
+            public string? SignedUrl { get; set; }
+        }
+
+        private class BatchSignItem
+        {
+            [JsonPropertyName("path")]
+            public string? Path { get; set; }
+
             [JsonPropertyName("signedURL")]
             public string? SignedUrl { get; set; }
         }
