@@ -9,7 +9,8 @@ using RacehorseTransport.Services.Mappers;
 
 namespace RacehorseTransport.Services.Implementations
 {
-    public class TripPlanningService : ITripPlanningService
+    // Phần tra cứu nằm ở file này; phần lập kế hoạch và trình duyệt nằm ở TripPlanningService.Workflow.cs
+    public partial class TripPlanningService : ITripPlanningService
     {
         // Chuyến ở hai trạng thái này không còn giữ xe, người hay ngựa
         private static readonly string[] ReleasedTripStatuses = { TripStatuses.Completed, TripStatuses.Cancelled };
@@ -18,17 +19,38 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IRepository<TransportAsset> _assetRepo;
         private readonly IRepository<User> _userRepo;
         private readonly IRepository<Trip> _tripRepo;
+        private readonly IRepository<TripCrew> _crewRepo;
+        private readonly IRepository<TripHorse> _tripHorseRepo;
+        private readonly IRepository<RouteCheckpoint> _checkpointRepo;
+        private readonly ITripService _tripService;
+        private readonly ICodeGenerator _codeGenerator;
+        private readonly INotificationService _notificationService;
+        private readonly IUnitOfWork _unitOfWork;
 
         public TripPlanningService(
             IRepository<BookingHorse> bookingHorseRepo,
             IRepository<TransportAsset> assetRepo,
             IRepository<User> userRepo,
-            IRepository<Trip> tripRepo)
+            IRepository<Trip> tripRepo,
+            IRepository<TripCrew> crewRepo,
+            IRepository<TripHorse> tripHorseRepo,
+            IRepository<RouteCheckpoint> checkpointRepo,
+            ITripService tripService,
+            ICodeGenerator codeGenerator,
+            INotificationService notificationService,
+            IUnitOfWork unitOfWork)
         {
             _bookingHorseRepo = bookingHorseRepo;
             _assetRepo = assetRepo;
             _userRepo = userRepo;
             _tripRepo = tripRepo;
+            _crewRepo = crewRepo;
+            _tripHorseRepo = tripHorseRepo;
+            _checkpointRepo = checkpointRepo;
+            _tripService = tripService;
+            _codeGenerator = codeGenerator;
+            _notificationService = notificationService;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<IReadOnlyList<UnplannedHorseModel>> GetUnplannedHorsesAsync(string? transportMode, int? bookingId)

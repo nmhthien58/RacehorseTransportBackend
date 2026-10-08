@@ -1,0 +1,687 @@
+using Microsoft.EntityFrameworkCore;
+using RacehorseTransport.Repositories.Constants;
+using RacehorseTransport.Repositories.Entities;
+using RacehorseTransport.Services.BusinessModels;
+using RacehorseTransport.Services.Constants;
+using RacehorseTransport.Services.Exceptions;
+
+namespace RacehorseTransport.Services.Implementations
+{
+    // Flow 3: Coordinator lập bản nháp chuyến (xe, đoàn, ngựa, mốc) -> trình -> Manager duyệt hoặc trả về.
+    public partial class TripPlanningService
+    {
+        // Tạm dùng khi đánh lại thứ tự mốc, xem ResequenceAsync
+        private const int ResequenceOffset = 100000;
+
+        // =============================================================================================
+        // Bản nháp
+        // =============================================================================================
+
+        public async Task<TripDetailModel> CreateTripAsync(TripPlanModel plan, CurrentUser currentUser)
+        {
+            await ValidatePlanAsync(plan, excludeTripId: null);
+            if (plan.Checkpoints != null)
+            {
+                ValidateCheckpointInputs(plan.Checkpoints);
+            }
+
+            int tripId = await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                var trip = new Trip
+                {
+                    TripCode = await _codeGenerator.NextAsync(CodePrefixes.Trip),
+                    VehicleId = plan.VehicleId,
+                    PlannedStartDate = plan.PlannedStartDate,
+                    PlannedEndDate = plan.PlannedEndDate,
+                    PlannedCost = plan.PlannedCost,
+                    OverallStatus = TripStatuses.Draft,
+                    PlannedByUserId = currentUser.UserId,
+                    Crew = BuildCrew(plan.Crew),
+                    TripHorses = BuildTripHorses(plan.Horses),
+                    Checkpoints = BuildCheckpoints(plan.Checkpoints ?? new List<CheckpointInputModel>())
+                };
+
+                await _tripRepo.AddAsync(trip);
+                return trip.TripId;
+            });
+
+            return await _tripService.GetTripByIdAsync(tripId, currentUser);
+        }
+
+        // Sửa bản nháp: thay toàn bộ đoàn xe và danh sách ngựa; các mốc chỉ bị thay khi plan.Checkpoints có giá trị
+        public async Task<TripDetailModel> UpdateTripAsync(int tripId, TripPlanModel plan, CurrentUser currentUser)
+        {
+            var trip = await GetDraftForEditAsync(tripId, currentUser);
+
+            await ValidatePlanAsync(plan, excludeTripId: tripId);
+            if (plan.Checkpoints != null)
+            {
+                ValidateCheckpointInputs(plan.Checkpoints);
+            }
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                // Xóa trước, thêm sau thành hai lần lưu để không vướng ràng buộc duy nhất (ô chuồng, thứ tự mốc)
+                await _crewRepo.DeleteRangeAsync(trip.Crew.ToList());
+                await _tripHorseRepo.DeleteRangeAsync(trip.TripHorses.ToList());
+                if (plan.Checkpoints != null)
+                {
+                    await _checkpointRepo.DeleteRangeAsync(trip.Checkpoints.ToList());
+                }
+
+                trip.VehicleId = plan.VehicleId;
+                trip.PlannedStartDate = plan.PlannedStartDate;
+                trip.PlannedEndDate = plan.PlannedEndDate;
+                trip.PlannedCost = plan.PlannedCost;
+
+                foreach (var member in BuildCrew(plan.Crew))
+                {
+                    trip.Crew.Add(member);
+                }
+                foreach (var tripHorse in BuildTripHorses(plan.Horses))
+                {
+                    trip.TripHorses.Add(tripHorse);
+                }
+                if (plan.Checkpoints != null)
+                {
+                    foreach (var checkpoint in BuildCheckpoints(plan.Checkpoints))
+                    {
+                        trip.Checkpoints.Add(checkpoint);
+                    }
+                }
+
+                await _tripRepo.UpdateAsync(trip);
+            });
+
+            return await _tripService.GetTripByIdAsync(tripId, currentUser);
+        }
+
+        // =============================================================================================
+        // Mốc lộ trình của bản nháp
+        // =============================================================================================
+
+        public async Task<TripDetailModel> AddCheckpointAsync(int tripId, CheckpointInputModel input, CurrentUser currentUser)
+        {
+            var trip = await GetDraftForEditAsync(tripId, currentUser);
+            ValidateCheckpointInputs(new[] { input });
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                var ordered = trip.Checkpoints.OrderBy(c => c.SequenceOrder).ToList();
+
+                var checkpoint = ToCheckpoint(input, sequenceOrder: ordered.Count + 1);
+                checkpoint.TripId = tripId;
+                await _checkpointRepo.AddAsync(checkpoint);
+
+                // Chèn vào giữa thì đánh lại thứ tự cả danh sách
+                if (input.Position.HasValue && input.Position.Value <= ordered.Count)
+                {
+                    ordered.Insert(Math.Max(1, input.Position.Value) - 1, checkpoint);
+                    await ResequenceAsync(ordered);
+                }
+            });
+
+            return await _tripService.GetTripByIdAsync(tripId, currentUser);
+        }
+
+        public async Task<TripDetailModel> UpdateCheckpointAsync(int tripId, int checkpointId, CheckpointInputModel input, CurrentUser currentUser)
+        {
+            var trip = await GetDraftForEditAsync(tripId, currentUser);
+            var checkpoint = FindCheckpoint(trip, checkpointId);
+            ValidateCheckpointInputs(new[] { input });
+
+            checkpoint.CheckpointName = input.CheckpointName;
+            checkpoint.CheckpointType = input.CheckpointType;
+            checkpoint.Address = input.Address;
+            checkpoint.PlannedTime = input.PlannedTime;
+            checkpoint.MandatoryRestMinutes = input.MandatoryRestMinutes;
+
+            await _checkpointRepo.UpdateAsync(checkpoint);
+            return await _tripService.GetTripByIdAsync(tripId, currentUser);
+        }
+
+        public async Task<TripDetailModel> DeleteCheckpointAsync(int tripId, int checkpointId, CurrentUser currentUser)
+        {
+            var trip = await GetDraftForEditAsync(tripId, currentUser);
+            var checkpoint = FindCheckpoint(trip, checkpointId);
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                await _checkpointRepo.DeleteAsync(checkpoint);
+                await ResequenceAsync(trip.Checkpoints.OrderBy(c => c.SequenceOrder).ToList());
+            });
+
+            return await _tripService.GetTripByIdAsync(tripId, currentUser);
+        }
+
+        public async Task<TripDetailModel> ReorderCheckpointsAsync(int tripId, List<int> checkpointIds, CurrentUser currentUser)
+        {
+            var trip = await GetDraftForEditAsync(tripId, currentUser);
+
+            var existingIds = trip.Checkpoints.Select(c => c.CheckpointId).OrderBy(id => id).ToList();
+            if (checkpointIds.Count != checkpointIds.Distinct().Count()
+                || !existingIds.SequenceEqual(checkpointIds.OrderBy(id => id)))
+            {
+                throw new BusinessException("CheckpointIds must contain every checkpoint of this trip exactly once.");
+            }
+
+            var ordered = checkpointIds.Select(id => trip.Checkpoints.First(c => c.CheckpointId == id)).ToList();
+            await _unitOfWork.ExecuteInTransactionAsync(() => ResequenceAsync(ordered));
+
+            return await _tripService.GetTripByIdAsync(tripId, currentUser);
+        }
+
+        // =============================================================================================
+        // Trình và duyệt kế hoạch
+        // =============================================================================================
+
+        public async Task<TripDetailModel> SubmitTripAsync(int tripId, CurrentUser currentUser)
+        {
+            var trip = await GetDraftForEditAsync(tripId, currentUser);
+
+            // Kiểm tra lại toàn bộ: từ lúc lập nháp tới giờ xe, người hoặc đơn có thể đã thay đổi
+            await ValidatePlanAsync(ToPlan(trip), excludeTripId: tripId);
+            ValidateRoute(trip);
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                trip.OverallStatus = TripStatuses.PendingApproval;
+                await _tripRepo.UpdateAsync(trip);
+
+                await _notificationService.SendToRoleAsync(
+                    UserRoles.LogisticsManager,
+                    $"Trip plan {trip.TripCode} awaiting approval",
+                    $"A transport plan for {trip.TripHorses.Count} horse(s) has been submitted for your review.",
+                    NotificationReferenceTypes.Trip,
+                    trip.TripId);
+            });
+
+            return await _tripService.GetTripByIdAsync(tripId, currentUser);
+        }
+
+        public async Task<TripDetailModel> ApproveTripAsync(int tripId, CurrentUser currentUser)
+        {
+            var trip = await GetTrackedTripAsync(tripId);
+            EnsureStatus(trip, TripStatuses.PendingApproval, "approved");
+            await ValidatePlanAsync(ToPlan(trip), excludeTripId: tripId);
+
+            var customerIds = await _tripHorseRepo.GetQueryable()
+                .Where(th => th.TripId == tripId)
+                .Select(th => th.BookingHorse!.Booking!.CustomerUserId)
+                .Distinct()
+                .ToListAsync();
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                trip.OverallStatus = TripStatuses.Scheduled;
+                trip.ApprovedByUserId = currentUser.UserId;
+                trip.ApprovedAt = DateTimeOffset.UtcNow;
+                trip.PlanRejectionReason = null;
+                await _tripRepo.UpdateAsync(trip);
+
+                await _notificationService.SendToUsersAsync(
+                    trip.Crew.Select(c => c.UserId),
+                    $"You are assigned to trip {trip.TripCode}",
+                    $"Departure is planned for {trip.PlannedStartDate:yyyy-MM-dd HH:mm} UTC. Open the trip to see the schedule, horses and checkpoints.",
+                    NotificationReferenceTypes.Trip,
+                    trip.TripId);
+
+                if (trip.PlannedByUserId.HasValue)
+                {
+                    await _notificationService.SendAsync(
+                        trip.PlannedByUserId.Value,
+                        $"Trip plan {trip.TripCode} approved",
+                        "The transport plan has been approved and the crew has been notified.",
+                        NotificationReferenceTypes.Trip,
+                        trip.TripId);
+                }
+
+                await _notificationService.SendToUsersAsync(
+                    customerIds,
+                    $"Your horses are scheduled on trip {trip.TripCode}",
+                    $"Transport has been scheduled. Planned departure: {trip.PlannedStartDate:yyyy-MM-dd HH:mm} UTC.",
+                    NotificationReferenceTypes.Trip,
+                    trip.TripId);
+            });
+
+            return await _tripService.GetTripByIdAsync(tripId, currentUser);
+        }
+
+        // Trả kế hoạch về cho Coordinator sửa. Bị trả lần thứ 3 thì chuyến bị hủy, ngựa quay lại hàng chờ xếp chuyến.
+        public async Task<TripDetailModel> RejectTripAsync(int tripId, string reason, CurrentUser currentUser)
+        {
+            var trip = await GetTrackedTripAsync(tripId);
+            EnsureStatus(trip, TripStatuses.PendingApproval, "rejected");
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                trip.PlanRejectionCount += 1;
+                trip.PlanRejectionReason = reason.Trim();
+                bool cancelled = trip.PlanRejectionCount >= TripStatuses.MaxPlanRejectionCount;
+                trip.OverallStatus = cancelled ? TripStatuses.Cancelled : TripStatuses.Draft;
+                await _tripRepo.UpdateAsync(trip);
+
+                if (trip.PlannedByUserId.HasValue)
+                {
+                    await _notificationService.SendAsync(
+                        trip.PlannedByUserId.Value,
+                        cancelled ? $"Trip plan {trip.TripCode} cancelled" : $"Trip plan {trip.TripCode} returned",
+                        cancelled
+                            ? $"The plan was rejected {trip.PlanRejectionCount} times and has been cancelled. Reason: {trip.PlanRejectionReason}"
+                            : $"The plan needs changes ({trip.PlanRejectionCount}/{TripStatuses.MaxPlanRejectionCount}). Reason: {trip.PlanRejectionReason}",
+                        NotificationReferenceTypes.Trip,
+                        trip.TripId);
+                }
+            });
+
+            return await _tripService.GetTripByIdAsync(tripId, currentUser);
+        }
+
+        // Hủy chuyến chưa khởi hành: người lập kế hoạch, Manager hoặc Admin
+        public async Task<TripDetailModel> CancelTripAsync(int tripId, CurrentUser currentUser)
+        {
+            var trip = await GetTrackedTripAsync(tripId);
+
+            bool isPlanner = currentUser.Role == UserRoles.FleetCoordinator && trip.PlannedByUserId == currentUser.UserId;
+            if (!isPlanner && !currentUser.IsInRole(UserRoles.LogisticsManager, UserRoles.Admin))
+            {
+                throw new ForbiddenException("Only the coordinator who planned this trip or a manager can cancel it.");
+            }
+
+            if (trip.OverallStatus != TripStatuses.Draft
+                && trip.OverallStatus != TripStatuses.PendingApproval
+                && trip.OverallStatus != TripStatuses.Scheduled)
+            {
+                throw new BusinessException($"A trip can only be cancelled before departure (current status: {trip.OverallStatus}).");
+            }
+
+            bool wasScheduled = trip.OverallStatus == TripStatuses.Scheduled;
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                trip.OverallStatus = TripStatuses.Cancelled;
+                await _tripRepo.UpdateAsync(trip);
+
+                var recipients = new List<int>();
+                if (wasScheduled)
+                {
+                    recipients.AddRange(trip.Crew.Select(c => c.UserId)); // đoàn xe đã được báo lịch thì phải báo hủy
+                }
+                if (trip.PlannedByUserId.HasValue && trip.PlannedByUserId != currentUser.UserId)
+                {
+                    recipients.Add(trip.PlannedByUserId.Value);
+                }
+
+                await _notificationService.SendToUsersAsync(
+                    recipients,
+                    $"Trip {trip.TripCode} cancelled",
+                    "This trip has been cancelled. Its horses are back in the planning queue.",
+                    NotificationReferenceTypes.Trip,
+                    trip.TripId);
+            });
+
+            return await _tripService.GetTripByIdAsync(tripId, currentUser);
+        }
+
+        // =============================================================================================
+        // Kiểm tra kế hoạch
+        // =============================================================================================
+
+        // Mọi quy tắc về xe, ngựa và đoàn xe của một kế hoạch. excludeTripId: bỏ qua chính chuyến đang sửa khi dò trùng lịch.
+        private async Task ValidatePlanAsync(TripPlanModel plan, int? excludeTripId)
+        {
+            var startUtc = plan.PlannedStartDate.ToUniversalTime();
+            var endUtc = plan.PlannedEndDate.ToUniversalTime();
+
+            if (endUtc <= startUtc)
+            {
+                throw new BusinessException("PlannedEndDate must be after PlannedStartDate.");
+            }
+            if (startUtc <= DateTimeOffset.UtcNow)
+            {
+                throw new BusinessException("PlannedStartDate must be in the future.");
+            }
+            if (plan.PlannedCost < 0)
+            {
+                throw new BusinessException("PlannedCost cannot be negative.");
+            }
+
+            // ---------- Ngựa ----------
+            if (plan.Horses.Count == 0)
+            {
+                throw new BusinessException("A trip needs at least one horse.");
+            }
+
+            var bookingHorseIds = plan.Horses.Select(h => h.BookingHorseId).ToList();
+            if (bookingHorseIds.Count != bookingHorseIds.Distinct().Count())
+            {
+                throw new BusinessException("The same horse appears more than once in this trip.");
+            }
+
+            var bookingHorses = await _bookingHorseRepo.GetQueryable()
+                .AsNoTracking()
+                .Include(bh => bh.Horse)
+                .Include(bh => bh.Booking)
+                .Where(bh => bookingHorseIds.Contains(bh.BookingHorseId))
+                .ToListAsync();
+
+            var unknownIds = bookingHorseIds.Except(bookingHorses.Select(bh => bh.BookingHorseId)).ToList();
+            if (unknownIds.Count > 0)
+            {
+                throw new BusinessException($"Booking horse(s) with ID {string.Join(", ", unknownIds)} were not found.");
+            }
+
+            var notPlannable = bookingHorses.FirstOrDefault(bh =>
+                bh.Status == BookingHorseStatuses.Cancelled || bh.Booking!.Status != BookingStatuses.Approved);
+            if (notPlannable != null)
+            {
+                throw new BusinessException(
+                    $"Horse '{notPlannable.Horse!.Name}' cannot be planned: booking {notPlannable.Booking!.BookingCode} is {notPlannable.Booking.Status}. Only horses of approved bookings can be placed on a trip.");
+            }
+
+            var modes = bookingHorses.Select(bh => bh.Booking!.TransportMode).Distinct().ToList();
+            if (modes.Count > 1)
+            {
+                throw new BusinessException("Ground and air bookings cannot be combined on the same trip.");
+            }
+            string transportMode = modes[0];
+
+            // Mỗi con ngựa trong đơn chỉ nằm trên một chuyến còn hiệu lực
+            var alreadyPlanned = await _tripHorseRepo.GetQueryable()
+                .Where(th => bookingHorseIds.Contains(th.BookingHorseId)
+                    && th.TripId != excludeTripId
+                    && th.Trip!.OverallStatus != TripStatuses.Cancelled)
+                .Select(th => th.BookingHorse!.Horse!.Name + " (" + th.Trip!.TripCode + ")")
+                .ToListAsync();
+
+            if (alreadyPlanned.Count > 0)
+            {
+                throw new BusinessException($"These horses are already on another trip: {string.Join(", ", alreadyPlanned)}.");
+            }
+
+            // ---------- Xe ----------
+            var vehicle = await _assetRepo.GetByIdAsync(plan.VehicleId);
+            if (vehicle == null)
+            {
+                throw new BusinessException($"Vehicle with ID {plan.VehicleId} was not found.");
+            }
+            if (vehicle.Status == AssetStatuses.Maintenance)
+            {
+                throw new BusinessException($"Vehicle {vehicle.AssetCode} is under maintenance.");
+            }
+
+            bool isAirStall = vehicle.AssetType == AssetTypes.AirStall;
+            if ((transportMode == TransportModes.Air) != isAirStall)
+            {
+                throw new BusinessException(transportMode == TransportModes.Air
+                    ? "Air bookings must be planned on an air stall."
+                    : "Ground bookings must be planned on a truck or van, not an air stall.");
+            }
+
+            if (plan.Horses.Count > vehicle.CapacityHorses)
+            {
+                throw new BusinessException($"Vehicle {vehicle.AssetCode} carries at most {vehicle.CapacityHorses} horse(s); this plan has {plan.Horses.Count}.");
+            }
+
+            var slots = plan.Horses.Select(h => h.StallSlotNumber).ToList();
+            if (slots.Any(s => s < 1 || s > vehicle.CapacityHorses))
+            {
+                throw new BusinessException($"StallSlotNumber must be between 1 and {vehicle.CapacityHorses} for vehicle {vehicle.AssetCode}.");
+            }
+            if (slots.Count != slots.Distinct().Count())
+            {
+                throw new BusinessException("Two horses cannot share the same stall slot.");
+            }
+
+            var otherTrips = OverlappingTrips(startUtc, endUtc).Where(t => t.TripId != excludeTripId);
+
+            var vehicleConflict = await otherTrips.Where(t => t.VehicleId == plan.VehicleId).Select(t => t.TripCode).FirstOrDefaultAsync();
+            if (vehicleConflict != null)
+            {
+                throw new BusinessException($"Vehicle {vehicle.AssetCode} is already booked on trip {vehicleConflict} during this period.");
+            }
+
+            // ---------- Đoàn xe ----------
+            if (plan.Crew.Any(c => !CrewRoles.All.Contains(c.CrewRole)))
+            {
+                throw new BusinessException($"CrewRole must be one of: {string.Join(", ", CrewRoles.All)}.");
+            }
+            if (plan.Crew.GroupBy(c => new { c.UserId, c.CrewRole }).Any(g => g.Count() > 1))
+            {
+                throw new BusinessException("A crew member is listed twice with the same role.");
+            }
+            if (plan.Crew.GroupBy(c => c.CrewRole).Any(g => g.Count(c => c.IsLead) > 1))
+            {
+                throw new BusinessException("There can be only one lead driver and one lead escort.");
+            }
+
+            int driverCount = plan.Crew.Count(c => c.CrewRole == CrewRoles.Driver);
+            int escortCount = plan.Crew.Count(c => c.CrewRole == CrewRoles.Escort);
+            int requiredEscorts = (int)Math.Ceiling(plan.Horses.Count / (double)PricingService.HorsesPerGroom);
+
+            if (driverCount == 0)
+            {
+                throw new BusinessException("A trip needs at least one driver.");
+            }
+            if (escortCount < requiredEscorts)
+            {
+                throw new BusinessException($"{plan.Horses.Count} horse(s) need at least {requiredEscorts} escort(s) (one per {PricingService.HorsesPerGroom} horses); this plan has {escortCount}.");
+            }
+
+            var crewUserIds = plan.Crew.Select(c => c.UserId).Distinct().ToList();
+            var crewUsers = await _userRepo.GetQueryable()
+                .AsNoTracking()
+                .Where(u => crewUserIds.Contains(u.UserId) && u.IsActive && u.Role == UserRoles.DriverEscort)
+                .ToListAsync();
+
+            var invalidCrewIds = crewUserIds.Except(crewUsers.Select(u => u.UserId)).ToList();
+            if (invalidCrewIds.Count > 0)
+            {
+                throw new BusinessException($"User(s) with ID {string.Join(", ", invalidCrewIds)} are not active drivers / escorts.");
+            }
+
+            var busyCrew = await otherTrips
+                .SelectMany(t => t.Crew, (t, c) => new { c.UserId, c.User!.FullName, t.TripCode })
+                .Where(x => crewUserIds.Contains(x.UserId))
+                .Select(x => x.FullName + " (" + x.TripCode + ")")
+                .Distinct()
+                .ToListAsync();
+
+            if (busyCrew.Count > 0)
+            {
+                throw new BusinessException($"These crew members are already assigned during this period: {string.Join(", ", busyCrew)}.");
+            }
+        }
+
+        private static void ValidateCheckpointInputs(IEnumerable<CheckpointInputModel> checkpoints)
+        {
+            foreach (var checkpoint in checkpoints)
+            {
+                if (!CheckpointTypes.All.Contains(checkpoint.CheckpointType))
+                {
+                    throw new BusinessException($"CheckpointType '{checkpoint.CheckpointType}' is invalid. Allowed values: {string.Join(", ", CheckpointTypes.All)}.");
+                }
+                if (checkpoint.MandatoryRestMinutes < 0)
+                {
+                    throw new BusinessException("MandatoryRestMinutes cannot be negative.");
+                }
+            }
+        }
+
+        // Lộ trình hoàn chỉnh mới được trình: bắt đầu bằng Origin, kết thúc bằng Destination, thời gian tăng dần
+        // và nằm trong khoảng thời gian kế hoạch của chuyến.
+        private static void ValidateRoute(Trip trip)
+        {
+            var route = trip.Checkpoints.Where(c => c.IsActive).OrderBy(c => c.SequenceOrder).ToList();
+
+            if (route.Count < 2)
+            {
+                throw new BusinessException("The route needs at least an origin and a destination checkpoint.");
+            }
+            if (route[0].CheckpointType != CheckpointTypes.Origin)
+            {
+                throw new BusinessException("The first checkpoint must be of type Origin.");
+            }
+            if (route[^1].CheckpointType != CheckpointTypes.Destination)
+            {
+                throw new BusinessException("The last checkpoint must be of type Destination.");
+            }
+            if (route.Skip(1).Any(c => c.CheckpointType == CheckpointTypes.Origin)
+                || route.Take(route.Count - 1).Any(c => c.CheckpointType == CheckpointTypes.Destination))
+            {
+                throw new BusinessException("Only the first checkpoint can be an Origin and only the last can be a Destination.");
+            }
+
+            for (int i = 1; i < route.Count; i++)
+            {
+                if (route[i].PlannedTime <= route[i - 1].PlannedTime)
+                {
+                    throw new BusinessException($"Checkpoint '{route[i].CheckpointName}' must be planned after '{route[i - 1].CheckpointName}'.");
+                }
+            }
+
+            if (route[0].PlannedTime < trip.PlannedStartDate || route[^1].PlannedTime > trip.PlannedEndDate)
+            {
+                throw new BusinessException("Checkpoint times must fall between the trip's planned start and end.");
+            }
+        }
+
+        // =============================================================================================
+        // Hàm phụ
+        // =============================================================================================
+
+        // Chuyến được nạp kèm đoàn xe, ngựa và mốc; chỉ bản nháp của chính người lập (hoặc Admin) mới sửa được
+        private async Task<Trip> GetDraftForEditAsync(int tripId, CurrentUser currentUser)
+        {
+            var trip = await GetTrackedTripAsync(tripId);
+
+            bool isPlanner = currentUser.Role == UserRoles.FleetCoordinator && trip.PlannedByUserId == currentUser.UserId;
+            if (!isPlanner && currentUser.Role != UserRoles.Admin)
+            {
+                throw new ForbiddenException("Only the coordinator who planned this trip can change it.");
+            }
+
+            if (trip.OverallStatus != TripStatuses.Draft)
+            {
+                throw new BusinessException($"Only a draft trip can be changed (current status: {trip.OverallStatus}).");
+            }
+
+            return trip;
+        }
+
+        private async Task<Trip> GetTrackedTripAsync(int tripId)
+        {
+            var trip = await _tripRepo.GetQueryable()
+                .Include(t => t.Crew)
+                .Include(t => t.TripHorses)
+                .Include(t => t.Checkpoints)
+                .FirstOrDefaultAsync(t => t.TripId == tripId);
+
+            if (trip == null)
+            {
+                throw new NotFoundException($"Trip with ID {tripId} was not found.");
+            }
+            return trip;
+        }
+
+        private static RouteCheckpoint FindCheckpoint(Trip trip, int checkpointId)
+        {
+            var checkpoint = trip.Checkpoints.FirstOrDefault(c => c.CheckpointId == checkpointId);
+            if (checkpoint == null)
+            {
+                throw new NotFoundException($"Checkpoint with ID {checkpointId} was not found on trip {trip.TripCode}.");
+            }
+            return checkpoint;
+        }
+
+        private static void EnsureStatus(Trip trip, string requiredStatus, string action)
+        {
+            if (trip.OverallStatus != requiredStatus)
+            {
+                throw new BusinessException($"Only a trip in status {requiredStatus} can be {action} (current status: {trip.OverallStatus}).");
+            }
+        }
+
+        // DB cấm hai mốc đang hiệu lực của một chuyến trùng thứ tự, và kiểm tra ngay từng câu lệnh.
+        // Đổi chỗ trực tiếp (1 <-> 2) sẽ trùng giữa chừng, nên đẩy tất cả ra vùng số tạm rồi mới gán thứ tự thật.
+        private async Task ResequenceAsync(List<RouteCheckpoint> ordered)
+        {
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                ordered[i].SequenceOrder = ResequenceOffset + i;
+            }
+            await _checkpointRepo.SaveChangesAsync();
+
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                ordered[i].SequenceOrder = i + 1;
+            }
+            await _checkpointRepo.SaveChangesAsync();
+        }
+
+        // Mỗi vai trò có đúng một trưởng nhóm: nếu chưa chọn thì người đầu tiên của vai trò đó là trưởng nhóm
+        private static List<TripCrew> BuildCrew(List<TripCrewInputModel> crew)
+        {
+            var result = crew.Select(c => new TripCrew
+            {
+                UserId = c.UserId,
+                CrewRole = c.CrewRole,
+                IsLead = c.IsLead,
+                Duty = c.Duty
+            }).ToList();
+
+            foreach (var roleGroup in result.GroupBy(c => c.CrewRole))
+            {
+                if (!roleGroup.Any(c => c.IsLead))
+                {
+                    roleGroup.First().IsLead = true;
+                }
+            }
+
+            return result;
+        }
+
+        private static List<TripHorse> BuildTripHorses(List<TripHorseInputModel> horses)
+        {
+            return horses.Select(h => new TripHorse
+            {
+                BookingHorseId = h.BookingHorseId,
+                StallSlotNumber = h.StallSlotNumber,
+                Notes = h.Notes
+            }).ToList();
+        }
+
+        private static List<RouteCheckpoint> BuildCheckpoints(List<CheckpointInputModel> checkpoints)
+        {
+            return checkpoints.Select((c, index) => ToCheckpoint(c, index + 1)).ToList();
+        }
+
+        private static RouteCheckpoint ToCheckpoint(CheckpointInputModel input, int sequenceOrder)
+        {
+            return new RouteCheckpoint
+            {
+                SequenceOrder = sequenceOrder,
+                CheckpointName = input.CheckpointName,
+                CheckpointType = input.CheckpointType,
+                Address = input.Address,
+                PlannedTime = input.PlannedTime,
+                MandatoryRestMinutes = input.MandatoryRestMinutes,
+                Status = CheckpointStatuses.Pending,
+                IsActive = true
+            };
+        }
+
+        private static TripPlanModel ToPlan(Trip trip)
+        {
+            return new TripPlanModel
+            {
+                VehicleId = trip.VehicleId,
+                PlannedStartDate = trip.PlannedStartDate,
+                PlannedEndDate = trip.PlannedEndDate,
+                PlannedCost = trip.PlannedCost,
+                Crew = trip.Crew.Select(c => new TripCrewInputModel { UserId = c.UserId, CrewRole = c.CrewRole, IsLead = c.IsLead, Duty = c.Duty }).ToList(),
+                Horses = trip.TripHorses.Select(h => new TripHorseInputModel { BookingHorseId = h.BookingHorseId, StallSlotNumber = h.StallSlotNumber, Notes = h.Notes }).ToList()
+            };
+        }
+    }
+}

@@ -146,9 +146,9 @@ Làm sau khi T-05 và T-26 xong. Tạo project `RacehorseTransport.Tests` (xUnit
 ### M4 – Flow 3: Lộ trình & điều phối phương tiện · REQUIRED
 
 - [x] **T-14 · Hàng chờ xếp chuyến & tài nguyên rảnh** — `GET /api/trips/unplanned-horses`: ngựa thuộc đơn `Approved` chưa nằm trên chuyến nào, mọi Coordinator đều thấy. `GET /api/trips/available-vehicles?from=&to=&mode=`, `/available-crew?from=&to=`: loại xe/người đã có chuyến trùng thời gian; đơn đường bay chỉ dùng `AirStall`.
-- [ ] **T-15 · Dự thảo chuyến** — `POST /api/trips` (Coordinator): xe, nhân sự (`TripCrew`, ít nhất 1 Driver, 1 Escort cho mỗi 3 ngựa), ngựa (`TripHorses`, lấy từ **một hoặc nhiều** đơn `Approved` cùng phương thức vận chuyển; ngược lại ngựa của một đơn có thể chia ra nhiều chuyến, không vượt sức chứa, không trùng ô chuồng), danh sách mốc. `PUT /api/trips/{id}` khi còn `Draft`.
-- [ ] **T-16 · Mốc lộ trình** — Thêm/sửa/xóa/đổi thứ tự `RouteCheckpoints` khi chuyến còn `Draft`; mốc đầu là `Origin`, mốc cuối là `Destination`, thời gian tăng dần.
-- [ ] **T-17 · Trình & duyệt kế hoạch** — `POST /api/trips/{id}/submit` (→ `PendingApproval`), `/approve` (Manager → `Scheduled`, báo tài xế/áp tải), `/reject` (lý do, tăng `PlanRejectionCount`; lần thứ 3 → `Cancelled`).
+- [x] **T-15 · Dự thảo chuyến** — `POST /api/trips` (Coordinator): xe, nhân sự (`TripCrew`, ít nhất 1 Driver, 1 Escort cho mỗi 3 ngựa), ngựa (`TripHorses`, lấy từ **một hoặc nhiều** đơn `Approved` cùng phương thức vận chuyển; ngược lại ngựa của một đơn có thể chia ra nhiều chuyến, không vượt sức chứa, không trùng ô chuồng), danh sách mốc. `PUT /api/trips/{id}` khi còn `Draft`.
+- [x] **T-16 · Mốc lộ trình** — Thêm/sửa/xóa/đổi thứ tự `RouteCheckpoints` khi chuyến còn `Draft`; mốc đầu là `Origin`, mốc cuối là `Destination`, thời gian tăng dần.
+- [x] **T-17 · Trình & duyệt kế hoạch** — `POST /api/trips/{id}/submit` (→ `PendingApproval`), `/approve` (Manager → `Scheduled`, báo tài xế/áp tải), `/reject` (lý do, tăng `PlanRejectionCount`; lần thứ 3 → `Cancelled`).
 - [x] **T-18 · Màn hình tài xế** — `GET /api/trips` (tài xế / áp tải chỉ thấy chuyến mình có tên trong `TripCrew`; nhân sự khác thấy tất cả; lọc theo trạng thái, ngày), `GET /api/trips/{id}` đủ lịch trình, đoàn xe, ngựa phụ trách kèm yêu cầu chăm sóc, các mốc, và các đơn trên chuyến.
 
 ### M5 – Flow 4: Trạng thái & nhật ký lộ trình · REQUIRED

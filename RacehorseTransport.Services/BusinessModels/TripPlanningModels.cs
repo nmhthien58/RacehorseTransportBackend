@@ -23,6 +23,47 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? DossierStatus { get; set; }
     }
 
+    // Kế hoạch chuyến do Coordinator lập (dùng cho cả tạo mới và sửa bản nháp)
+    public class TripPlanModel
+    {
+        public int VehicleId { get; set; }
+        public DateTimeOffset PlannedStartDate { get; set; }
+        public DateTimeOffset PlannedEndDate { get; set; }
+        public decimal PlannedCost { get; set; }
+        public List<TripCrewInputModel> Crew { get; set; } = new();
+        public List<TripHorseInputModel> Horses { get; set; } = new();
+
+        // null khi sửa = giữ nguyên các mốc hiện có; có giá trị = thay toàn bộ
+        public List<CheckpointInputModel>? Checkpoints { get; set; }
+    }
+
+    public class TripCrewInputModel
+    {
+        public int UserId { get; set; }
+        public string CrewRole { get; set; } = string.Empty;
+        public bool IsLead { get; set; }
+        public string? Duty { get; set; }
+    }
+
+    public class TripHorseInputModel
+    {
+        public int BookingHorseId { get; set; }
+        public int StallSlotNumber { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    public class CheckpointInputModel
+    {
+        public string CheckpointName { get; set; } = string.Empty;
+        public string CheckpointType { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public DateTimeOffset PlannedTime { get; set; }
+        public int MandatoryRestMinutes { get; set; }
+
+        // Chỉ dùng khi thêm một mốc: vị trí chèn (1 = đầu tiên). Bỏ trống = thêm vào cuối.
+        public int? Position { get; set; }
+    }
+
     public class AvailableVehicleModel
     {
         public int AssetId { get; set; }
