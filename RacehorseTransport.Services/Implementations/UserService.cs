@@ -84,8 +84,7 @@ namespace RacehorseTransport.Services.Implementations
                 Email = email,
                 PasswordHash = _passwordHasher.Hash(model.Password),
                 PhoneNumber = NormalizePhone(model.PhoneNumber),
-                Role = model.Role,
-                EmailVerifiedAt = DateTimeOffset.UtcNow // tài khoản do Admin tạo coi như đã xác thực
+                Role = model.Role
             };
 
             await _userRepo.AddAsync(user);

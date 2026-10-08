@@ -13,7 +13,7 @@ namespace RacehorseTransport.Services.Implementations
 {
     public class AuthService : IAuthService
     {
-        // Khoảng cách tối thiểu giữa hai lần gửi lại email xác thực / đặt lại mật khẩu cho cùng một tài khoản
+        // Khoảng cách tối thiểu giữa hai lần gửi email đặt lại mật khẩu cho cùng một tài khoản
         private static readonly TimeSpan ResendInterval = TimeSpan.FromMinutes(1);
 
         private readonly IRepository<User> _userRepo;
@@ -46,7 +46,6 @@ namespace RacehorseTransport.Services.Implementations
         }
 
         // Tự đăng ký chỉ tạo được tài khoản Customer; tài khoản nhân sự do Admin tạo.
-        // Tài khoản mới chưa xác thực email: vẫn đăng nhập được nhưng bị chặn ở các tính năng chính.
         public async Task<AuthResultModel> RegisterCustomerAsync(RegisterModel model)
         {
             string email = model.Email.Trim().ToLowerInvariant();
@@ -66,8 +65,6 @@ namespace RacehorseTransport.Services.Implementations
             };
 
             await _userRepo.AddAsync(user);
-            await SendVerificationEmailAsync(user);
-
             return await IssueTokensAsync(user);
         }
 
@@ -95,7 +92,6 @@ namespace RacehorseTransport.Services.Implementations
 
         // Đăng nhập bằng Google: frontend gửi ID token nhận từ Google, server kiểm tra rồi cấp token của hệ thống.
         // Email đã có tài khoản (khách hoặc nhân sự) thì đăng nhập vào tài khoản đó; chưa có thì tạo tài khoản Customer.
-        // Google đã xác nhận email nên tài khoản được coi là đã xác thực email.
         public async Task<AuthResultModel> LoginWithGoogleAsync(string idToken)
         {
             var google = await _googleTokenValidator.ValidateAsync(idToken);
@@ -110,23 +106,13 @@ namespace RacehorseTransport.Services.Implementations
                     Email = google.Email,
                     // Tài khoản tạo qua Google không có mật khẩu dùng được; muốn có thì dùng "quên mật khẩu" để đặt
                     PasswordHash = _passwordHasher.Hash(_tokenService.CreateRefreshToken()),
-                    Role = UserRoles.Customer,
-                    EmailVerifiedAt = DateTimeOffset.UtcNow
+                    Role = UserRoles.Customer
                 };
                 await _userRepo.AddAsync(user);
             }
-            else
+            else if (!user.IsActive)
             {
-                if (!user.IsActive)
-                {
-                    throw new ForbiddenException("This account has been deactivated.");
-                }
-
-                if (user.EmailVerifiedAt == null)
-                {
-                    user.EmailVerifiedAt = DateTimeOffset.UtcNow;
-                    await _userRepo.UpdateAsync(user);
-                }
+                throw new ForbiddenException("This account has been deactivated.");
             }
 
             return await IssueTokensAsync(user);
@@ -199,46 +185,6 @@ namespace RacehorseTransport.Services.Implementations
         }
 
         // =============================================================================================
-        // Xác thực email
-        // =============================================================================================
-
-        public async Task<UserModel> VerifyEmailAsync(string token)
-        {
-            var record = await ConsumeTokenAsync(token, UserTokenTypes.EmailVerification);
-            if (record == null)
-            {
-                throw new BusinessException("The verification link is invalid or has expired. Please request a new one.");
-            }
-
-            var user = await GetUserAsync(record.UserId);
-            if (user.EmailVerifiedAt == null)
-            {
-                user.EmailVerifiedAt = DateTimeOffset.UtcNow;
-                await _userRepo.UpdateAsync(user);
-            }
-
-            return user.ToBusinessModel();
-        }
-
-        public async Task ResendVerificationAsync(int userId)
-        {
-            var user = await GetUserAsync(userId);
-
-            if (user.EmailVerifiedAt != null)
-            {
-                throw new BusinessException("Your email address is already verified.");
-            }
-
-            await EnsureNotRequestedRecentlyAsync(userId, UserTokenTypes.EmailVerification);
-            await SendVerificationEmailAsync(user);
-        }
-
-        public async Task<bool> IsEmailVerifiedAsync(int userId)
-        {
-            return await _userRepo.ExistsAsync(u => u.UserId == userId && u.EmailVerifiedAt != null);
-        }
-
-        // =============================================================================================
         // Quên mật khẩu
         // =============================================================================================
 
@@ -285,7 +231,6 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             user.PasswordHash = _passwordHasher.Hash(newPassword);
-            user.EmailVerifiedAt ??= DateTimeOffset.UtcNow; // mở được link trong hộp thư nghĩa là email đúng của người này
             await _userRepo.UpdateAsync(user);
 
             // Đăng xuất mọi thiết bị: refresh token cũ không dùng được nữa
@@ -310,19 +255,6 @@ namespace RacehorseTransport.Services.Implementations
                 throw new NotFoundException($"User with ID {userId} was not found.");
             }
             return user;
-        }
-
-        private async Task SendVerificationEmailAsync(User user)
-        {
-            int hours = Math.Max(1, _emailOptions.VerificationTokenHours);
-            string token = await CreateTokenAsync(user.UserId, UserTokenTypes.EmailVerification, TimeSpan.FromHours(hours));
-
-            _emailService.Queue(user.Email, user.FullName, EmailTemplateNames.VerifyEmail, new Dictionary<string, string>
-            {
-                ["FullName"] = user.FullName,
-                ["Link"] = FrontendLink("verify-email", token),
-                ["ExpiresInHours"] = hours.ToString()
-            });
         }
 
         // Link mở trang của frontend; trang đó đọc token trên URL rồi gọi API tương ứng
@@ -357,7 +289,7 @@ namespace RacehorseTransport.Services.Implementations
         }
 
         // Tạo token ngẫu nhiên, lưu mã băm, trả về chuỗi gốc để gửi cho người dùng.
-        // Với link xác thực / đặt lại mật khẩu: link mới thay thế các link cũ chưa dùng.
+        // Với link đặt lại mật khẩu: link mới thay thế các link cũ chưa dùng.
         private async Task<string> CreateTokenAsync(int userId, string tokenType, TimeSpan lifetime)
         {
             if (tokenType != UserTokenTypes.Refresh)
@@ -412,12 +344,5 @@ namespace RacehorseTransport.Services.Implementations
             return await _tokenRepo.ExistsAsync(t => t.UserId == userId && t.TokenType == tokenType && t.CreatedAt > since);
         }
 
-        private async Task EnsureNotRequestedRecentlyAsync(int userId, string tokenType)
-        {
-            if (await WasRequestedRecentlyAsync(userId, tokenType))
-            {
-                throw new BusinessException("An email was sent less than a minute ago. Please check your inbox, or try again in a minute.");
-            }
-        }
     }
 }

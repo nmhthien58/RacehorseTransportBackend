@@ -27,7 +27,6 @@ namespace RacehorseTransport.API.Mappers
                 PhoneNumber = model.PhoneNumber,
                 Role = model.Role,
                 IsActive = model.IsActive,
-                EmailVerified = model.EmailVerified,
                 CreatedAt = model.CreatedAt
             };
         }

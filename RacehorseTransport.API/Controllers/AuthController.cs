@@ -129,32 +129,6 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
-        /// Confirm an email address with the token from the verification email.
-        /// </summary>
-        [HttpPost("verify-email")]
-        [AllowAnonymous]
-        [ProducesResponseType(typeof(ApiResponse<UserResponse>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request)
-        {
-            var user = await _authService.VerifyEmailAsync(request.Token);
-            return Ok(ApiResponse<UserResponse>.SuccessResult(user.ToResponse(), "Email verified successfully"));
-        }
-
-        /// <summary>
-        /// Send the verification email again to the logged-in user (at most once a minute).
-        /// </summary>
-        [HttpPost("resend-verification")]
-        [Authorize]
-        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> ResendVerification()
-        {
-            await _authService.ResendVerificationAsync(User.GetUserId());
-            return Ok(ApiResponse<object?>.SuccessResult(null, "Verification email sent"));
-        }
-
-        /// <summary>
         /// Request a password reset email. Always answers 200, whether or not the email is registered.
         /// </summary>
         [HttpPost("forgot-password")]

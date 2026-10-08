@@ -6,7 +6,7 @@ namespace RacehorseTransport.Services.Interfaces
     // lời gọi trả về ngay và không bao giờ ném lỗi, nên gửi mail hỏng không làm hỏng request.
     public interface IEmailService
     {
-        // templateName: tên file trong EmailTemplates (không có đuôi), ví dụ EmailTemplateNames.VerifyEmail.
+        // templateName: tên file trong EmailTemplates (không có đuôi), ví dụ EmailTemplateNames.ResetPassword.
         // values: giá trị cho các chỗ {{Tên}} trong mẫu.
         void Queue(string toAddress, string? toName, string templateName, IDictionary<string, string> values);
     }

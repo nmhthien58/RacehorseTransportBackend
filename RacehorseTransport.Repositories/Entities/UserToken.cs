@@ -1,6 +1,6 @@
 namespace RacehorseTransport.Repositories.Entities
 {
-    // identity.user_tokens: token dùng một lần, có hạn (refresh token, xác thực email, đặt lại mật khẩu).
+    // identity.user_tokens: token dùng một lần, có hạn (refresh token, đặt lại mật khẩu).
     // Chỉ lưu mã băm của token; chuỗi gốc chỉ nằm ở phía người dùng.
     public class UserToken
     {

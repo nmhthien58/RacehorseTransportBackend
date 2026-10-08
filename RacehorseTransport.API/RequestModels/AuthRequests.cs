@@ -45,12 +45,6 @@ namespace RacehorseTransport.API.RequestModels
         public string RefreshToken { get; set; } = string.Empty;
     }
 
-    public class VerifyEmailRequest
-    {
-        [Required(ErrorMessage = "Token is required.")]
-        public string Token { get; set; } = string.Empty;
-    }
-
     public class ForgotPasswordRequest
     {
         [Required(ErrorMessage = "Email is required.")]

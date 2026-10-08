@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using RacehorseTransport.API.Filters;
 using RacehorseTransport.API.Helpers;
 using RacehorseTransport.API.Mappers;
 using RacehorseTransport.API.RequestModels;
@@ -82,7 +81,6 @@ namespace RacehorseTransport.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
-        [RequireVerifiedEmail]
         public async Task<IActionResult> UploadDocument(int id, [FromForm] UploadDocumentRequest request)
         {
             using var file = request.File.ToUploadModel()!;

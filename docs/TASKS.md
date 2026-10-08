@@ -98,7 +98,7 @@ Bảng `common.system_notifications` · entity `SystemNotification`. Phần **t�
 Quy tắc: chỉ thao tác trên thông báo có `RecipientUserId` = người đang đăng nhập (của người khác → `NotFoundException`). Lưu ý `NotificationId` kiểu `long`.
 
 ### [ ] B-06 · Nội dung email
-Viết nội dung (tiêu đề + thân HTML đơn giản, tiếng Việt) cho các email hệ thống gửi đi, mỗi mẫu một file trong `RacehorseTransport.Services/EmailTemplates/`. Chỗ cần điền dữ liệu viết dạng `{{FullName}}`, `{{BookingCode}}`, `{{Link}}`. Danh sách mẫu: xác thực email, đặt lại mật khẩu, đơn được duyệt, đơn bị từ chối, cần bổ sung giấy tờ, hồ sơ đã thông quan, có sự cố trên chuyến, ngựa đã tới điểm giao. Phần gửi mail do Thiên làm (T-29).
+Viết nội dung (tiêu đề + thân HTML đơn giản, tiếng Việt) cho các email hệ thống gửi đi, mỗi mẫu một file trong `RacehorseTransport.Services/EmailTemplates/`. Chỗ cần điền dữ liệu viết dạng `{{FullName}}`, `{{BookingCode}}`, `{{Link}}`. Danh sách mẫu: đặt lại mật khẩu, đơn được duyệt, đơn bị từ chối, cần bổ sung giấy tờ, hồ sơ đã thông quan, có sự cố trên chuyến, ngựa đã tới điểm giao. Phần gửi mail do Thiên làm (T-29).
 
 ### [ ] B-07 · Danh mục giá trị cho dropdown
 `GET /api/lookups/enums` (không cần service, không cần DB) — trả về các mảng `All` trong `DomainConstants.cs` để FE đổ dropdown:
@@ -123,16 +123,16 @@ Làm sau khi T-05 và T-26 xong. Tạo project `RacehorseTransport.Tests` (xUnit
 - [x] **T-02 · Lưu file** — `IFileStorageService` đẩy file lên **Supabase Storage** (bucket riêng tư, trả link có chữ ký hết hạn vì giấy tờ là dữ liệu nhạy cảm; đổi nhà cung cấp không phải sửa nghiệp vụ); `POST /api/files` (multipart) trả về URL. Giới hạn dung lượng và đuôi file (pdf, jpg, png). Dùng cho giấy tờ, ảnh ngựa, ảnh nhật ký, chữ ký e-POD.
 - [x] **T-03 · Gửi thông báo** — `INotificationService.SendAsync(userId, title, message, referenceType, referenceId)` và `SendToRoleAsync(role, ...)`. Các luồng bên dưới đều gọi tới đây. *(B-05 phụ thuộc task này để có dữ liệu thử.)*
 - [x] **T-04 · Sinh mã** — `ICodeGenerator`: `BKG-2026-0001`, `DOS-…`, `TRP-…`, `INC-…`; không trùng khi hai request tới cùng lúc.
-- [x] **T-28 · Hồ sơ ngựa của khách** — `GET/POST/PUT/DELETE /api/horses`. Khách chỉ thấy và sửa ngựa của mình (`OwnerUserId` lấy từ token, không nhận từ client; của người khác → 403); nhân sự xem được tất cả. `MicrochipNumber`, `PassportNumber` không trùng. Xóa mềm (`IsActive = false`), không xóa được ngựa đang nằm trong đơn chưa kết thúc. Cần tài khoản đã xác thực email.
+- [x] **T-28 · Hồ sơ ngựa của khách** — `GET/POST/PUT/DELETE /api/horses`. Khách chỉ thấy và sửa ngựa của mình (`OwnerUserId` lấy từ token, không nhận từ client; của người khác → 403); nhân sự xem được tất cả. `MicrochipNumber`, `PassportNumber` không trùng. Xóa mềm (`IsActive = false`), không xóa được ngựa đang nằm trong đơn chưa kết thúc.
 - [x] **T-29 · Gửi email** — `IEmailService` gửi qua SMTP của một tài khoản Gmail lập riêng cho đồ án (cấu hình trong `appsettings.Local.json`), dùng mẫu của B-06. Gửi ở nền: mail lỗi thì ghi log, không làm hỏng request.
-- [x] **T-30 · Xác thực email & quên mật khẩu** — Đăng ký xong gửi link xác thực; `POST /api/auth/verify-email`, `/resend-verification`, `/forgot-password`, `/reset-password`. Token dùng một lần, có hạn. Tài khoản chưa xác thực **vẫn đăng nhập được** nhưng bị chặn ở các tính năng (thêm ngựa, tạo đơn, nộp giấy tờ) bằng policy `VerifiedEmail`, trả 403 kèm thông báo yêu cầu xác thực. Tài khoản nhân sự do Admin tạo coi như đã xác thực. Cần thêm vào schema: cột `identity.users.email_verified_at` và bảng `identity.user_tokens` (chuyển luôn refresh token về bảng này để không phụ thuộc Redis).
-- [x] **T-31 · Thông báo qua email** — `INotificationService` gửi kèm email cho **khách hàng** ở các sự kiện chính (duyệt/từ chối đơn, cần bổ sung giấy tờ, đã thông quan, sự cố, đã tới điểm giao). Nhân sự chỉ nhận chuông trong ứng dụng.
+- [x] **T-30 · Quên mật khẩu & token trong database** — `POST /api/auth/forgot-password` gửi link đặt lại mật khẩu, `POST /api/auth/reset-password` đặt mật khẩu mới (token dùng một lần, hạn 60 phút, đăng xuất mọi phiên cũ). Refresh token chuyển từ cache về bảng `identity.user_tokens` nên không còn mất khi server khởi động lại. Phần xác thực email khi đăng ký đã bỏ (quyết định 08/10/2026).
+- [x] **T-31 · Thông báo qua email** — `INotificationService` gửi kèm email cho **khách hàng** ở các sự kiện chính (duyệt/từ chối đơn, cần bổ sung giấy tờ, giấy bị từ chối, đã thông quan, hồ sơ có vấn đề, sự cố, đã tới điểm giao). Nhân sự chỉ nhận chuông trong ứng dụng.
 - [x] **T-32 · Đăng nhập bằng Google** — `POST /api/auth/google` nhận ID token từ nút Google của frontend, kiểm tra chữ ký và Client ID ngay tại server, rồi cấp token của hệ thống. Email chưa có thì tạo tài khoản Customer đã xác thực; email đã có thì đăng nhập vào tài khoản đó.
 
 ### M2 – Flow 1: Tạo & duyệt yêu cầu vận chuyển · REQUIRED
 
 - [x] **T-05 · Báo giá** — `IPricingService` tính giá bằng C# từ bảng `pricing.price_items` (công thức ở phụ lục cuối file); `POST /api/bookings/quote-preview` cho khách xem giá trước khi gửi (không ghi DB); lưu các dòng báo giá vào `QuoteBreakdown` (jsonb). Cache bảng giá, xóa cache khi B-03 sửa giá.
-- [x] **T-06 · Tạo đơn** — `POST /api/bookings` (Customer đã xác thực email): kiểm tra ngựa thuộc về khách, ngựa chưa nằm trong đơn khác trùng thời gian, `DeliveryDate > DepartureDate`, đơn đường bộ phải có `DistanceKm`, `IsExpress` khi khởi hành dưới 7 ngày. Tạo `BookingHorses`, tính giá, báo cho Manager.
+- [x] **T-06 · Tạo đơn** — `POST /api/bookings` (Customer): kiểm tra ngựa thuộc về khách, ngựa chưa nằm trong đơn khác trùng thời gian, `DeliveryDate > DepartureDate`, đơn đường bộ phải có `DistanceKm`, `IsExpress` khi khởi hành dưới 7 ngày. Tạo `BookingHorses`, tính giá, báo cho Manager.
 - [x] **T-07 · Xem đơn** — `GET /api/bookings` (khách: đơn của mình; Specialist: đơn mình phụ trách; Manager/Coordinator: tất cả; lọc theo trạng thái, ngày), `GET /api/bookings/{id}` trả đủ ngựa, báo giá, Specialist phụ trách, tiến độ hồ sơ, và **từng con ngựa đang ở chuyến nào** (một đơn có thể đi nhiều chuyến).
 - [x] **T-08 · Duyệt đơn** — `POST /api/bookings/{id}/approve` (Manager, **bắt buộc chọn Specialist phụ trách** ngay trong thao tác duyệt → `Approved`, tự tạo `DigitalDossier` cho từng ngựa), `/reject` (bắt buộc lý do), `/reassign-specialist` (Manager đổi người), `/cancel` (khách, chỉ khi `Submitted`). Không phân công Coordinator theo đơn. Mỗi bước gửi thông báo.
 - [x] **T-09 · Tự hết hạn** — `BackgroundService` chuyển đơn `Submitted` quá 48 giờ sang `Expired`.
@@ -210,8 +210,8 @@ Không task nào của Tú chặn việc của Thiên. Chiều ngược lại:
 
 **Tài khoản và hạ tầng**
 
-9. **Chưa xác thực email vẫn đăng nhập được**, nhưng không dùng được các tính năng bên trong (thêm ngựa, tạo đơn, nộp giấy tờ).
-10. **Có làm**: xác thực email, quên mật khẩu, thông báo qua email (gửi từ Gmail của tài khoản lập riêng cho đồ án, qua Gmail API vì Railway chặn cổng SMTP), đăng nhập bằng Google. **Chưa làm**: thanh toán / đặt cọc.
+9. **Không xác thực email khi đăng ký**: đăng ký xong là dùng được ngay. (Từng làm thử rồi bỏ ngày 08/10/2026 để giảm số email phải gửi.)
+10. **Có làm**: quên mật khẩu, thông báo qua email cho khách, đăng nhập bằng Google. Email gửi từ Gmail lập riêng cho đồ án, qua Gmail API vì Railway chặn cổng SMTP. **Chưa làm**: thanh toán / đặt cọc.
 11. **File lưu trên Supabase Storage**, cùng project Supabase mới của nhóm với database.
 12. **Thông báo của API bằng tiếng Anh.**
 

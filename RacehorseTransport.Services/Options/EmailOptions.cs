@@ -9,16 +9,15 @@ namespace RacehorseTransport.Services.Options
         //   "GmailApi": gọi Gmail API qua HTTPS bằng thông tin trong section "Google". Dùng được ở mọi nơi, kể cả
         //               nền tảng chặn cổng SMTP như Railway.
         //   "Smtp":     SMTP (ví dụ Gmail + app password). Chỉ dùng được ở nơi không chặn cổng 587.
-        //   bỏ trống:   không gửi, chỉ ghi log (kèm link xác thực / đặt lại mật khẩu).
+        //   bỏ trống:   không gửi, chỉ ghi log (kèm link đặt lại mật khẩu).
         public string Provider { get; set; } = string.Empty;
 
         public string FromAddress { get; set; } = string.Empty;
         public string FromName { get; set; } = "Racehorse Transport";
 
-        // Địa chỉ frontend, dùng để tạo link trong email (xác thực, đặt lại mật khẩu)
+        // Địa chỉ frontend, dùng để tạo link trong email (đặt lại mật khẩu, nút mở ứng dụng)
         public string FrontendBaseUrl { get; set; } = "http://localhost:5173";
 
-        public int VerificationTokenHours { get; set; } = 24;
         public int PasswordResetTokenMinutes { get; set; } = 60;
 
         public SmtpOptions Smtp { get; set; } = new();

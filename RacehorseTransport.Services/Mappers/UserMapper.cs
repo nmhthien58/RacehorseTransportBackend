@@ -16,7 +16,6 @@ namespace RacehorseTransport.Services.Mappers
                 PhoneNumber = entity.PhoneNumber,
                 Role = entity.Role,
                 IsActive = entity.IsActive,
-                EmailVerified = entity.EmailVerifiedAt != null,
                 CreatedAt = entity.CreatedAt
             };
         }

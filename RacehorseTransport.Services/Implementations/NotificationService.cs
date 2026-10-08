@@ -59,12 +59,12 @@ namespace RacehorseTransport.Services.Implementations
             }
         }
 
-        // Nhân sự chỉ nhận chuông trong ứng dụng; khách hàng đã xác thực email nhận thêm email
+        // Nhân sự chỉ nhận chuông trong ứng dụng; khách hàng nhận thêm email
         private async Task EmailCustomersAsync(List<int> userIds, string title, string message)
         {
             var customers = await _userRepo.GetQueryable()
                 .AsNoTracking()
-                .Where(u => userIds.Contains(u.UserId) && u.Role == UserRoles.Customer && u.IsActive && u.EmailVerifiedAt != null)
+                .Where(u => userIds.Contains(u.UserId) && u.Role == UserRoles.Customer && u.IsActive)
                 .Select(u => new { u.Email, u.FullName })
                 .ToListAsync();
 

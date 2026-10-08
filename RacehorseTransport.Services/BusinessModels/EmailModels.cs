@@ -18,7 +18,6 @@ namespace RacehorseTransport.Services.BusinessModels
     // Tên các mẫu email = tên file trong RacehorseTransport.Services/EmailTemplates (không có đuôi .html)
     public static class EmailTemplateNames
     {
-        public const string VerifyEmail = "VerifyEmail";       // {{FullName}}, {{Link}}, {{ExpiresInHours}}
         public const string ResetPassword = "ResetPassword";   // {{FullName}}, {{Link}}, {{ExpiresInMinutes}}
         public const string Notification = "Notification";     // {{FullName}}, {{Title}}, {{Message}}, {{Link}}
     }

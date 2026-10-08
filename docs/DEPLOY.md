@@ -13,7 +13,7 @@ Lưu ý:
 
 - Các bảng nằm trong 10 schema riêng (`identity`, `booking`, `fleet`...), không nằm trong `public`. Supabase không mở các schema này ra Data API, đó là điều mong muốn: chỉ backend được đọc ghi.
 - Muốn dựng lại từ đầu: chạy `database/00_reset.sql` rồi lặp lại bước 2 và 3. Lệnh này xóa toàn bộ dữ liệu của hệ thống.
-- Database đã dựng từ trước và muốn giữ dữ liệu: chạy các file `database/03_update_*.sql` **trước khi** deploy bản code mới. Các file này chỉ thêm cột và bảng, chạy lại nhiều lần không sao. Hiện có: `03_update_incident_rejection_reason.sql`, `03_update_email_verification.sql`.
+- Database đã dựng từ trước và muốn giữ dữ liệu: chạy các file `database/03_update_*.sql` **trước khi** deploy bản code mới. Các file này chỉ thêm cột và bảng, chạy lại nhiều lần không sao. Hiện có: `03_update_incident_rejection_reason.sql`, `03_update_user_tokens.sql`. Riêng `03_update_drop_email_verification.sql` là file dọn dẹp tùy chọn, chỉ chạy **sau khi** bản code mới đã deploy.
 - `02_seed.sql` tạo 6 tài khoản dùng chung một mật khẩu đã ghi công khai trong repo. Xem mục 4 trước khi đưa link cho người khác.
 
 ### Lấy chuỗi kết nối
@@ -63,13 +63,13 @@ Railway tự cấp biến `PORT`, không cần thêm. Tạo `Jwt__Key` bằng Po
 
 ### Email
 
-Hệ thống gửi email xác thực tài khoản, đặt lại mật khẩu, và thông báo cho khách ở các sự kiện chính. Cách gửi chọn bằng `Email__Provider`:
+Hệ thống gửi email đặt lại mật khẩu và email thông báo cho khách ở các sự kiện chính. Cách gửi chọn bằng `Email__Provider`:
 
 | `Email__Provider` | Cách gửi | Cần gì |
 |---|---|---|
 | `GmailApi` | Gọi Gmail API qua HTTPS. Dùng được ở máy và trên Railway | Ba giá trị `Google__...` ở mục Google bên dưới |
 | `Smtp` | SMTP của Gmail (cổng 587). Chỉ dùng được ở máy | App password của Gmail, điền `Email:Smtp:Username`, `Email:Smtp:Password` |
-| (bỏ trống) | Không gửi | Link xác thực / đặt lại mật khẩu được ghi ra log của server |
+| (bỏ trống) | Không gửi | Link đặt lại mật khẩu được ghi ra log của server |
 
 **Vì sao không dùng SMTP trên Railway:** Railway chặn các cổng SMTP (25, 465, 587) ở gói Free, Trial và Hobby, nên kết nối tới `smtp.gmail.com` sẽ hết thời gian chờ. Gmail API đi qua HTTPS (cổng 443) nên không bị chặn, và miễn phí.
 
@@ -158,7 +158,7 @@ Nếu deploy báo lỗi, mở tab **Deployments** → **View logs**:
 | `ConnectionStrings:DefaultConnection is empty` | Chưa đặt chuỗi kết nối |
 | Health check thất bại, log có `Failed to connect` / `No such host` | Sai host (đang dùng Direct connection) hoặc sai mật khẩu |
 | `28P01: password authentication failed` | Sai mật khẩu, hoặc `Username` thiếu phần `.<mã project>` |
-| `42703: column u.email_verified_at does not exist` hoặc `42P01: relation "identity.user_tokens" does not exist` | Chưa chạy `database/03_update_email_verification.sql` |
+| `42P01: relation "identity.user_tokens" does not exist` | Chưa chạy `database/03_update_user_tokens.sql` |
 | `Email '...' could not be sent` kèm `timed out` | Đang dùng `Smtp` trên Railway (cổng bị chặn): đổi sang `GmailApi` |
 | `Gmail API token failed with 400` kèm `invalid_grant` | Refresh token hết hạn hoặc bị thu hồi: làm lại bước 5 của mục Google. Nếu lặp lại sau 7 ngày: ứng dụng còn ở trạng thái Testing (bước 3.3) |
 | `Gmail API token failed with 401` kèm `invalid_client` | Sai `Google__ClientId` hoặc `Google__ClientSecret` |
@@ -170,5 +170,5 @@ Nếu deploy báo lỗi, mở tab **Deployments** → **View logs**:
 ## 4. Việc phải làm trước khi chia sẻ link
 
 - **Đổi mật khẩu các tài khoản seed.** Mật khẩu chung nằm công khai trong `02_seed.sql`, ai đọc repo cũng đăng nhập được tài khoản Admin của bản deploy. Đăng nhập bằng `admin@logistics.com`, gọi `PUT /api/auth/change-password` cho chính nó, rồi `PUT /api/users/{id}/password` cho 5 tài khoản còn lại (hoặc `PATCH /api/users/{id}/active` để khóa tài khoản không dùng).
-- **Đặt `Email__FrontendBaseUrl` đúng địa chỉ frontend.** Link trong email xác thực và đặt lại mật khẩu trỏ về địa chỉ này; để mặc định thì link trỏ về `http://localhost:5173`.
+- **Đặt `Email__FrontendBaseUrl` đúng địa chỉ frontend.** Link trong email đặt lại mật khẩu và nút "Mở ứng dụng" trỏ về địa chỉ này; để mặc định thì link trỏ về `http://localhost:5173`.
 - **Project Supabase miễn phí tự tạm dừng** sau khoảng một tuần không có truy cập. Trước buổi demo, mở dashboard và bấm **Restore** nếu project đang ngủ.

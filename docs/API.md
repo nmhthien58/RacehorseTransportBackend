@@ -210,7 +210,7 @@ API danh sách có phân trang trả thêm `pagination`:
 |---|---|---|
 | 400 | Dữ liệu gửi lên sai, hoặc vi phạm quy tắc nghiệp vụ | Hiện `message`. Nếu `message` là `Validation failed` thì hiện từng dòng trong `errors` |
 | 401 | Chưa đăng nhập, token sai hoặc đã hết hạn | Xin token mới (mục 4); không được thì chuyển về trang đăng nhập. File `api.js` ở mục 1 đã làm việc này |
-| 403 | Đã đăng nhập nhưng không có quyền, hoặc khách chưa xác thực email | Hiện `message`, không thử lại. Nếu `message` bắt đầu bằng `Please verify your email address` thì dẫn người dùng tới chỗ gửi lại email xác thực |
+| 403 | Đã đăng nhập nhưng không có quyền | Hiện `message`, không thử lại |
 | 404 | Không tìm thấy dữ liệu theo id đã gửi | Hiện `message` |
 | 415 | Gửi sai kiểu dữ liệu (ví dụ gửi JSON vào API nhận file) | Sửa code: xem mục 2.5 |
 | 500 | Lỗi phía server | Báo lỗi chung, thử lại sau, báo cho backend |
@@ -426,25 +426,18 @@ Khi đăng nhập thành công, server trả về hai chuỗi:
 
 Lưu cả hai vào `localStorage` sau khi đăng nhập. File `api.js` ở mục 1 đã xử lý việc gắn token và tự xin token mới.
 
-### Xác thực email hoạt động thế nào
+### Email hệ thống gửi cho người dùng
 
-Khách hàng tự đăng ký sẽ nhận một email chứa link xác thực. Trước khi bấm link đó, tài khoản **vẫn đăng nhập và xem dữ liệu được**, nhưng bị chặn ở ba việc: thêm / sửa / xóa ngựa, gửi đơn vận chuyển, nộp giấy tờ. Gọi vào các API đó sẽ nhận `403` với `message` bắt đầu bằng `Please verify your email address`.
+Hệ thống tự gửi email trong hai trường hợp; frontend không phải gọi gì thêm:
 
-- Đọc `user.emailVerified` (có trong response đăng nhập và `GET /api/auth/me`) để hiện dải nhắc "Vui lòng xác thực email" kèm nút gửi lại.
-- Tài khoản nhân sự do Admin tạo luôn có `emailVerified` là `true`.
+- **Quên mật khẩu:** email chứa link `<địa chỉ frontend>/reset-password?token=...`. Frontend cần có trang `/reset-password`: đọc `token` trên URL bằng `new URLSearchParams(window.location.search).get("token")`, cho người dùng nhập mật khẩu mới, rồi gọi `POST /api/auth/reset-password`.
+- **Thông báo cho khách hàng** ở các sự kiện chính: đơn được duyệt / bị từ chối, cần bổ sung giấy tờ, giấy bị từ chối, ngựa đã thông quan, hồ sơ có vấn đề, có sự cố trên chuyến, ngựa tới điểm giao. Nhân sự không nhận email, chỉ nhận thông báo trong ứng dụng.
 
-Frontend cần có **hai trang** mà link trong email trỏ tới:
-
-| Link trong email | Trang cần làm | Việc trang đó làm |
-|---|---|---|
-| `<địa chỉ frontend>/verify-email?token=...` | Trang xác thực email | Đọc `token` trên URL, gọi `POST /api/auth/verify-email`, rồi báo thành công hoặc thất bại |
-| `<địa chỉ frontend>/reset-password?token=...` | Trang đặt lại mật khẩu | Đọc `token` trên URL, cho người dùng nhập mật khẩu mới, gọi `POST /api/auth/reset-password` |
-
-Lấy `token` trên URL: `new URLSearchParams(window.location.search).get("token")`.
+Đăng ký tài khoản **không** cần xác thực email: đăng ký xong là dùng được ngay.
 
 ### POST /api/auth/register — Đăng ký tài khoản khách hàng
 
-Tạo tài khoản mới với vai trò `Customer` và đăng nhập luôn (response có sẵn token). Hệ thống gửi một email xác thực tới địa chỉ vừa đăng ký; `user.emailVerified` là `false` cho tới khi người dùng bấm link trong email. Tài khoản nhân sự không đăng ký ở đây mà do Admin tạo (mục 5).
+Tạo tài khoản mới với vai trò `Customer` và đăng nhập luôn (response có sẵn token). Tài khoản nhân sự không đăng ký ở đây mà do Admin tạo (mục 5).
 
 - **Ai gọi được:** Ai cũng gọi được, không cần đăng nhập
 - **Dữ liệu gửi lên:** JSON
@@ -474,8 +467,8 @@ Response `201` — phần `data`:
 ```json
 {
   "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "accessTokenExpiresAt": "2026-10-08T08:07:09+00:00",
-  "refreshToken": "L5Muy7kt...",
+  "accessTokenExpiresAt": "2026-10-08T08:24:28+00:00",
+  "refreshToken": "NCWPGUvt...",
   "user": {
     "userId": 7,
     "fullName": "Lê Minh Anh",
@@ -483,8 +476,7 @@ Response `201` — phần `data`:
     "phoneNumber": "+84901234567",
     "role": "Customer",
     "isActive": true,
-    "emailVerified": false,
-    "createdAt": "2026-10-08T07:07:09+00:00"
+    "createdAt": "2026-10-08T07:24:28+00:00"
   }
 }
 ```
@@ -526,8 +518,8 @@ Response `200` — phần `data`:
 ```json
 {
   "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "accessTokenExpiresAt": "2026-10-08T08:07:09+00:00",
-  "refreshToken": "Okn-hvM7...",
+  "accessTokenExpiresAt": "2026-10-08T08:24:28+00:00",
+  "refreshToken": "c5tbHtK4...",
   "user": {
     "userId": 5,
     "fullName": "Jane Smith",
@@ -535,8 +527,7 @@ Response `200` — phần `data`:
     "phoneNumber": "+84988111222",
     "role": "Customer",
     "isActive": true,
-    "emailVerified": true,
-    "createdAt": "2026-10-08T07:07:09+00:00"
+    "createdAt": "2026-10-08T07:24:28+00:00"
   }
 }
 ```
@@ -546,7 +537,7 @@ Response `200` — phần `data`:
 | `accessToken` | Token gửi kèm mọi request |
 | `accessTokenExpiresAt` | Thời điểm `accessToken` hết hạn |
 | `refreshToken` | Dùng để xin token mới |
-| `user` | Thông tin người đăng nhập; `user.role` quyết định giao diện, `user.emailVerified` cho biết đã xác thực email chưa |
+| `user` | Thông tin người đăng nhập; `user.role` quyết định giao diện |
 
 Lỗi thường gặp:
 
@@ -566,8 +557,8 @@ Lỗi thường gặp:
 
 Server xử lý theo email của tài khoản Google:
 
-- Email **chưa có** tài khoản: tạo tài khoản `Customer` mới, `emailVerified` là `true` ngay (Google đã xác nhận email).
-- Email **đã có** tài khoản (khách hoặc nhân sự): đăng nhập vào đúng tài khoản đó, và đánh dấu email đã xác thực nếu trước đó chưa.
+- Email **chưa có** tài khoản: tạo tài khoản `Customer` mới.
+- Email **đã có** tài khoản (khách hoặc nhân sự): đăng nhập vào đúng tài khoản đó.
 
 - **Ai gọi được:** ai cũng gọi được, không cần đăng nhập
 - **Dữ liệu gửi lên:** JSON
@@ -591,8 +582,8 @@ Response `200` — phần `data` (cùng dạng với đăng nhập thường):
 ```json
 {
   "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "accessTokenExpiresAt": "2026-10-08T08:07:09+00:00",
-  "refreshToken": "aT2iNok5...",
+  "accessTokenExpiresAt": "2026-10-08T08:24:28+00:00",
+  "refreshToken": "fTQhHEzK...",
   "user": {
     "userId": 8,
     "fullName": "Phạm Anh Thư",
@@ -600,8 +591,7 @@ Response `200` — phần `data` (cùng dạng với đăng nhập thường):
     "phoneNumber": null,
     "role": "Customer",
     "isActive": true,
-    "emailVerified": true,
-    "createdAt": "2026-10-08T07:07:09+00:00"
+    "createdAt": "2026-10-08T07:24:28+00:00"
   }
 }
 ```
@@ -715,8 +705,7 @@ Response `200` — phần `data`:
   "phoneNumber": "+84988111222",
   "role": "Customer",
   "isActive": true,
-  "emailVerified": true,
-  "createdAt": "2026-10-08T07:07:09+00:00"
+  "createdAt": "2026-10-08T07:24:28+00:00"
 }
 ```
 
@@ -753,8 +742,7 @@ Response `200` — phần `data`:
   "phoneNumber": "+84909999888",
   "role": "Customer",
   "isActive": true,
-  "emailVerified": true,
-  "createdAt": "2026-10-08T07:07:09+00:00"
+  "createdAt": "2026-10-08T07:24:28+00:00"
 }
 ```
 
@@ -790,69 +778,9 @@ Lỗi thường gặp:
 | 400 | `Current password is incorrect.` | Nhập sai mật khẩu hiện tại |
 | 400 | `New password must be different from the current password.` | Mật khẩu mới trùng mật khẩu cũ |
 
-### POST /api/auth/verify-email — Xác thực email bằng token trong link
-
-Trang `/verify-email` của frontend gọi API này với `token` lấy trên URL. Mỗi link chỉ dùng được một lần và có hạn 24 giờ.
-
-- **Ai gọi được:** Ai cũng gọi được, không cần đăng nhập
-- **Dữ liệu gửi lên:** JSON
-
-Các trường gửi lên:
-
-| Trường | Kiểu | Bắt buộc | Mô tả |
-|---|---|---|---|
-| `token` | chuỗi | Có | Giá trị `token` trên URL của link trong email |
-
-Ví dụ request:
-
-```json
-{
-  "token": "kJ8sQ2x..."
-}
-```
-
-Response `200` — phần `data`:
-
-```json
-{
-  "userId": 7,
-  "fullName": "Lê Minh Anh",
-  "email": "minhanh@example.com",
-  "phoneNumber": "+84901234567",
-  "role": "Customer",
-  "isActive": true,
-  "emailVerified": true,
-  "createdAt": "2026-10-08T07:07:09+00:00"
-}
-```
-
-`data` là tài khoản với `emailVerified` là `true`. Nếu người dùng đang đăng nhập, cập nhật lại `user` đang lưu; không cần đăng nhập lại.
-
-Lỗi thường gặp:
-
-| HTTP | `message` | Khi nào |
-|---|---|---|
-| 400 | `The verification link is invalid or has expired. Please request a new one.` | Token sai, đã dùng rồi, đã hết hạn, hoặc đã có link mới hơn thay thế |
-
-### POST /api/auth/resend-verification — Gửi lại email xác thực
-
-Gửi một email xác thực mới cho người đang đăng nhập. Link cũ hết hiệu lực. Mỗi phút chỉ gửi được một lần.
-
-- **Ai gọi được:** Mọi người đã đăng nhập
-- **Dữ liệu gửi lên:** không có (không cần body)
-
-Response `200`: `data` là `null`, `message` là `Verification email sent`.
-
-Lỗi thường gặp:
-
-| HTTP | `message` | Khi nào |
-|---|---|---|
-| 400 | `An email was sent less than a minute ago. Please check your inbox, or try again in a minute.` | Vừa gửi trong vòng một phút |
-| 400 | `Your email address is already verified.` | Tài khoản đã xác thực rồi |
-
 ### POST /api/auth/forgot-password — Quên mật khẩu: xin link đặt lại
 
-Gửi email chứa link đặt lại mật khẩu (hạn 60 phút). API **luôn trả 200**, kể cả khi email chưa đăng ký, để người lạ không dò được email nào có tài khoản. Vì vậy luôn hiện cùng một câu: "Nếu email đã đăng ký, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu."
+Gửi email chứa link đặt lại mật khẩu (hạn 60 phút, mỗi phút chỉ gửi một lần cho cùng một tài khoản). API **luôn trả 200**, kể cả khi email chưa đăng ký, để người lạ không dò được email nào có tài khoản. Vì vậy luôn hiện cùng một câu: "Nếu email đã đăng ký, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu."
 
 - **Ai gọi được:** Ai cũng gọi được, không cần đăng nhập
 - **Dữ liệu gửi lên:** JSON
@@ -927,8 +855,7 @@ Một tài khoản (`user`) có dạng:
   "phoneNumber": "+84912000007",
   "role": "DriverEscort",
   "isActive": true,
-  "emailVerified": true,
-  "createdAt": "2026-10-08T07:07:10+00:00"
+  "createdAt": "2026-10-08T07:24:29+00:00"
 }
 ```
 
@@ -938,7 +865,6 @@ Một tài khoản (`user`) có dạng:
 | `fullName`, `email`, `phoneNumber` | Thông tin liên hệ |
 | `role` | Vai trò (mục 3) |
 | `isActive` | `false` là tài khoản đã bị khóa, không đăng nhập được |
-| `emailVerified` | Đã xác thực email chưa (mục 4) |
 | `createdAt` | Thời điểm tạo |
 
 ### GET /api/users — Danh sách tài khoản
@@ -971,8 +897,7 @@ Response `200` — phần `data`:
     "phoneNumber": "+84912000004",
     "role": "DriverEscort",
     "isActive": true,
-    "emailVerified": true,
-    "createdAt": "2026-10-08T07:07:09+00:00"
+    "createdAt": "2026-10-08T07:24:28+00:00"
   }
 ]
 ```
@@ -1167,8 +1092,7 @@ Response `200` — phần `data`:
     "phoneNumber": "+84912000002",
     "role": "TransportSpecialist",
     "isActive": true,
-    "emailVerified": true,
-    "createdAt": "2026-10-08T07:07:09+00:00"
+    "createdAt": "2026-10-08T07:24:28+00:00"
   },
   {
     "userId": 10,
@@ -1177,8 +1101,7 @@ Response `200` — phần `data`:
     "phoneNumber": "+84912000008",
     "role": "TransportSpecialist",
     "isActive": true,
-    "emailVerified": true,
-    "createdAt": "2026-10-08T07:07:10+00:00"
+    "createdAt": "2026-10-08T07:24:29+00:00"
   }
 ]
 ```
@@ -1193,7 +1116,7 @@ Một con ngựa (`horse`) có dạng:
 
 ```json
 {
-  "horseId": 3,
+  "horseId": 4,
   "ownerUserId": 5,
   "ownerName": "Jane Smith",
   "name": "Silver Wind",
@@ -1204,9 +1127,9 @@ Một con ngựa (`horse`) có dạng:
   "dateOfBirth": "2019-05-20",
   "color": "Xám",
   "specialCareRequirements": "Dễ say xe, cần cỏ tươi",
-  "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/horses/2026/10/ea5856....png?token=eyJ...",
+  "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/horses/2026/10/6f316c....png?token=eyJ...",
   "isActive": true,
-  "createdAt": "2026-10-08T07:07:10+00:00"
+  "createdAt": "2026-10-08T07:24:30+00:00"
 }
 ```
 
@@ -1295,7 +1218,6 @@ Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
-| 403 | `Please verify your email address before using this feature. Check your inbox or request a new verification email.` | Khách chưa xác thực email (mục 4) |
 | 400 | `Microchip number '...' is already registered.` | Mã vi mạch đã có trong hệ thống |
 | 400 | `Passport number '...' is already registered.` | Số hộ chiếu đã có trong hệ thống |
 | 400 | `DateOfBirth must be in the past.` | Ngày sinh ở tương lai |
@@ -1343,7 +1265,6 @@ Lỗi thường gặp:
 | HTTP | `message` | Khi nào |
 |---|---|---|
 | 403 | `You can only modify your own horses.` | Sửa ngựa của người khác |
-| 403 | `Please verify your email address before using this feature. Check your inbox or request a new verification email.` | Khách chưa xác thực email (mục 4) |
 | 400 | `Microchip number '...' is already registered.` | Mã vi mạch đã có trong hệ thống |
 | 400 | `Passport number '...' is already registered.` | Số hộ chiếu đã có trong hệ thống |
 | 400 | `DateOfBirth must be in the past.` | Ngày sinh ở tương lai |
@@ -1368,7 +1289,6 @@ Lỗi thường gặp:
 |---|---|---|
 | 400 | `This horse is part of a booking that is still in progress and cannot be deleted.` | Ngựa đang nằm trong một đơn chưa kết thúc |
 | 403 | `You can only modify your own horses.` | Xóa ngựa của người khác |
-| 403 | `Please verify your email address before using this feature. Check your inbox or request a new verification email.` | Khách chưa xác thực email (mục 4) |
 
 ---
 
@@ -1581,7 +1501,7 @@ Response `201` — phần `data`:
   "status": "Submitted",
   "assignedSpecialistId": null,
   "assignedSpecialistName": null,
-  "createdAt": "2026-10-08T07:07:11+00:00",
+  "createdAt": "2026-10-08T07:24:30+00:00",
   "customerEmail": "jane.smith@racehorseowner.com",
   "customerPhone": "+84988111222",
   "specialInstructions": "Giữ cabin 17 độ",
@@ -1631,7 +1551,6 @@ Lỗi thường gặp:
 | 400 | `These horses are already in another booking for an overlapping period: ...` | Ngựa đang nằm trong một đơn khác trùng thời gian |
 | 400 | `The same horse appears more than once in this booking.` | Chọn trùng một con ngựa |
 | 403 | `You do not have permission to perform this action.` | Người gọi không phải `Customer` |
-| 403 | `Please verify your email address before using this feature. Check your inbox or request a new verification email.` | Khách chưa xác thực email (mục 4) |
 
 ### GET /api/bookings — Danh sách đơn
 
@@ -1676,7 +1595,7 @@ Response `200` — phần `data`:
     "status": "Submitted",
     "assignedSpecialistId": null,
     "assignedSpecialistName": null,
-    "createdAt": "2026-10-08T07:07:11+00:00"
+    "createdAt": "2026-10-08T07:24:30+00:00"
   }
 ]
 ```
@@ -1725,7 +1644,7 @@ Response `200` — phần `data`:
   "status": "Approved",
   "assignedSpecialistId": 2,
   "assignedSpecialistName": "Nguyễn Thị Mai",
-  "createdAt": "2026-10-08T07:07:11+00:00",
+  "createdAt": "2026-10-08T07:24:30+00:00",
   "customerEmail": "jane.smith@racehorseowner.com",
   "customerPhone": "+84988111222",
   "specialInstructions": "Giữ cabin 17 độ",
@@ -1736,7 +1655,7 @@ Response `200` — phần `data`:
   "rejectionReason": null,
   "reviewedByUserId": 1,
   "reviewedByName": "Trần Quốc Bảo",
-  "reviewedAt": "2026-10-08T07:07:11+00:00",
+  "reviewedAt": "2026-10-08T07:24:30+00:00",
   "quoteLines": [
     {
       "code": "FREIGHT_SHARED",
@@ -1993,7 +1912,7 @@ Response `200` — phần `data`:
     "specialistName": "Nguyễn Thị Mai",
     "clearanceNumber": null,
     "clearedAt": null,
-    "createdAt": "2026-10-08T07:07:11+00:00"
+    "createdAt": "2026-10-08T07:24:30+00:00"
   }
 ]
 ```
@@ -2031,7 +1950,7 @@ Response `200` — phần `data`:
   "specialistName": "Nguyễn Thị Mai",
   "clearanceNumber": null,
   "clearedAt": null,
-  "createdAt": "2026-10-08T07:07:11+00:00",
+  "createdAt": "2026-10-08T07:24:30+00:00",
   "passportNumber": "FEI-VN-2023-02",
   "issueReason": null,
   "checklist": [
@@ -2052,14 +1971,14 @@ Response `200` — phần `data`:
         "docTypeCode": "COGGINS_EIA",
         "docTypeName": "Chứng nhận xét nghiệm Coggins âm tính",
         "documentNumber": "DOC-4-2",
-        "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/2c7b6f....pdf?token=eyJ...",
+        "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/398ccb....pdf?token=eyJ...",
         "status": "Pending",
         "correctionNote": null,
         "expiryDate": "2027-12-31",
         "rejectionCount": 0,
         "uploadedByUserId": 5,
         "uploadedByName": "Jane Smith",
-        "uploadedAt": "2026-10-08T07:07:11+00:00",
+        "uploadedAt": "2026-10-08T07:24:30+00:00",
         "reviewedByName": null,
         "reviewedAt": null
       }
@@ -2088,14 +2007,14 @@ Response `200` — phần `data`:
       "docTypeCode": "COGGINS_EIA",
       "docTypeName": "Chứng nhận xét nghiệm Coggins âm tính",
       "documentNumber": "DOC-4-2",
-      "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/2c7b6f....pdf?token=eyJ...",
+      "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/398ccb....pdf?token=eyJ...",
       "status": "Pending",
       "correctionNote": null,
       "expiryDate": "2027-12-31",
       "rejectionCount": 0,
       "uploadedByUserId": 5,
       "uploadedByName": "Jane Smith",
-      "uploadedAt": "2026-10-08T07:07:11+00:00",
+      "uploadedAt": "2026-10-08T07:24:30+00:00",
       "reviewedByName": null,
       "reviewedAt": null
     }
@@ -2213,7 +2132,6 @@ Lỗi thường gặp:
 | 400 | `The document has already expired.` | `expiryDate` ở quá khứ |
 | 400 | `File is required.` | Không gửi file |
 | 403 | `You cannot upload documents to this dossier.` | Không phải chủ ngựa hay chuyên viên phụ trách |
-| 403 | `Please verify your email address before using this feature. Check your inbox or request a new verification email.` | Khách chưa xác thực email (mục 4) |
 
 ### POST /api/documents/{id}/approve — Duyệt một giấy tờ
 
@@ -2455,7 +2373,7 @@ Response `200` — phần `data`:
     "capacityHorses": 6,
     "hasClimateControl": true,
     "hasGpsTracker": true,
-    "lastSanitizationDate": "2026-10-08T07:07:09+00:00"
+    "lastSanitizationDate": "2026-10-08T07:24:28+00:00"
   }
 ]
 ```
@@ -2486,8 +2404,7 @@ Response `200` — phần `data`:
     "phoneNumber": "+84912000004",
     "role": "DriverEscort",
     "isActive": true,
-    "emailVerified": true,
-    "createdAt": "2026-10-08T07:07:09+00:00"
+    "createdAt": "2026-10-08T07:24:28+00:00"
   }
 ]
 ```
@@ -2956,7 +2873,7 @@ Response `200` — phần `data`:
   "vehicleType": "HorseTruck_AirSuspension",
   "plannedStartDate": "2026-11-06T23:00:00+00:00",
   "plannedEndDate": "2026-11-09T11:00:00+00:00",
-  "actualStartDate": "2026-10-08T07:07:12+00:00",
+  "actualStartDate": "2026-10-08T07:24:31+00:00",
   "actualEndDate": null,
   "horseCount": 2,
   "crew": [
@@ -2984,7 +2901,7 @@ Response `200` — phần `data`:
   "plannedByName": "Lê Hoàng Nam",
   "approvedByUserId": 1,
   "approvedByName": "Trần Quốc Bảo",
-  "approvedAt": "2026-10-08T07:07:12+00:00",
+  "approvedAt": "2026-10-08T07:24:31+00:00",
   "planRejectionCount": 1,
   "planRejectionReason": null,
   "delayMinutes": 0,
@@ -2993,7 +2910,7 @@ Response `200` — phần `data`:
   "closedByName": null,
   "closedAt": null,
   "executiveRemarks": null,
-  "createdAt": "2026-10-08T07:07:12+00:00",
+  "createdAt": "2026-10-08T07:24:31+00:00",
   "horses": [
     {
       "tripHorseId": 7,
@@ -3022,8 +2939,8 @@ Response `200` — phần `data`:
       "address": "Ba Vì, Hà Nội",
       "plannedTime": "2026-11-06T23:00:00+00:00",
       "mandatoryRestMinutes": 0,
-      "actualArrivalTime": "2026-10-08T07:07:12+00:00",
-      "actualDepartureTime": "2026-10-08T07:07:12+00:00",
+      "actualArrivalTime": "2026-10-08T07:24:31+00:00",
+      "actualDepartureTime": "2026-10-08T07:24:31+00:00",
       "status": "Departed",
       "isActive": true
     },
@@ -3035,8 +2952,8 @@ Response `200` — phần `data`:
       "address": "Lạng Sơn",
       "plannedTime": "2026-11-07T05:00:00+00:00",
       "mandatoryRestMinutes": 0,
-      "actualArrivalTime": "2026-10-08T07:07:12+00:00",
-      "actualDepartureTime": "2026-10-08T07:07:12+00:00",
+      "actualArrivalTime": "2026-10-08T07:24:31+00:00",
+      "actualDepartureTime": "2026-10-08T07:24:31+00:00",
       "status": "Departed",
       "isActive": true
     }
@@ -3264,10 +3181,10 @@ Response `201` — phần `data`:
   "stressLevel": "Calm",
   "needsAttention": false,
   "notes": "Ăn uống bình thường",
-  "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/884aa4....jpg?token=eyJ...",
+  "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/f0e923....jpg?token=eyJ...",
   "recordedByUserId": 4,
   "recordedByName": "Phạm Văn Đức",
-  "loggedAt": "2026-10-08T07:07:12+00:00"
+  "loggedAt": "2026-10-08T07:24:31+00:00"
 }
 ```
 
@@ -3326,7 +3243,7 @@ Response `200` — phần `data`:
     "leadDriverPhone": "+84912000004",
     "plannedStartDate": "2026-11-06T23:00:00+00:00",
     "plannedEndDate": "2026-11-09T11:00:00+00:00",
-    "actualStartDate": "2026-10-08T07:07:12+00:00",
+    "actualStartDate": "2026-10-08T07:24:31+00:00",
     "actualEndDate": null,
     "horseCount": 2,
     "checkpointsTotal": 4,
@@ -3386,7 +3303,7 @@ Response `200` — phần `data`:
       "leadDriverName": "Phạm Văn Đức",
       "plannedStartDate": "2026-11-06T23:00:00+00:00",
       "plannedEndDate": "2026-11-09T11:00:00+00:00",
-      "actualStartDate": "2026-10-08T07:07:12+00:00",
+      "actualStartDate": "2026-10-08T07:24:31+00:00",
       "actualEndDate": null,
       "delayMinutes": 0,
       "handoverCompleted": false,
@@ -3398,8 +3315,8 @@ Response `200` — phần `data`:
           "checkpointType": "Origin",
           "address": "Ba Vì, Hà Nội",
           "plannedTime": "2026-11-06T23:00:00+00:00",
-          "actualArrivalTime": "2026-10-08T07:07:12+00:00",
-          "actualDepartureTime": "2026-10-08T07:07:12+00:00",
+          "actualArrivalTime": "2026-10-08T07:24:31+00:00",
+          "actualDepartureTime": "2026-10-08T07:24:31+00:00",
           "status": "Departed",
           "delayMinutes": 0
         },
@@ -3410,8 +3327,8 @@ Response `200` — phần `data`:
           "checkpointType": "BorderGate",
           "address": "Lạng Sơn",
           "plannedTime": "2026-11-07T05:00:00+00:00",
-          "actualArrivalTime": "2026-10-08T07:07:12+00:00",
-          "actualDepartureTime": "2026-10-08T07:07:12+00:00",
+          "actualArrivalTime": "2026-10-08T07:24:31+00:00",
+          "actualDepartureTime": "2026-10-08T07:24:31+00:00",
           "status": "Departed",
           "delayMinutes": 0
         }
@@ -3435,10 +3352,10 @@ Response `200` — phần `data`:
             "stressLevel": "Calm",
             "needsAttention": false,
             "notes": "Ăn uống bình thường",
-            "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/884aa4....jpg?token=eyJ...",
+            "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/f0e923....jpg?token=eyJ...",
             "recordedByUserId": 4,
             "recordedByName": "Phạm Văn Đức",
-            "loggedAt": "2026-10-08T07:07:12+00:00"
+            "loggedAt": "2026-10-08T07:24:31+00:00"
           },
           "logs": [
             {
@@ -3454,10 +3371,10 @@ Response `200` — phần `data`:
               "stressLevel": "Calm",
               "needsAttention": false,
               "notes": "Ăn uống bình thường",
-              "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/884aa4....jpg?token=eyJ...",
+              "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/welfare/2026/10/f0e923....jpg?token=eyJ...",
               "recordedByUserId": 4,
               "recordedByName": "Phạm Văn Đức",
-              "loggedAt": "2026-10-08T07:07:12+00:00"
+              "loggedAt": "2026-10-08T07:24:31+00:00"
             }
           ]
         }
@@ -3465,7 +3382,7 @@ Response `200` — phần `data`:
     }
   ],
   "horsesAwaitingPlanning": [],
-  "generatedAt": "2026-10-08T07:07:12+00:00"
+  "generatedAt": "2026-10-08T07:24:31+00:00"
 }
 ```
 
@@ -3538,7 +3455,7 @@ Một sự cố (`incident`) có dạng:
   "affectedHorseName": "Red Flash (Tia Chớp Đỏ)",
   "reportedByUserId": 4,
   "reportedByName": "Phạm Văn Đức",
-  "reportedAt": "2026-10-08T07:07:12+00:00",
+  "reportedAt": "2026-10-08T07:24:31+00:00",
   "proposedAction": "Đổi xe dự phòng, nghỉ thêm tại trạm thú y Bằng Tường",
   "revisedRouteNotes": "Đã liên hệ trạm thú y Bằng Tường",
   "additionalCost": 650,
@@ -3870,11 +3787,11 @@ Một biên bản bàn giao (`handover`) có dạng:
   "bookingCode": "BKG-2026-0002",
   "customerName": "Jane Smith",
   "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
-  "handoverDateTime": "2026-10-08T07:07:12+00:00",
+  "handoverDateTime": "2026-10-08T07:24:31+00:00",
   "recipientName": "Jane Smith",
   "recipientPhone": "+84988111222",
   "recipientIdCard": "PASSPORT-US-991283",
-  "signatureUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/signatures/2026/10/29ff9f....png?token=eyJ...",
+  "signatureUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/signatures/2026/10/d17811....png?token=eyJ...",
   "overallCondition": "Excellent",
   "remarks": "Hai con ngựa đến nơi an toàn, không trầy xước.",
   "driverUserId": 4,
@@ -4311,7 +4228,7 @@ Các phần dưới đây backend chưa làm. Frontend có thể dựng giao di�
 
 | Phần | Ghi chú |
 |---|---|
-| Chuông thông báo (danh sách, đếm chưa đọc, đánh dấu đã đọc) | Backend đã tạo thông báo cho mọi sự kiện; chưa có API để đọc. Riêng khách hàng đã nhận được email ở các sự kiện chính: đơn được duyệt / bị từ chối, cần bổ sung giấy tờ, giấy bị từ chối, thông quan, hồ sơ có vấn đề, sự cố, ngựa tới điểm giao |
+| Chuông thông báo (danh sách, đếm chưa đọc, đánh dấu đã đọc) | Backend đã tạo thông báo cho mọi sự kiện; chưa có API để đọc. Riêng khách hàng đã nhận được email ở các sự kiện chính (mục 4) |
 | Quản lý phương tiện | Hiện chỉ có `GET /api/trips/available-vehicles` |
 | Quy định giấy tờ theo quốc gia, bảng giá | Dữ liệu có sẵn và đang được dùng để tính; chưa có màn hình quản trị |
 | API trả danh sách enum cho dropdown | Tạm dùng bảng ở mục 3 |
@@ -4322,7 +4239,7 @@ Tiến độ từng phần xem ở [TASKS.md](TASKS.md).
 
 ## 15. Bảng tra nhanh mọi endpoint
 
-Tổng cộng 84 endpoint. Chi tiết từng cái xem ở mục tương ứng.
+Tổng cộng 82 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 
 **4. Đăng nhập và tài khoản của tôi**
 
@@ -4336,8 +4253,6 @@ Tổng cộng 84 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | GET | `/api/auth/me` | Xem hồ sơ của tôi | Mọi người đã đăng nhập |
 | PUT | `/api/auth/me` | Sửa hồ sơ của tôi | Mọi người đã đăng nhập |
 | PUT | `/api/auth/change-password` | Đổi mật khẩu | Mọi người đã đăng nhập |
-| POST | `/api/auth/verify-email` | Xác thực email bằng token trong link | Ai cũng gọi được, không cần đăng nhập |
-| POST | `/api/auth/resend-verification` | Gửi lại email xác thực | Mọi người đã đăng nhập |
 | POST | `/api/auth/forgot-password` | Quên mật khẩu: xin link đặt lại | Ai cũng gọi được, không cần đăng nhập |
 | POST | `/api/auth/reset-password` | Đặt mật khẩu mới bằng token trong link | Ai cũng gọi được, không cần đăng nhập |
 

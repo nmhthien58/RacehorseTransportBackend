@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using RacehorseTransport.API.Filters;
 using RacehorseTransport.API.Helpers;
 using RacehorseTransport.API.Mappers;
 using RacehorseTransport.API.RequestModels;
@@ -63,7 +62,6 @@ namespace RacehorseTransport.API.Controllers
         [Authorize(Roles = UserRoles.Customer)]
         [ProducesResponseType(typeof(ApiResponse<BookingDetailResponse>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
-        [RequireVerifiedEmail]
         public async Task<IActionResult> Create([FromBody] CreateBookingRequest request)
         {
             var created = await _bookingService.CreateBookingAsync(request.ToBusinessModel(), User.ToCurrentUser());

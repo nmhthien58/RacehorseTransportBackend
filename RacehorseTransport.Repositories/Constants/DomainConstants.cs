@@ -22,7 +22,6 @@ namespace RacehorseTransport.Repositories.Constants
     public static class UserTokenTypes
     {
         public const string Refresh = "Refresh";
-        public const string EmailVerification = "EmailVerification";
         public const string PasswordReset = "PasswordReset";
     }
 

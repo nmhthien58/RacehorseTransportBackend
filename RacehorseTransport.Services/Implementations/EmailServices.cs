@@ -33,7 +33,7 @@ namespace RacehorseTransport.Services.Implementations
 
                 if (string.IsNullOrWhiteSpace(_options.Provider))
                 {
-                    // Chưa cấu hình gửi mail (thường là máy dev): ghi ra log để vẫn lấy được link xác thực / đặt lại mật khẩu
+                    // Chưa cấu hình gửi mail (thường là máy dev): ghi ra log để vẫn lấy được link đặt lại mật khẩu
                     values.TryGetValue("Link", out string? link);
                     _logger.LogInformation("Email is not configured; skipped '{Subject}' to {To}. Link: {Link}", subject, toAddress, link ?? "(none)");
                     return;
