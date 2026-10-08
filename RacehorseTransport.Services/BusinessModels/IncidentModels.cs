@@ -54,6 +54,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? ProposedAction { get; set; }
         public string? RevisedRouteNotes { get; set; }
         public decimal AdditionalCost { get; set; }
+        public string? RejectionReason { get; set; } // lý do của lần từ chối gần nhất; xóa khi phương án được duyệt
         public int? ApprovedByUserId { get; set; }
         public string? ApprovedByName { get; set; }
         public DateTimeOffset? ApprovedAt { get; set; }

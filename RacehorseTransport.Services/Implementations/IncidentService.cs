@@ -272,6 +272,7 @@ namespace RacehorseTransport.Services.Implementations
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 incident.Status = IncidentStatuses.Approved;
+                incident.RejectionReason = null;
                 incident.ApprovedByUserId = currentUser.UserId;
                 incident.ApprovedAt = DateTimeOffset.UtcNow;
                 await _incidentRepo.UpdateAsync(incident);
@@ -295,7 +296,7 @@ namespace RacehorseTransport.Services.Implementations
             return await GetIncidentByIdAsync(incidentId, currentUser);
         }
 
-        // Lý do từ chối gửi cho Coordinator qua thông báo; Coordinator sửa rồi đề xuất lại
+        // Lý do từ chối lưu vào sự cố và gửi cho Coordinator qua thông báo; Coordinator sửa rồi đề xuất lại
         public async Task<IncidentModel> RejectPlanAsync(int incidentId, string reason, CurrentUser currentUser)
         {
             var incident = await GetTrackedIncidentAsync(incidentId);
@@ -306,10 +307,11 @@ namespace RacehorseTransport.Services.Implementations
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 incident.Status = IncidentStatuses.Rejected;
+                incident.RejectionReason = reason.Trim();
                 await _incidentRepo.UpdateAsync(incident);
 
                 string title = $"Plan for incident {incident.IncidentCode} was rejected";
-                string message = $"Trip {trip.TripCode}. Reason: {reason.Trim()} Please propose a new plan.";
+                string message = $"Trip {trip.TripCode}. Reason: {incident.RejectionReason} Please propose a new plan.";
 
                 if (trip.PlannedByUserId.HasValue)
                 {

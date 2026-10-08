@@ -15,6 +15,7 @@ namespace RacehorseTransport.Repositories.Entities
         public string? ProposedAction { get; set; }
         public string? RevisedRouteNotes { get; set; }
         public decimal AdditionalCost { get; set; }
+        public string? RejectionReason { get; set; } // lý do của lần từ chối phương án gần nhất
         public string Status { get; set; } = IncidentStatuses.Reported;
         public int? ApprovedByUserId { get; set; }
         public DateTimeOffset? ApprovedAt { get; set; }

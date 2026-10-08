@@ -74,6 +74,7 @@ namespace RacehorseTransport.API.Mappers
                 ProposedAction = model.ProposedAction,
                 RevisedRouteNotes = model.RevisedRouteNotes,
                 AdditionalCost = model.AdditionalCost,
+                RejectionReason = model.RejectionReason,
                 ApprovedByUserId = model.ApprovedByUserId,
                 ApprovedByName = model.ApprovedByName,
                 ApprovedAt = model.ApprovedAt,

@@ -307,6 +307,7 @@ CREATE TABLE incident.trip_incidents (
     proposed_action         varchar(255),
     revised_route_notes     text,
     additional_cost         numeric(18,2) NOT NULL DEFAULT 0,
+    rejection_reason        varchar(500), -- lý do của lần Manager từ chối phương án gần nhất
     -- Vòng đời: Reported -> PlanProposed -> Approved | Rejected (đề xuất lại) -> Resolved
     status                  varchar(30)   NOT NULL DEFAULT 'Reported'
         CONSTRAINT ck_trip_incidents_status CHECK (status IN ('Reported', 'PlanProposed', 'Approved', 'Rejected', 'Resolved')),
