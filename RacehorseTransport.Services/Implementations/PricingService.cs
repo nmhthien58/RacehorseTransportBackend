@@ -128,7 +128,7 @@ namespace RacehorseTransport.Services.Implementations
                 });
             }
 
-            // 5. Phí áp tải: 1 groom cho mỗi 3 ngựa; đường bộ tính theo ngày
+            // 5. Phí áp tải: 1 nhân viên áp tải cho mỗi 3 ngựa; đường bộ tính theo ngày
             int groomCount = (int)Math.Ceiling(horseCount / (double)HorsesPerGroom);
             int transitDays = Math.Max(1, (int)Math.Ceiling((input.DeliveryDate - input.DepartureDate).TotalHours / 24));
 

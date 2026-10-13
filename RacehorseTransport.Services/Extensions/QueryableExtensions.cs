@@ -56,7 +56,7 @@ namespace RacehorseTransport.Services.Extensions
             return query;
         }
 
-        // Đếm tổng, cắt trang và map Entity -> BusinessModel
+        // Đếm tổng, phân trang và ánh xạ Entity sang BusinessModel.
         public static async Task<PagedBusinessResult<TModel>> ToPagedResultAsync<TEntity, TModel>(
             this IQueryable<TEntity> query,
             BusinessQueryOptions options,
@@ -64,9 +64,15 @@ namespace RacehorseTransport.Services.Extensions
         {
             int page = options.Page > 0 ? options.Page : 1;
             int size = options.Size > 0 ? Math.Min(options.Size, BusinessQueryOptions.MaxSize) : 10;
+            long skip = ((long)page - 1) * size;
+
+            if (skip > int.MaxValue)
+            {
+                throw new BusinessException("Page and size produce an offset that is too large.");
+            }
 
             int totalItems = await query.CountAsync();
-            var items = await query.Skip((page - 1) * size).Take(size).ToListAsync();
+            var items = await query.Skip((int)skip).Take(size).ToListAsync();
 
             return new PagedBusinessResult<TModel>
             {

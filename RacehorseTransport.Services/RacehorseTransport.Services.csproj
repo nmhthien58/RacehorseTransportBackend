@@ -13,6 +13,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Mẫu email: mỗi file .html trong EmailTemplates được nhúng vào assembly -->
+    <EmbeddedResource Include="EmailTemplates\*.html" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\RacehorseTransport.Repositories\RacehorseTransport.Repositories.csproj" />
   </ItemGroup>
 
