@@ -1,13 +1,13 @@
-### Mở file này bằng Visual Studio / VS Code (REST Client) rồi bấm "Send Request" từng khối.
-### Mật khẩu tài khoản seed: xem phần đầu file database/02_seed.sql
+### Mở tệp này bằng Visual Studio / VS Code (REST Client), rồi bấm nút gửi yêu cầu (Send Request) ở từng khối.
+### Mật khẩu tài khoản dữ liệu mẫu: xem phần đầu tệp database/02_seed.sql.
 
 @baseUrl = http://localhost:5080
-@password = <điền mật khẩu seed vào đây, đừng commit>
+@password = <điền mật khẩu dữ liệu mẫu vào đây, không đưa vào commit>
 
-### Health check
+### Kiểm tra trạng thái hệ thống
 GET {{baseUrl}}/health
 
-### Đăng nhập (đổi email để thử role khác)
+### Đăng nhập (đổi email để thử vai trò khác)
 # mai.nguyen@clearance.com      -> TransportSpecialist
 # bao.tran@logistics.com        -> LogisticsManager
 # nam.le@fleet.com              -> FleetCoordinator
@@ -24,14 +24,60 @@ Content-Type: application/json
 }
 
 ###
-@accessToken = {{login.response.body.data.accessToken}}
-@refreshToken = {{login.response.body.data.refreshToken}}
+@accessToken = {{login.response.body.$.data.accessToken}}
+@refreshToken = {{login.response.body.$.data.refreshToken}}
+
+### Các mã truy cập riêng dùng để thử phân quyền B-01 → B-07
+# @name loginAdmin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@logistics.com",
+  "password": "{{password}}"
+}
+
+###
+# @name loginManager
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "bao.tran@logistics.com",
+  "password": "{{password}}"
+}
+
+###
+# @name loginCoordinator
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "nam.le@fleet.com",
+  "password": "{{password}}"
+}
+
+###
+# @name loginCustomer
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "jane.smith@racehorseowner.com",
+  "password": "{{password}}"
+}
+
+###
+@adminToken = {{loginAdmin.response.body.$.data.accessToken}}
+@managerToken = {{loginManager.response.body.$.data.accessToken}}
+@coordinatorToken = {{loginCoordinator.response.body.$.data.accessToken}}
+@customerToken = {{loginCustomer.response.body.$.data.accessToken}}
 
 ### Thông tin người đang đăng nhập
 GET {{baseUrl}}/api/auth/me
 Authorization: Bearer {{accessToken}}
 
-### Đổi refresh token lấy access token mới
+### Dùng mã làm mới để lấy mã truy cập mới
 POST {{baseUrl}}/api/auth/refresh
 Content-Type: application/json
 
@@ -39,7 +85,7 @@ Content-Type: application/json
   "refreshToken": "{{refreshToken}}"
 }
 
-### Đăng ký tài khoản Customer
+### Đăng ký tài khoản khách hàng
 POST {{baseUrl}}/api/auth/register
 Content-Type: application/json
 
@@ -50,13 +96,13 @@ Content-Type: application/json
   "phoneNumber": "+84900000001"
 }
 
-### ---------- Document types (CRUD mẫu) ----------
+### ---------- Loại giấy tờ (CRUD mẫu) ----------
 
 ### Danh sách có tìm kiếm / sắp xếp / phân trang
 GET {{baseUrl}}/api/document-types?search=&sort=-code&page=1&size=10
 Authorization: Bearer {{accessToken}}
 
-### Danh sách đầy đủ cho dropdown (có cache)
+### Danh sách đầy đủ cho danh sách chọn (có bộ nhớ đệm)
 GET {{baseUrl}}/api/document-types/lookup
 Authorization: Bearer {{accessToken}}
 
@@ -64,7 +110,7 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/document-types/1
 Authorization: Bearer {{accessToken}}
 
-### Tạo mới (chỉ TransportSpecialist / Admin)
+### Tạo mới (chỉ chuyên viên vận chuyển / quản trị viên)
 POST {{baseUrl}}/api/document-types
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -91,3 +137,352 @@ Content-Type: application/json
 ### Xóa
 DELETE {{baseUrl}}/api/document-types/5
 Authorization: Bearer {{accessToken}}
+
+### =====================================================================
+### B-01 · Quản lý phương tiện
+### Chạy yêu cầu tạo trước các yêu cầu dùng {{createdAssetId}}.
+### =====================================================================
+
+### [ĐÚNG] Danh sách xe: nhân sự được phép xem
+GET {{baseUrl}}/api/transport-assets?search=29B&status=Available&assetType=HorseTruck_AirSuspension&sort=assetCode&page=1&size=10
+Authorization: Bearer {{coordinatorToken}}
+
+### [SAI - 403] Khách hàng không được xem danh sách xe
+GET {{baseUrl}}/api/transport-assets?page=1&size=10
+Authorization: Bearer {{customerToken}}
+
+### [ĐÚNG] Chi tiết xe trong dữ liệu mẫu
+GET {{baseUrl}}/api/transport-assets/1
+Authorization: Bearer {{coordinatorToken}}
+
+### [SAI - 404] Xe không tồn tại
+GET {{baseUrl}}/api/transport-assets/999999
+Authorization: Bearer {{coordinatorToken}}
+
+### [ĐÚNG] Tạo xe
+# @name createTransportAsset
+POST {{baseUrl}}/api/transport-assets
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "assetCode": "DEMO-TU-01",
+  "assetType": "HorseVan",
+  "capacityHorses": 2,
+  "hasClimateControl": true,
+  "hasGpsTracker": true,
+  "status": "Available",
+  "lastSanitizationDate": "2026-10-12T08:00:00+07:00"
+}
+
+###
+@createdAssetId = {{createTransportAsset.response.body.$.data.assetId}}
+
+### [SAI - 400] Sức chứa vượt giới hạn
+POST {{baseUrl}}/api/transport-assets
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "assetCode": "DEMO-TU-BAD",
+  "assetType": "HorseVan",
+  "capacityHorses": 13,
+  "hasClimateControl": true,
+  "hasGpsTracker": true,
+  "status": "Available"
+}
+
+### [ĐÚNG] Cập nhật xe vừa tạo
+PUT {{baseUrl}}/api/transport-assets/{{createdAssetId}}
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "assetCode": "DEMO-TU-01",
+  "assetType": "HorseVan",
+  "capacityHorses": 3,
+  "hasClimateControl": true,
+  "hasGpsTracker": true,
+  "status": "Maintenance",
+  "lastSanitizationDate": "2026-10-12T09:00:00+07:00"
+}
+
+### [SAI - 400] Loại phương tiện không thuộc AssetTypes.All
+PUT {{baseUrl}}/api/transport-assets/{{createdAssetId}}
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "assetCode": "DEMO-TU-01",
+  "assetType": "Motorbike",
+  "capacityHorses": 2,
+  "hasClimateControl": true,
+  "hasGpsTracker": true,
+  "status": "Available"
+}
+
+### [ĐÚNG] Xóa xe vừa tạo, chưa từng gắn với chuyến
+DELETE {{baseUrl}}/api/transport-assets/{{createdAssetId}}
+Authorization: Bearer {{coordinatorToken}}
+
+### [SAI - 400] Xe có ID 1 đã được dùng trong chuyến dữ liệu mẫu nên không được xóa
+DELETE {{baseUrl}}/api/transport-assets/1
+Authorization: Bearer {{coordinatorToken}}
+
+### =====================================================================
+### B-02 · Quy định giấy tờ theo quốc gia
+### Chạy yêu cầu tạo trước các yêu cầu dùng {{createdRequirementId}}.
+### =====================================================================
+
+### [ĐÚNG] Lọc quy định nhập khẩu của Thái Lan
+GET {{baseUrl}}/api/country-doc-requirements?countryCode=TH&direction=Import&page=1&size=10
+Authorization: Bearer {{accessToken}}
+
+### [SAI - 400] Mã quốc gia không đúng hai chữ cái
+GET {{baseUrl}}/api/country-doc-requirements?countryCode=VNM&page=1&size=10
+Authorization: Bearer {{accessToken}}
+
+### [ĐÚNG] Chi tiết quy định trong dữ liệu mẫu
+GET {{baseUrl}}/api/country-doc-requirements/1
+Authorization: Bearer {{customerToken}}
+
+### [SAI - 404] Quy định không tồn tại
+GET {{baseUrl}}/api/country-doc-requirements/999999
+Authorization: Bearer {{customerToken}}
+
+### [ĐÚNG] Tạo quy định mới
+# @name createCountryRequirement
+POST {{baseUrl}}/api/country-doc-requirements
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "countryCode": "VN",
+  "direction": "Import",
+  "docTypeId": 1,
+  "validityDays": 365,
+  "isMandatory": true,
+  "regulationNote": "Dữ liệu thử B-02"
+}
+
+###
+@createdRequirementId = {{createCountryRequirement.response.body.$.data.requirementId}}
+
+### [SAI - 400] Loại giấy tờ không tồn tại
+POST {{baseUrl}}/api/country-doc-requirements
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "countryCode": "VN",
+  "direction": "Import",
+  "docTypeId": 999999,
+  "validityDays": 30,
+  "isMandatory": true
+}
+
+### [ĐÚNG] Cập nhật quy định vừa tạo
+PUT {{baseUrl}}/api/country-doc-requirements/{{createdRequirementId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "countryCode": "VN",
+  "direction": "Import",
+  "docTypeId": 1,
+  "validityDays": 180,
+  "isMandatory": true,
+  "regulationNote": "Đã cập nhật bằng request mẫu"
+}
+
+### [SAI - 400] Hướng quy định không hợp lệ
+PUT {{baseUrl}}/api/country-doc-requirements/{{createdRequirementId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "countryCode": "VN",
+  "direction": "Transit",
+  "docTypeId": 1,
+  "validityDays": 180,
+  "isMandatory": true
+}
+
+### [ĐÚNG] Xóa quy định vừa tạo
+DELETE {{baseUrl}}/api/country-doc-requirements/{{createdRequirementId}}
+Authorization: Bearer {{accessToken}}
+
+### [SAI - 404] Xóa ID không tồn tại
+DELETE {{baseUrl}}/api/country-doc-requirements/999999
+Authorization: Bearer {{accessToken}}
+
+### =====================================================================
+### B-03 · Bảng giá
+### Chạy yêu cầu tạo trước các yêu cầu dùng {{createdPriceItemId}}.
+### =====================================================================
+
+### [ĐÚNG] Quản lý hậu cần xem bảng giá
+GET {{baseUrl}}/api/price-items?category=Freight&transportMode=Air&isActive=true&search=Zone&page=1&size=10
+Authorization: Bearer {{managerToken}}
+
+### [SAI - 403] Khách hàng không được xem bảng giá quản trị
+GET {{baseUrl}}/api/price-items?page=1&size=10
+Authorization: Bearer {{customerToken}}
+
+### [ĐÚNG] Chi tiết một dòng giá
+GET {{baseUrl}}/api/price-items/1
+Authorization: Bearer {{managerToken}}
+
+### [SAI - 404] Dòng giá không tồn tại
+GET {{baseUrl}}/api/price-items/999999
+Authorization: Bearer {{managerToken}}
+
+### [ĐÚNG] Tạo dòng giá dùng chung
+# @name createPriceItem
+POST {{baseUrl}}/api/price-items
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "category": "Surcharge",
+  "itemCode": "DEMO_HANDLING_TU",
+  "itemName": "Phụ phí xử lý demo",
+  "transportMode": null,
+  "destCountryCode": null,
+  "calcType": "PerBooking",
+  "value": 25,
+  "minHorses": null
+}
+
+###
+@createdPriceItemId = {{createPriceItem.response.body.$.data.priceItemId}}
+
+### [SAI - 400] Giá trị âm
+POST {{baseUrl}}/api/price-items
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "category": "Surcharge",
+  "itemCode": "DEMO_NEGATIVE",
+  "itemName": "Dữ liệu sai",
+  "calcType": "PerBooking",
+  "value": -1
+}
+
+### [ĐÚNG] Cập nhật dòng giá vừa tạo
+PUT {{baseUrl}}/api/price-items/{{createdPriceItemId}}
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "category": "Surcharge",
+  "itemCode": "DEMO_HANDLING_TU",
+  "itemName": "Phụ phí xử lý demo đã cập nhật",
+  "transportMode": null,
+  "destCountryCode": null,
+  "calcType": "PerBooking",
+  "value": 30,
+  "minHorses": null
+}
+
+### [SAI - 400] Cách tính giá không hợp lệ
+PUT {{baseUrl}}/api/price-items/{{createdPriceItemId}}
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "category": "Surcharge",
+  "itemCode": "DEMO_HANDLING_TU",
+  "itemName": "Dữ liệu sai",
+  "calcType": "ByMagic",
+  "value": 30
+}
+
+### [ĐÚNG] Ngừng sử dụng dòng giá
+PATCH {{baseUrl}}/api/price-items/{{createdPriceItemId}}/active
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "isActive": false
+}
+
+### [SAI - 400] Thiếu isActive
+PATCH {{baseUrl}}/api/price-items/{{createdPriceItemId}}/active
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{}
+
+### =====================================================================
+### B-04 · Kiểm tra tài khoản dữ liệu mẫu bổ sung
+### =====================================================================
+
+### [ĐÚNG] Đăng nhập tài khoản điều phối viên mới
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "huy.pham@fleet.com",
+  "password": "{{password}}"
+}
+
+### [SAI - 401] Mật khẩu tài khoản dữ liệu mẫu không đúng
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "huy.pham@fleet.com",
+  "password": "WrongPassword@123"
+}
+
+### =====================================================================
+### B-05 · Hộp thông báo
+### =====================================================================
+
+### [ĐÚNG] Jane xem thông báo chưa đọc của mình, mới nhất trước
+GET {{baseUrl}}/api/notifications?isRead=false&page=1&size=10
+Authorization: Bearer {{customerToken}}
+
+### [SAI - 400] Số trang phải lớn hơn hoặc bằng 1
+GET {{baseUrl}}/api/notifications?page=0&size=10
+Authorization: Bearer {{customerToken}}
+
+### [ĐÚNG] Đếm thông báo chưa đọc
+GET {{baseUrl}}/api/notifications/unread-count
+Authorization: Bearer {{customerToken}}
+
+### [SAI - 401] Không có mã truy cập
+GET {{baseUrl}}/api/notifications/unread-count
+
+### [ĐÚNG] Jane đánh dấu thông báo ID 2 của mình đã đọc
+PATCH {{baseUrl}}/api/notifications/2/read
+Authorization: Bearer {{customerToken}}
+
+### [SAI - 404] Quản trị viên không được thao tác thông báo ID 1 của Jane
+PATCH {{baseUrl}}/api/notifications/1/read
+Authorization: Bearer {{adminToken}}
+
+### [ĐÚNG] Jane đánh dấu toàn bộ thông báo của mình đã đọc
+PATCH {{baseUrl}}/api/notifications/read-all
+Authorization: Bearer {{customerToken}}
+
+### [SAI - 401] Đánh dấu đọc tất cả khi không có mã truy cập
+PATCH {{baseUrl}}/api/notifications/read-all
+
+### =====================================================================
+### B-06 · Mẫu email
+### Không có đường dẫn API riêng. Kiểm tra 8 tệp trong Services/EmailTemplates.
+### =====================================================================
+
+### =====================================================================
+### B-07 · Danh mục giá trị enum
+### =====================================================================
+
+### [ĐÚNG] Người đã đăng nhập lấy dữ liệu cho danh sách chọn
+GET {{baseUrl}}/api/lookups/enums
+Authorization: Bearer {{customerToken}}
+
+### [SAI - 401] Không có mã truy cập
+GET {{baseUrl}}/api/lookups/enums
