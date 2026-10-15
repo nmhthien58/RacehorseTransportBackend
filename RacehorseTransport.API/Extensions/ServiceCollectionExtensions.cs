@@ -77,6 +77,7 @@ namespace RacehorseTransport.API.Extensions
             services.AddSingleton<ITokenService, JwtTokenService>();
             services.AddScoped<ICodeGenerator, CodeGenerator>();
             services.AddScoped<INotificationService, NotificationService>();
+            services.AddScoped<INotificationReadService, NotificationReadService>();
             services.AddHttpClient<IFileStorageService, SupabaseFileStorageService>(client => client.Timeout = TimeSpan.FromSeconds(30));
 
             // Đăng nhập bằng Google: kiểm tra ID token bằng khóa công khai của Google
