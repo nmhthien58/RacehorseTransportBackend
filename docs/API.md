@@ -23,8 +23,12 @@ Tài liệu này hướng dẫn gọi API của hệ thống vận chuyển ng�
 11. [Flow 5 – Sự cố và nắn tuyến](#11-flow-5--sự-cố-và-nắn-tuyến)
 12. [Flow 6 – Bàn giao, đóng chuyến và báo cáo](#12-flow-6--bàn-giao-đóng-chuyến-và-báo-cáo)
 13. [Danh mục loại giấy tờ](#13-danh-mục-loại-giấy-tờ)
-14. [Những phần chưa có API](#14-những-phần-chưa-có-api)
-15. [Bảng tra nhanh mọi endpoint](#15-bảng-tra-nhanh-mọi-endpoint)
+14. [Thông báo trong ứng dụng (chuông)](#14-thông-báo-trong-ứng-dụng-chuông)
+15. [Quản lý phương tiện](#15-quản-lý-phương-tiện)
+16. [Quy định giấy tờ theo quốc gia](#16-quy-định-giấy-tờ-theo-quốc-gia)
+17. [Bảng giá](#17-bảng-giá)
+18. [Những phần chưa có API](#18-những-phần-chưa-có-api)
+19. [Bảng tra nhanh mọi endpoint](#19-bảng-tra-nhanh-mọi-endpoint)
 
 ---
 
@@ -411,7 +415,12 @@ Các trường dưới đây chỉ nhận đúng những giá trị liệt kê, 
 | Trạng thái sự cố | `Reported` mới báo · `PlanProposed` đã có phương án chờ duyệt · `Approved` phương án được duyệt · `Rejected` phương án bị từ chối · `Resolved` đã xử lý xong |
 | `overallCondition` (tình trạng khi bàn giao) | `Excellent` tốt · `NormalFatigue` mệt bình thường · `Injured` bị thương |
 | `onTimeStatus` (kết quả đúng giờ của chuyến) | `OnTime` đúng giờ · `Delayed_AcceptableForceMajeure` trễ do bất khả kháng · `Delayed_OperationalFault` trễ do lỗi vận hành |
-| Loại phương tiện (`assetType`) | `HorseTruck_AirSuspension` · `HorseVan` · `AirStall` |
+| Loại phương tiện (`assetType`) | `HorseTruck_AirSuspension` xe tải giảm xóc khí · `HorseVan` xe van · `AirStall` chuồng hàng không |
+| Tình trạng phương tiện (`status`, mục 15) | `Available` sẵn sàng · `InTransit` đang chạy chuyến · `Maintenance` đang bảo dưỡng |
+| `direction` (quy định giấy tờ, mục 16) | `Export` khi rời nước · `Import` khi vào nước |
+| `category` (nhóm giá, mục 17) | `Freight` cước · `StallClass` hệ số hạng chuồng · `Surcharge` phụ phí · `Discount` chiết khấu · `Clearance` phí thủ tục · `Escort` người chăm ngựa · `Insurance` bảo hiểm |
+| `calcType` (cách tính giá, mục 17) | `PerHorse` · `PerKmPerHorse` · `Multiplier` · `Percent` · `PerBooking` · `PerGroom` · `PerGroomDay` |
+| `referenceType` (thông báo, mục 14) | `Booking` · `Dossier` · `Trip` · `Incident` |
 
 ---
 
@@ -4222,24 +4231,1031 @@ Lỗi thường gặp:
 
 ---
 
-## 14. Những phần chưa có API
+## 14. Thông báo trong ứng dụng (chuông)
+
+Mỗi khi có sự kiện (đơn được duyệt, giấy bị từ chối, chuyến xuất phát, có sự cố...), backend tự tạo một thông báo cho người liên quan. Các API dưới đây dùng để làm **biểu tượng chuông** trên thanh menu: hiện số thông báo chưa đọc, mở danh sách, bấm vào một thông báo thì đánh dấu đã đọc và chuyển tới trang liên quan.
+
+Ai cũng chỉ thấy và thao tác được **thông báo của chính mình**. Gọi vào thông báo của người khác sẽ nhận `404` như thể thông báo đó không tồn tại.
+
+Một thông báo có dạng:
+
+```json
+{
+  "notificationId": 2,
+  "title": "Ngựa đã tới điểm bàn giao",
+  "message": "Chuyến TRP-2026-0001 đã tới Trường đua Tùng Hóa. Vui lòng kiểm tra và ký biên bản bàn giao.",
+  "referenceType": "Trip",
+  "referenceId": 1,
+  "isRead": false,
+  "createdAt": "2026-10-02T10:30:00+00:00"
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `notificationId` | Mã thông báo (số nguyên lớn, kiểu `long` ở backend; trong JavaScript dùng như số bình thường) |
+| `title` | Tiêu đề ngắn, hiện in đậm trong danh sách |
+| `message` | Nội dung chi tiết |
+| `referenceType` | Thông báo nói về cái gì: `Booking` (đơn), `Dossier` (hồ sơ kiểm dịch), `Trip` (chuyến), `Incident` (sự cố). Có thể `null` |
+| `referenceId` | Mã của đối tượng đó, dùng để mở trang chi tiết. Có thể `null` |
+| `isRead` | `false` là chưa đọc (nên tô đậm hoặc có chấm xanh) |
+| `createdAt` | Thời điểm tạo (giờ UTC, xem mục 2.4) |
+
+Gợi ý chuyển trang khi bấm vào thông báo (đổi đường dẫn cho khớp router của frontend):
+
+| `referenceType` | Mở trang | API lấy dữ liệu trang đó |
+|---|---|---|
+| `Booking` | Chi tiết đơn | `GET /api/bookings/{referenceId}` |
+| `Dossier` | Chi tiết hồ sơ | `GET /api/dossiers/{referenceId}` |
+| `Trip` | Chi tiết chuyến (nhân sự) hoặc trang theo dõi đơn (khách) | `GET /api/trips/{referenceId}` |
+| `Incident` | Chi tiết sự cố | `GET /api/incidents/{referenceId}` |
+
+> Khách hàng không gọi được `GET /api/trips/{id}`. Với thông báo `Trip` gửi cho khách, hãy đưa khách về danh sách đơn của họ hoặc trang theo dõi đơn (`GET /api/tracking/bookings/{id}`).
+
+### GET /api/notifications — Danh sách thông báo của tôi
+
+Lấy thông báo của người đang đăng nhập, **mới nhất đứng đầu**. Có phân trang.
+
+- **Ai gọi được:** Mọi người đã đăng nhập
+
+Tham số query (gắn sau dấu `?`):
+
+| Tham số | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `isRead` | true / false | Không | `false` chỉ lấy thông báo chưa đọc, `true` chỉ lấy đã đọc; bỏ trống để lấy tất cả |
+| `page` | số | Không | Trang, bắt đầu từ 1 (mặc định 1) |
+| `size` | số | Không | Số dòng mỗi trang, 1–100 (mặc định 10) |
+
+API này **không** có `search` và `sort`; thứ tự luôn là mới nhất trước.
+
+Ví dụ: `GET /api/notifications?isRead=false&page=1&size=10`
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Notifications retrieved successfully",
+  "data": [
+    {
+      "notificationId": 2,
+      "title": "Ngựa đã tới điểm bàn giao",
+      "message": "Chuyến TRP-2026-0001 đã tới Trường đua Tùng Hóa. Vui lòng kiểm tra và ký biên bản bàn giao.",
+      "referenceType": "Trip",
+      "referenceId": 1,
+      "isRead": false,
+      "createdAt": "2026-10-02T10:30:00+00:00"
+    },
+    {
+      "notificationId": 1,
+      "title": "Đơn BKG-2026-0001 đã được phê duyệt",
+      "message": "Yêu cầu vận chuyển của bạn đã được phê duyệt và phân công nhân sự phụ trách.",
+      "referenceType": "Booking",
+      "referenceId": 1,
+      "isRead": true,
+      "createdAt": "2026-09-20T02:00:00+00:00"
+    }
+  ],
+  "errors": null,
+  "pagination": {
+    "page": 1,
+    "pageSize": 10,
+    "totalItems": 2,
+    "totalPages": 1
+  }
+}
+```
+
+Lỗi thường gặp:
+
+| HTTP | `errors` | Khi nào |
+|---|---|---|
+| 400 | `The value 'abc' is not valid for IsRead.` | `isRead` không phải `true` / `false` |
+| 400 | `Size must be between 1 and 100.` | `size` ngoài khoảng 1–100 |
+| 401 | | Chưa đăng nhập hoặc token hết hạn |
+
+### GET /api/notifications/unread-count — Số thông báo chưa đọc
+
+Trả về số thông báo chưa đọc, để hiện con số đỏ trên biểu tượng chuông.
+
+- **Ai gọi được:** Mọi người đã đăng nhập
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Request processed successfully",
+  "data": {
+    "count": 1
+  },
+  "errors": null
+}
+```
+
+Backend chưa có cơ chế đẩy thông báo tức thời (WebSocket). Cách đơn giản là gọi lại API này định kỳ, ví dụ 30 giây một lần, và khi người dùng chuyển trang:
+
+```js
+import api from './api'; // file axios dùng chung ở mục 1
+
+export async function fetchUnreadCount() {
+  const res = await api.get('/api/notifications/unread-count');
+  return res.data.data.count;
+}
+
+// Trong component thanh menu (React):
+// useEffect(() => {
+//   const load = () => fetchUnreadCount().then(setUnread).catch(() => {});
+//   load();
+//   const timer = setInterval(load, 30000);
+//   return () => clearInterval(timer);
+// }, []);
+```
+
+### PATCH /api/notifications/{id}/read — Đánh dấu một thông báo đã đọc
+
+Gọi khi người dùng bấm vào một thông báo. Gọi lại với thông báo đã đọc rồi vẫn trả `200` bình thường.
+
+- **Ai gọi được:** Người nhận thông báo đó
+- **Dữ liệu gửi lên:** không có body
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã thông báo (`notificationId`) |
+
+Response `200`: `data` là thông báo với `isRead: true`.
+
+```json
+{
+  "success": true,
+  "message": "Notification marked as read successfully",
+  "data": {
+    "notificationId": 2,
+    "title": "Ngựa đã tới điểm bàn giao",
+    "message": "Chuyến TRP-2026-0001 đã tới Trường đua Tùng Hóa. Vui lòng kiểm tra và ký biên bản bàn giao.",
+    "referenceType": "Trip",
+    "referenceId": 1,
+    "isRead": true,
+    "createdAt": "2026-10-02T10:30:00+00:00"
+  },
+  "errors": null
+}
+```
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 404 | `Notification with ID 1 was not found.` | Không có thông báo đó, **hoặc** thông báo thuộc về người khác |
+
+Ví dụ bấm vào một thông báo: đánh dấu đã đọc rồi chuyển trang.
+
+```js
+async function onClickNotification(n, navigate) {
+  if (!n.isRead) {
+    await api.patch(`/api/notifications/${n.notificationId}/read`);
+  }
+  const routes = {
+    Booking: `/bookings/${n.referenceId}`,
+    Dossier: `/dossiers/${n.referenceId}`,
+    Trip: `/trips/${n.referenceId}`,
+    Incident: `/incidents/${n.referenceId}`,
+  };
+  if (n.referenceType && routes[n.referenceType]) navigate(routes[n.referenceType]);
+}
+```
+
+### PATCH /api/notifications/read-all — Đánh dấu tất cả đã đọc
+
+Đánh dấu mọi thông báo chưa đọc của người đang đăng nhập là đã đọc (nút "Đánh dấu tất cả đã đọc").
+
+- **Ai gọi được:** Mọi người đã đăng nhập
+- **Dữ liệu gửi lên:** không có body
+
+Response `200`: `data` là `null`. Sau đó `unread-count` sẽ trả `0`.
+
+```json
+{
+  "success": true,
+  "message": "All notifications marked as read successfully",
+  "data": null,
+  "errors": null
+}
+```
+
+---
+
+## 15. Quản lý phương tiện
+
+Danh sách xe tải chở ngựa, xe van và chuồng hàng không (air stall) của công ty. Điều phối viên dùng màn hình này để thêm xe mới, cập nhật tình trạng (đang bảo dưỡng...) và ngày khử trùng gần nhất. Khi xếp chuyến (mục 9) chỉ những xe `Available` mới hiện trong `GET /api/trips/available-vehicles`.
+
+- **Xem:** mọi nhân sự (LogisticsManager, TransportSpecialist, FleetCoordinator, DriverEscort, Admin). Khách hàng không xem được (`403`).
+- **Thêm / sửa / xóa:** FleetCoordinator, Admin.
+
+Một phương tiện có dạng:
+
+```json
+{
+  "assetId": 2,
+  "assetCode": "51C-246.80",
+  "assetType": "HorseVan",
+  "capacityHorses": 2,
+  "hasClimateControl": false,
+  "hasGpsTracker": true,
+  "status": "Available",
+  "lastSanitizationDate": "2026-09-25T01:00:00+00:00"
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `assetId` | Mã phương tiện, dùng làm `vehicleId` khi tạo chuyến |
+| `assetCode` | Biển số xe hoặc mã chuồng bay; luôn được lưu **chữ in hoa**, không trùng |
+| `assetType` | Loại: `HorseTruck_AirSuspension` xe tải chở ngựa có giảm xóc khí · `HorseVan` xe van chở ngựa · `AirStall` chuồng dùng cho đường hàng không |
+| `capacityHorses` | Chở tối đa bao nhiêu con ngựa (1–12) |
+| `hasClimateControl` | Có điều hòa hay không |
+| `hasGpsTracker` | Có thiết bị định vị hay không |
+| `status` | Tình trạng: `Available` sẵn sàng · `InTransit` đang chạy chuyến · `Maintenance` đang bảo dưỡng |
+| `lastSanitizationDate` | Lần khử trùng gần nhất (giờ UTC); có thể `null` |
+
+### GET /api/transport-assets — Danh sách phương tiện
+
+- **Ai gọi được:** Mọi nhân sự (không gồm Customer)
+
+Tham số query (gắn sau dấu `?`):
+
+| Tham số | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `search` | chuỗi | Không | Tìm theo `assetCode` (một phần biển số) |
+| `status` | chuỗi | Không | Lọc theo tình trạng: `Available`, `InTransit`, `Maintenance` |
+| `assetType` | chuỗi | Không | Lọc theo loại: `HorseTruck_AirSuspension`, `HorseVan`, `AirStall` |
+| `sort` | chuỗi | Không | Trường sắp xếp, thêm `-` phía trước để giảm dần (ví dụ `-capacityHorses`) |
+| `page` | số | Không | Trang, bắt đầu từ 1 (mặc định 1) |
+| `size` | số | Không | Số dòng mỗi trang, 1–100 (mặc định 10) |
+
+Ví dụ: `GET /api/transport-assets?status=Available&assetType=HorseVan`
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Transport assets retrieved successfully",
+  "data": [
+    {
+      "assetId": 2,
+      "assetCode": "51C-246.80",
+      "assetType": "HorseVan",
+      "capacityHorses": 2,
+      "hasClimateControl": false,
+      "hasGpsTracker": true,
+      "status": "Available",
+      "lastSanitizationDate": "2026-09-25T01:00:00+00:00"
+    }
+  ],
+  "errors": null,
+  "pagination": {
+    "page": 1,
+    "pageSize": 10,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}
+```
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Status 'Broken' is invalid. Allowed values: Available, InTransit, Maintenance.` | `status` sai giá trị (phân biệt hoa thường) |
+| 400 | `AssetType 'Truck' is invalid. Allowed values: HorseTruck_AirSuspension, HorseVan, AirStall.` | `assetType` sai giá trị |
+| 403 | `You do not have permission to perform this action.` | Khách hàng gọi |
+
+### GET /api/transport-assets/{id} — Chi tiết phương tiện
+
+- **Ai gọi được:** Mọi nhân sự (không gồm Customer)
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã phương tiện (`assetId`) |
+
+Response `200`: `data` là một phương tiện.
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 404 | `Transport asset with ID 99 was not found.` | Không có phương tiện với mã đó |
+
+### POST /api/transport-assets — Thêm phương tiện
+
+- **Ai gọi được:** FleetCoordinator, Admin
+- **Dữ liệu gửi lên:** JSON
+
+Các trường gửi lên:
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `assetCode` | chuỗi | Có | Biển số / mã, tối đa 30 ký tự, không trùng. Gõ chữ thường cũng được, server tự đổi sang in hoa |
+| `assetType` | chuỗi | Có | `HorseTruck_AirSuspension`, `HorseVan` hoặc `AirStall` |
+| `capacityHorses` | số | Có | Sức chứa, từ 1 đến 12 |
+| `hasClimateControl` | true / false | Không | Mặc định `true` |
+| `hasGpsTracker` | true / false | Không | Mặc định `true` |
+| `status` | chuỗi | Có | `Available`, `InTransit` hoặc `Maintenance`. Xe mới thường là `Available` |
+| `lastSanitizationDate` | ngày giờ | Không | Lần khử trùng gần nhất, dạng ISO 8601 (ví dụ `2026-10-14T08:00:00+07:00`) |
+
+Ví dụ request:
+
+```json
+{
+  "assetCode": "51c-999.01",
+  "assetType": "HorseVan",
+  "capacityHorses": 2,
+  "hasClimateControl": true,
+  "hasGpsTracker": true,
+  "status": "Available",
+  "lastSanitizationDate": "2026-10-14T08:00:00+07:00"
+}
+```
+
+Response `201`:
+
+```json
+{
+  "success": true,
+  "message": "Transport asset created successfully",
+  "data": {
+    "assetId": 6,
+    "assetCode": "51C-999.01",
+    "assetType": "HorseVan",
+    "capacityHorses": 2,
+    "hasClimateControl": true,
+    "hasGpsTracker": true,
+    "status": "Available",
+    "lastSanitizationDate": "2026-10-14T08:00:00+07:00"
+  },
+  "errors": null
+}
+```
+
+Lỗi thường gặp:
+
+| HTTP | `message` / `errors` | Khi nào |
+|---|---|---|
+| 400 | `Transport asset code '51C-999.01' already exists.` | Trùng biển số (không phân biệt hoa thường) |
+| 400 | `AssetType 'Truck' is invalid. Allowed values: HorseTruck_AirSuspension, HorseVan, AirStall.` | Loại phương tiện sai |
+| 400 | `CapacityHorses must be between 1 and 12.` | Sức chứa ngoài khoảng 1–12 |
+| 403 | `You do not have permission to perform this action.` | Người gọi không phải FleetCoordinator / Admin |
+
+```js
+const res = await api.post('/api/transport-assets', {
+  assetCode: form.assetCode,
+  assetType: form.assetType,          // lấy từ dropdown
+  capacityHorses: Number(form.capacityHorses),
+  hasClimateControl: form.hasClimateControl,
+  hasGpsTracker: form.hasGpsTracker,
+  status: 'Available',
+  lastSanitizationDate: form.lastSanitizationDate || null,
+});
+console.log(res.data.data.assetId);
+```
+
+### PUT /api/transport-assets/{id} — Sửa phương tiện
+
+Sửa thông tin hoặc đổi tình trạng của một phương tiện (ví dụ đưa xe vào bảo dưỡng). Gửi lại **đủ** các trường, kể cả trường không đổi.
+
+- **Ai gọi được:** FleetCoordinator, Admin
+- **Dữ liệu gửi lên:** JSON
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã phương tiện |
+
+Các trường gửi lên: giống `POST /api/transport-assets`, chỉ khác là `hasClimateControl` và `hasGpsTracker` **không có mặc định** — bỏ trống sẽ thành `false`, nên luôn gửi kèm.
+
+Ví dụ request (đưa xe vào bảo dưỡng):
+
+```json
+{
+  "assetCode": "51C-999.01",
+  "assetType": "HorseVan",
+  "capacityHorses": 2,
+  "hasClimateControl": true,
+  "hasGpsTracker": true,
+  "status": "Maintenance",
+  "lastSanitizationDate": "2026-10-14T08:00:00+07:00"
+}
+```
+
+Response `200`: `data` là phương tiện sau khi sửa, `message` là `Transport asset updated successfully`.
+
+Lỗi thường gặp: như khi thêm, cộng thêm:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 404 | `Transport asset with ID 99 was not found.` | Không có phương tiện với mã đó |
+
+### DELETE /api/transport-assets/{id} — Xóa phương tiện
+
+Xóa hẳn một phương tiện **chưa từng được xếp vào chuyến nào**. Xe đã chạy chuyến thì không xóa được; muốn ngừng dùng thì sửa `status` sang `Maintenance`.
+
+- **Ai gọi được:** FleetCoordinator, Admin
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã phương tiện |
+
+Response `200`: `data` là `null`, `message` là `Transport asset deleted successfully`.
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `This transport asset has been assigned to a trip and cannot be deleted.` | Xe đã có trong ít nhất một chuyến |
+| 404 | `Transport asset with ID 99 was not found.` | Không có phương tiện với mã đó |
+
+---
+
+## 16. Quy định giấy tờ theo quốc gia
+
+Bảng quy định "nước nào, chiều nào, cần những giấy gì". Backend dựa vào bảng này để lập **checklist giấy tờ** của hồ sơ kiểm dịch (mục 8): lấy các giấy **xuất khẩu** (`Export`) của nước đi cộng các giấy **nhập khẩu** (`Import`) của nước đến. Loại giấy mà cả hai nước cùng yêu cầu chỉ hiện một dòng, lấy thời hạn ngắn hơn.
+
+Ví dụ: đơn đi từ Việt Nam sang Thái Lan sẽ cần các giấy `VN` + `Export` và các giấy `TH` + `Import`.
+
+> Checklist được tính lại **mỗi lần xem hồ sơ**, nên sửa bảng này là checklist của mọi hồ sơ (kể cả hồ sơ đang làm) đổi theo ngay. Nếu cặp nước của đơn chưa có quy định nào, checklist dùng các loại giấy có `isMandatory: true` trong danh mục loại giấy tờ (mục 13).
+
+- **Xem:** mọi người đã đăng nhập (kể cả khách, để biết trước cần chuẩn bị giấy gì).
+- **Thêm / sửa / xóa:** TransportSpecialist, Admin.
+
+Một quy định có dạng:
+
+```json
+{
+  "requirementId": 4,
+  "countryCode": "TH",
+  "direction": "Import",
+  "docTypeId": 2,
+  "docTypeCode": "COGGINS_EIA",
+  "docTypeName": "Chứng nhận xét nghiệm Coggins âm tính",
+  "validityDays": 30,
+  "isMandatory": true,
+  "regulationNote": "Xét nghiệm EIA âm tính trong 30 ngày"
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `requirementId` | Mã quy định |
+| `countryCode` | Mã nước 2 chữ cái in hoa theo chuẩn ISO (`VN`, `TH`, `JP`...) |
+| `direction` | `Export` giấy cần khi **rời** nước này · `Import` giấy cần khi **vào** nước này |
+| `docTypeId`, `docTypeCode`, `docTypeName` | Loại giấy tờ (lấy từ danh mục ở mục 13) |
+| `validityDays` | Giấy chỉ có giá trị trong bao nhiêu ngày; `null` là không giới hạn |
+| `isMandatory` | `true` bắt buộc, `false` khuyến nghị |
+| `regulationNote` | Ghi chú quy định, hiện cho khách đọc; có thể `null` |
+
+Mỗi bộ ba (`countryCode`, `direction`, `docTypeId`) chỉ có **một** dòng.
+
+### GET /api/country-doc-requirements — Danh sách quy định
+
+- **Ai gọi được:** Mọi người đã đăng nhập
+
+Tham số query (gắn sau dấu `?`):
+
+| Tham số | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `countryCode` | chuỗi | Không | Lọc theo nước, đúng 2 chữ cái (gõ thường cũng được) |
+| `direction` | chuỗi | Không | `Export` hoặc `Import` |
+| `page` | số | Không | Trang, bắt đầu từ 1 (mặc định 1) |
+| `size` | số | Không | Số dòng mỗi trang, 1–100 (mặc định 10) |
+
+API này **không** có `search`.
+
+Ví dụ: `GET /api/country-doc-requirements?countryCode=th&direction=Import&size=2`
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Country document requirements retrieved successfully",
+  "data": [
+    {
+      "requirementId": 3,
+      "countryCode": "TH",
+      "direction": "Import",
+      "docTypeId": 1,
+      "docTypeCode": "HORSE_PASSPORT",
+      "docTypeName": "Hộ chiếu ngựa quốc tế (FEI Passport)",
+      "validityDays": null,
+      "isMandatory": true,
+      "regulationNote": "Hộ chiếu FEI còn hiệu lực"
+    },
+    {
+      "requirementId": 4,
+      "countryCode": "TH",
+      "direction": "Import",
+      "docTypeId": 2,
+      "docTypeCode": "COGGINS_EIA",
+      "docTypeName": "Chứng nhận xét nghiệm Coggins âm tính",
+      "validityDays": 30,
+      "isMandatory": true,
+      "regulationNote": "Xét nghiệm EIA âm tính trong 30 ngày"
+    }
+  ],
+  "errors": null,
+  "pagination": {
+    "page": 1,
+    "pageSize": 2,
+    "totalItems": 4,
+    "totalPages": 2
+  }
+}
+```
+
+Lỗi thường gặp:
+
+| HTTP | `message` / `errors` | Khi nào |
+|---|---|---|
+| 400 | `CountryCode must contain exactly two letters.` | `countryCode` không phải đúng 2 chữ cái (ví dụ `VNM`) |
+| 400 | `Direction 'Inbound' is invalid. Allowed values: Export, Import.` | `direction` sai giá trị |
+
+Ví dụ hiện cho khách "sang Thái Lan cần chuẩn bị gì":
+
+```js
+const res = await api.get('/api/country-doc-requirements', {
+  params: { countryCode: 'TH', direction: 'Import', size: 100 },
+});
+const docs = res.data.data; // mỗi phần tử: docTypeName, validityDays, isMandatory, regulationNote
+```
+
+### GET /api/country-doc-requirements/{id} — Chi tiết một quy định
+
+- **Ai gọi được:** Mọi người đã đăng nhập
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã quy định (`requirementId`) |
+
+Response `200`: `data` là một quy định.
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 404 | `Country document requirement with ID 999 was not found.` | Không có quy định với mã đó |
+
+### POST /api/country-doc-requirements — Thêm quy định
+
+- **Ai gọi được:** TransportSpecialist, Admin
+- **Dữ liệu gửi lên:** JSON
+
+Các trường gửi lên:
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `countryCode` | chuỗi | Có | Đúng 2 chữ cái; server tự đổi sang in hoa |
+| `direction` | chuỗi | Có | `Export` hoặc `Import` |
+| `docTypeId` | số | Có | Mã loại giấy, lấy từ `GET /api/document-types/lookup` |
+| `validityDays` | số | Không | Số ngày giấy còn hiệu lực, lớn hơn 0; bỏ trống là không giới hạn |
+| `isMandatory` | true / false | Không | Mặc định `true` |
+| `regulationNote` | chuỗi | Không | Ghi chú, tối đa 255 ký tự |
+
+Ví dụ request:
+
+```json
+{
+  "countryCode": "vn",
+  "direction": "Export",
+  "docTypeId": 4,
+  "validityDays": 180,
+  "isMandatory": false,
+  "regulationNote": "Một số nước nhận yêu cầu thêm sổ tiêm phòng"
+}
+```
+
+Response `201`:
+
+```json
+{
+  "success": true,
+  "message": "Country document requirement created successfully",
+  "data": {
+    "requirementId": 63,
+    "countryCode": "VN",
+    "direction": "Export",
+    "docTypeId": 4,
+    "docTypeCode": "VACCINE",
+    "docTypeName": "Chứng nhận tiêm phòng cúm ngựa",
+    "validityDays": 180,
+    "isMandatory": false,
+    "regulationNote": "Một số nước nhận yêu cầu thêm sổ tiêm phòng"
+  },
+  "errors": null
+}
+```
+
+Lỗi thường gặp:
+
+| HTTP | `message` / `errors` | Khi nào |
+|---|---|---|
+| 400 | `A document requirement for SG, Import, document type ID 2 already exists.` | Nước + chiều + loại giấy này đã có quy định; hãy sửa dòng cũ |
+| 400 | `Document type with ID 999 does not exist.` | `docTypeId` không có trong danh mục |
+| 400 | `Direction 'Inbound' is invalid. Allowed values: Export, Import.` | `direction` sai giá trị |
+| 400 | `CountryCode must contain exactly two letters.` | Mã nước sai |
+| 403 | `You do not have permission to perform this action.` | Người gọi không phải TransportSpecialist / Admin |
+
+### PUT /api/country-doc-requirements/{id} — Sửa quy định
+
+Gửi lại **đủ** các trường như khi thêm.
+
+- **Ai gọi được:** TransportSpecialist, Admin
+- **Dữ liệu gửi lên:** JSON
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã quy định |
+
+Ví dụ request:
+
+```json
+{
+  "countryCode": "VN",
+  "direction": "Export",
+  "docTypeId": 4,
+  "validityDays": 90,
+  "isMandatory": true,
+  "regulationNote": "Tiêm phòng cúm ngựa trong 90 ngày trước ngày đi"
+}
+```
+
+Response `200`: `data` là quy định sau khi sửa, `message` là `Country document requirement updated successfully`.
+
+Lỗi thường gặp: như khi thêm (đổi sang một bộ nước + chiều + loại giấy đã có dòng khác cũng bị báo trùng), cộng thêm:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 404 | `Country document requirement with ID 999 was not found.` | Không có quy định với mã đó |
+
+### DELETE /api/country-doc-requirements/{id} — Xóa quy định
+
+- **Ai gọi được:** TransportSpecialist, Admin
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã quy định |
+
+Response `200`: `data` là `null`, `message` là `Country document requirement deleted successfully`.
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 404 | `Country document requirement with ID 999 was not found.` | Không có quy định với mã đó |
+
+---
+
+## 17. Bảng giá
+
+Các dòng giá mà backend dùng để **tính báo giá** cho đơn (`POST /api/bookings/quote-preview` và `POST /api/bookings`, mục 7). Quản lý dùng màn hình này để chỉnh giá cước, phụ phí, chiết khấu... mà không cần sửa code. Giá mới có hiệu lực với các báo giá tính **sau** khi lưu; đơn đã gửi giữ nguyên giá cũ.
+
+- **Ai gọi được (cả xem lẫn sửa):** LogisticsManager, Admin. Khách hàng và các nhân sự khác nhận `403`.
+- Không có API xóa: muốn ngừng một dòng giá thì **tắt** nó bằng `PATCH /api/price-items/{id}/active`.
+
+Một dòng giá có dạng:
+
+```json
+{
+  "priceItemId": 1,
+  "category": "Freight",
+  "itemCode": "FREIGHT",
+  "itemName": "Zone A - Đông Nam Á (Thái Lan)",
+  "transportMode": "Air",
+  "destCountryCode": "TH",
+  "calcType": "PerHorse",
+  "value": 3000.0000,
+  "minHorses": null,
+  "isActive": true
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `priceItemId` | Mã dòng giá |
+| `category` | Nhóm giá (bảng bên dưới) |
+| `itemCode` | Mã khoản giá; chỉ gồm chữ, số, dấu gạch dưới; luôn được lưu **in hoa** |
+| `itemName` | Tên hiển thị, cũng là tên dòng trong báo giá gửi khách |
+| `transportMode` | Chỉ áp dụng cho `Ground` hoặc `Air`; `null` là áp dụng cho cả hai |
+| `destCountryCode` | Chỉ áp dụng khi nước đến là nước này; `null` là mọi nước |
+| `calcType` | Cách tính (bảng bên dưới) |
+| `value` | Con số dùng để tính: số tiền, hệ số hoặc phần trăm tùy `calcType` |
+| `minHorses` | Chỉ dùng cho chiết khấu: đơn có từ bao nhiêu con ngựa trở lên thì được hưởng |
+| `isActive` | `false` là đã tắt, không được dùng khi tính giá |
+
+**Nhóm giá (`category`) và các mã mà công thức đang dùng:**
+
+| `category` | Ý nghĩa | Mã (`itemCode`) công thức đọc |
+|---|---|---|
+| `Freight` | Cước vận chuyển gốc | `FREIGHT` (đường bay tính theo con, đường bộ tính theo km × con) |
+| `StallClass` | Hệ số theo hạng chuồng, nhân vào cước gốc | `STALL_SHARED`, `STALL_COMFORT`, `STALL_PRIVATE` |
+| `Discount` | Chiết khấu theo số ngựa (%) | Mọi mã; lấy bậc có `minHorses` cao nhất mà đơn đạt tới |
+| `Surcharge` | Phụ phí (%) tính trên cước sau chiết khấu | `SUR_FUEL` (luôn áp), `SUR_EXPRESS` (khởi hành dưới 7 ngày), `SUR_CLIMATE` (khi khách cần điều hòa) |
+| `Clearance` | Phí thủ tục, thông quan, kiểm dịch | Mọi mã có `value` > 0 (ví dụ `FEE_DOCS`, `FEE_CLEARANCE`, `FEE_QUARANTINE`) |
+| `Escort` | Phí người chăm ngựa đi kèm (1 người cho mỗi 3 ngựa) | `ESCORT` |
+| `Insurance` | Bảo hiểm (% giá trị khai báo) | `INS_TRANSIT` |
+
+> **Lưu ý khi thêm mã mới:** chỉ nhóm `Discount` và `Clearance` tự nhận mọi mã mới. Ở các nhóm còn lại, công thức chỉ đọc đúng những mã trong bảng trên — thêm một phụ phí mới như `SUR_HOLIDAY` sẽ lưu được nhưng **không** được cộng vào báo giá. Đổi `itemCode` của một dòng đang dùng (ví dụ đổi `FREIGHT`) có thể làm báo giá báo lỗi thiếu cước.
+
+**Cách tính (`calcType`):**
+
+| `calcType` | `value` nghĩa là |
+|---|---|
+| `PerHorse` | Số tiền cho mỗi con ngựa |
+| `PerKmPerHorse` | Số tiền cho mỗi km, mỗi con ngựa |
+| `Multiplier` | Hệ số nhân (ví dụ `1.5`) |
+| `Percent` | Phần trăm (ví dụ `10` là 10%) |
+| `PerBooking` | Số tiền cho cả đơn |
+| `PerGroom` | Số tiền cho mỗi người chăm ngựa |
+| `PerGroomDay` | Số tiền cho mỗi người chăm ngựa mỗi ngày |
+
+**Dòng nào được chọn khi có nhiều dòng cùng mã?** Ví dụ `FREIGHT` có một dòng cho từng nước đến. Khi tính giá, backend chỉ xét các dòng đang bật, khớp phương thức (hoặc `null`) và khớp nước đến (hoặc `null`); trong số đó, dòng **ghi rõ nước đến** được ưu tiên, rồi tới dòng **ghi rõ phương thức**. Vì vậy mỗi bộ (`itemCode`, `transportMode`, `destCountryCode`) chỉ được có một dòng.
+
+### GET /api/price-items — Danh sách dòng giá
+
+- **Ai gọi được:** LogisticsManager, Admin
+
+Tham số query (gắn sau dấu `?`):
+
+| Tham số | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `search` | chuỗi | Không | Tìm theo `itemCode` và `itemName` |
+| `category` | chuỗi | Không | Lọc theo nhóm (`Freight`, `StallClass`, `Surcharge`, `Discount`, `Clearance`, `Escort`, `Insurance`) |
+| `transportMode` | chuỗi | Không | `Ground` hoặc `Air` (chỉ lấy dòng ghi đúng phương thức đó, không gồm dòng `null`) |
+| `isActive` | true / false | Không | Lọc dòng đang bật / đã tắt |
+| `sort` | chuỗi | Không | Trường sắp xếp, thêm `-` phía trước để giảm dần (ví dụ `-value`) |
+| `page` | số | Không | Trang, bắt đầu từ 1 (mặc định 1) |
+| `size` | số | Không | Số dòng mỗi trang, 1–100 (mặc định 10) |
+
+Ví dụ: `GET /api/price-items?category=Discount`
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Price items retrieved successfully",
+  "data": [
+    {
+      "priceItemId": 23,
+      "category": "Discount",
+      "itemCode": "DISC_VOL_2",
+      "itemName": "Chiết khấu 2-3 ngựa",
+      "transportMode": null,
+      "destCountryCode": null,
+      "calcType": "Percent",
+      "value": 5.0000,
+      "minHorses": 2,
+      "isActive": true
+    },
+    {
+      "priceItemId": 24,
+      "category": "Discount",
+      "itemCode": "DISC_VOL_4",
+      "itemName": "Chiết khấu 4-6 ngựa",
+      "transportMode": null,
+      "destCountryCode": null,
+      "calcType": "Percent",
+      "value": 10.0000,
+      "minHorses": 4,
+      "isActive": true
+    },
+    {
+      "priceItemId": 25,
+      "category": "Discount",
+      "itemCode": "DISC_VOL_7",
+      "itemName": "Chiết khấu từ 7 ngựa",
+      "transportMode": null,
+      "destCountryCode": null,
+      "calcType": "Percent",
+      "value": 15.0000,
+      "minHorses": 7,
+      "isActive": true
+    }
+  ],
+  "errors": null,
+  "pagination": {
+    "page": 1,
+    "pageSize": 10,
+    "totalItems": 3,
+    "totalPages": 1
+  }
+}
+```
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Category 'Tax' is invalid. Allowed values: Freight, StallClass, Surcharge, Discount, Clearance, Escort, Insurance.` | `category` sai giá trị |
+| 400 | `TransportMode 'Sea' is invalid. Allowed values: Ground, Air.` | `transportMode` sai giá trị |
+| 403 | `You do not have permission to perform this action.` | Người gọi không phải LogisticsManager / Admin |
+
+### GET /api/price-items/{id} — Chi tiết dòng giá
+
+- **Ai gọi được:** LogisticsManager, Admin
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã dòng giá (`priceItemId`) |
+
+Response `200`: `data` là một dòng giá.
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 404 | `Price item with ID 999 was not found.` | Không có dòng giá với mã đó |
+
+### POST /api/price-items — Thêm dòng giá
+
+Dòng mới luôn ở trạng thái đang bật (`isActive: true`).
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON
+
+Các trường gửi lên:
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `category` | chuỗi | Có | Nhóm giá, xem bảng ở đầu mục |
+| `itemCode` | chuỗi | Có | Chỉ gồm chữ, số, dấu gạch dưới; tối đa 30 ký tự; server tự đổi sang in hoa |
+| `itemName` | chuỗi | Có | Tên hiển thị, tối đa 100 ký tự |
+| `transportMode` | chuỗi | Không | `Ground`, `Air`, hoặc bỏ trống / `null` để áp dụng cả hai |
+| `destCountryCode` | chuỗi | Không | Mã nước 2 chữ cái, hoặc bỏ trống / `null` để áp dụng mọi nước |
+| `calcType` | chuỗi | Có | Cách tính, xem bảng ở đầu mục |
+| `value` | số | Có | Không âm, tối đa 4 chữ số thập phân |
+| `minHorses` | số | Không | Lớn hơn 0; chỉ cần cho nhóm `Discount` |
+
+Ví dụ request:
+
+```json
+{
+  "category": "Surcharge",
+  "itemCode": "sur_holiday",
+  "itemName": "Phụ phí ngày lễ",
+  "transportMode": "Ground",
+  "destCountryCode": null,
+  "calcType": "Percent",
+  "value": 10,
+  "minHorses": null
+}
+```
+
+Response `201`:
+
+```json
+{
+  "success": true,
+  "message": "Price item created successfully",
+  "data": {
+    "priceItemId": 37,
+    "category": "Surcharge",
+    "itemCode": "SUR_HOLIDAY",
+    "itemName": "Phụ phí ngày lễ",
+    "transportMode": "Ground",
+    "destCountryCode": null,
+    "calcType": "Percent",
+    "value": 10,
+    "minHorses": null,
+    "isActive": true
+  },
+  "errors": null
+}
+```
+
+(Ví dụ này chỉ để minh họa API; như lưu ý ở đầu mục, phụ phí `SUR_HOLIDAY` chưa được công thức tính giá dùng tới.)
+
+Lỗi thường gặp:
+
+| HTTP | `message` / `errors` | Khi nào |
+|---|---|---|
+| 400 | `A price item with code 'SUR_HOLIDAY', transport mode 'Ground' and destination country 'Any' already exists.` | Đã có dòng cùng mã + phương thức + nước đến |
+| 400 | `Category 'Tax' is invalid. Allowed values: Freight, StallClass, Surcharge, Discount, Clearance, Escort, Insurance.` | `category` sai |
+| 400 | `CalcType 'Each' is invalid. Allowed values: PerHorse, PerKmPerHorse, Multiplier, Percent, PerBooking, PerGroom, PerGroomDay.` | `calcType` sai |
+| 400 | `TransportMode 'Sea' is invalid. Allowed values: Ground, Air.` | `transportMode` sai |
+| 400 | `ItemCode may only contain letters, digits and underscores.` | `itemCode` có dấu cách, gạch ngang... |
+| 400 | `Value must fit PostgreSQL numeric(18,4) and cannot be negative.` | `value` âm hoặc quá lớn |
+| 400 | `MinHorses must be greater than zero when provided.` | `minHorses` ≤ 0 |
+
+### PUT /api/price-items/{id} — Sửa dòng giá
+
+Gửi lại **đủ** các trường như khi thêm. API này không đổi `isActive`; muốn bật / tắt thì dùng API ngay dưới.
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã dòng giá |
+
+Ví dụ request:
+
+```json
+{
+  "category": "Surcharge",
+  "itemCode": "SUR_HOLIDAY",
+  "itemName": "Phụ phí ngày lễ, Tết",
+  "transportMode": "Ground",
+  "destCountryCode": null,
+  "calcType": "Percent",
+  "value": 12.5,
+  "minHorses": null
+}
+```
+
+Response `200`: `data` là dòng giá sau khi sửa, `message` là `Price item updated successfully`.
+
+Lỗi thường gặp: như khi thêm, cộng thêm:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 404 | `Price item with ID 999 was not found.` | Không có dòng giá với mã đó |
+
+### PATCH /api/price-items/{id}/active — Bật hoặc tắt dòng giá
+
+Dòng đã tắt vẫn hiện trong danh sách quản trị nhưng **không** được dùng khi tính giá.
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã dòng giá |
+
+Các trường gửi lên:
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `isActive` | true / false | Có | `false` để tắt, `true` để bật lại |
+
+Ví dụ request:
+
+```json
+{
+  "isActive": false
+}
+```
+
+Response `200`: `data` là dòng giá với `isActive` mới, `message` là `Price item active status updated successfully`.
+
+Lỗi thường gặp:
+
+| HTTP | `errors` | Khi nào |
+|---|---|---|
+| 400 | `IsActive is required.` | Gửi body rỗng `{}` |
+| 404 | `Price item with ID 999 was not found.` | Không có dòng giá với mã đó |
+
+```js
+await api.patch(`/api/price-items/${item.priceItemId}/active`, { isActive: !item.isActive });
+```
+
+---
+
+## 18. Những phần chưa có API
 
 Các phần dưới đây backend chưa làm. Frontend có thể dựng giao diện trước nhưng chưa nối được.
 
 | Phần | Ghi chú |
 |---|---|
-| Chuông thông báo (danh sách, đếm chưa đọc, đánh dấu đã đọc) | Backend đã tạo thông báo cho mọi sự kiện; chưa có API để đọc. Riêng khách hàng đã nhận được email ở các sự kiện chính (mục 4) |
-| Quản lý phương tiện | Hiện chỉ có `GET /api/trips/available-vehicles` |
-| Quy định giấy tờ theo quốc gia, bảng giá | Dữ liệu có sẵn và đang được dùng để tính; chưa có màn hình quản trị |
 | API trả danh sách enum cho dropdown | Tạm dùng bảng ở mục 3 |
+| Đẩy thông báo tức thời (WebSocket / push) | Hiện chỉ có API đọc thông báo (mục 14); frontend gọi lại `unread-count` định kỳ |
 
 Tiến độ từng phần xem ở [TASKS.md](TASKS.md).
 
 ---
 
-## 15. Bảng tra nhanh mọi endpoint
+## 19. Bảng tra nhanh mọi endpoint
 
-Tổng cộng 82 endpoint. Chi tiết từng cái xem ở mục tương ứng.
+Tổng cộng 101 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 
 **4. Đăng nhập và tài khoản của tôi**
 
@@ -4372,3 +5388,42 @@ Tổng cộng 82 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/document-types` | Thêm loại giấy tờ | TransportSpecialist, Admin |
 | PUT | `/api/document-types/{id}` | Sửa loại giấy tờ | TransportSpecialist, Admin |
 | DELETE | `/api/document-types/{id}` | Xóa loại giấy tờ | TransportSpecialist, Admin |
+
+**14. Thông báo trong ứng dụng (chuông)**
+
+| Method | Đường dẫn | Việc | Ai gọi được |
+|---|---|---|---|
+| GET | `/api/notifications` | Danh sách thông báo của tôi | Mọi người đã đăng nhập |
+| GET | `/api/notifications/unread-count` | Số thông báo chưa đọc | Mọi người đã đăng nhập |
+| PATCH | `/api/notifications/{id}/read` | Đánh dấu một thông báo đã đọc | Người nhận thông báo đó |
+| PATCH | `/api/notifications/read-all` | Đánh dấu tất cả đã đọc | Mọi người đã đăng nhập |
+
+**15. Quản lý phương tiện**
+
+| Method | Đường dẫn | Việc | Ai gọi được |
+|---|---|---|---|
+| GET | `/api/transport-assets` | Danh sách phương tiện | Mọi nhân sự (không gồm Customer) |
+| GET | `/api/transport-assets/{id}` | Chi tiết phương tiện | Mọi nhân sự (không gồm Customer) |
+| POST | `/api/transport-assets` | Thêm phương tiện | FleetCoordinator, Admin |
+| PUT | `/api/transport-assets/{id}` | Sửa phương tiện | FleetCoordinator, Admin |
+| DELETE | `/api/transport-assets/{id}` | Xóa phương tiện | FleetCoordinator, Admin |
+
+**16. Quy định giấy tờ theo quốc gia**
+
+| Method | Đường dẫn | Việc | Ai gọi được |
+|---|---|---|---|
+| GET | `/api/country-doc-requirements` | Danh sách quy định | Mọi người đã đăng nhập |
+| GET | `/api/country-doc-requirements/{id}` | Chi tiết một quy định | Mọi người đã đăng nhập |
+| POST | `/api/country-doc-requirements` | Thêm quy định | TransportSpecialist, Admin |
+| PUT | `/api/country-doc-requirements/{id}` | Sửa quy định | TransportSpecialist, Admin |
+| DELETE | `/api/country-doc-requirements/{id}` | Xóa quy định | TransportSpecialist, Admin |
+
+**17. Bảng giá**
+
+| Method | Đường dẫn | Việc | Ai gọi được |
+|---|---|---|---|
+| GET | `/api/price-items` | Danh sách dòng giá | LogisticsManager, Admin |
+| GET | `/api/price-items/{id}` | Chi tiết dòng giá | LogisticsManager, Admin |
+| POST | `/api/price-items` | Thêm dòng giá | LogisticsManager, Admin |
+| PUT | `/api/price-items/{id}` | Sửa dòng giá | LogisticsManager, Admin |
+| PATCH | `/api/price-items/{id}/active` | Bật hoặc tắt dòng giá | LogisticsManager, Admin |
