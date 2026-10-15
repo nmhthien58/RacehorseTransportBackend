@@ -1,0 +1,21 @@
+Subject: Sự cố {{IncidentCode}} trên chuyến {{TripCode}}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Thông báo sự cố trên chuyến</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#9b2c2c;">Thông báo sự cố trên chuyến</h2>
+    <p>Xin chào {{FullName}},</p>
+    <p>Chuyến <strong>{{TripCode}}</strong> của đơn <strong>{{BookingCode}}</strong> vừa ghi nhận sự cố <strong>{{IncidentCode}}</strong>.</p>
+    <p><strong>Mức độ:</strong> {{Severity}}</p>
+    <p><strong>Thông tin:</strong> {{IncidentDescription}}</p>
+    <p>Đội vận hành đang xử lý và sẽ cập nhật diễn biến mới nhất trên hệ thống.</p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Theo dõi chuyến</a>
+    </p>
+  </div>
+</body>
+</html>
