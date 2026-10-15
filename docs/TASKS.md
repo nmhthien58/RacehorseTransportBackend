@@ -27,7 +27,7 @@ Cập nhật: 08/10/2026 · Người làm: **Thiên** (mã `T-xx`) và **Tú** (
 
 Làm theo thứ tự từ trên xuống: task sau khó hơn task trước một chút. Mỗi task một nhánh, một Pull Request.
 
-### [ ] B-01 · Quản lý phương tiện
+### [x] B-01 · Quản lý phương tiện
 Bảng `fleet.transport_assets` · entity `TransportAsset`.
 
 | Method | Đường dẫn | Ai được gọi |
@@ -44,7 +44,7 @@ Quy tắc:
 - Không xóa được xe đã từng gắn với chuyến (`Trips.VehicleId`) → `BusinessException`.
 - Tìm kiếm theo `AssetCode` (không phân biệt hoa thường, xem cách làm trong `DocumentTypeService`); lọc thêm theo `status`, `assetType` (thêm 2 tham số vào controller).
 
-### [ ] B-02 · Quy định giấy tờ theo quốc gia
+### [x] B-02 · Quy định giấy tờ theo quốc gia
 Bảng `clearance.country_doc_requirements` · entity `CountryDocRequirement`.
 
 | Method | Đường dẫn | Ai được gọi |
@@ -59,7 +59,7 @@ Quy tắc:
 - `ValidityDays` để trống hoặc > 0.
 - Response trả kèm `docTypeCode`, `docTypeName` (dùng `.Include(r => r.DocumentType)`).
 
-### [ ] B-03 · Bảng giá
+### [x] B-03 · Bảng giá
 Bảng `pricing.price_items` · entity `PriceItem`.
 
 | Method | Đường dẫn | Ai được gọi |
@@ -75,7 +75,7 @@ Quy tắc:
 - `Value` ≥ 0. Bộ ba (`ItemCode`, `TransportMode`, `DestCountryCode`) không trùng.
 - Không có DELETE: ngừng dùng một dòng giá bằng `isActive = false`.
 
-### [ ] B-04 · Bổ sung dữ liệu seed cho demo
+### [x] B-04 · Bổ sung dữ liệu seed cho demo
 Sửa file `database/02_seed.sql` (không đụng tới code C#). Thêm dữ liệu để demo phong phú hơn:
 
 - 4–5 phương tiện đủ ba loại `AssetType`, có xe đang `Maintenance`.
@@ -85,7 +85,7 @@ Sửa file `database/02_seed.sql` (không đụng tới code C#). Thêm dữ li�
 
 Kiểm tra: chạy `00_reset.sql` → `01_schema.sql` → `02_seed.sql` không lỗi, đăng nhập được bằng tài khoản mới.
 
-### [ ] B-05 · Chuông thông báo – phần đọc
+### [x] B-05 · Chuông thông báo – phần đọc
 Bảng `common.system_notifications` · entity `SystemNotification`. Phần **tạo** thông báo do Thiên làm (T-03).
 
 | Method | Đường dẫn | Mô tả |
@@ -97,20 +97,20 @@ Bảng `common.system_notifications` · entity `SystemNotification`. Phần **t�
 
 Quy tắc: chỉ thao tác trên thông báo có `RecipientUserId` = người đang đăng nhập (của người khác → `NotFoundException`). Lưu ý `NotificationId` kiểu `long`.
 
-### [ ] B-06 · Nội dung email
+### [x] B-06 · Nội dung email
 Viết nội dung (tiêu đề + thân HTML đơn giản, tiếng Việt) cho các email hệ thống gửi đi, mỗi mẫu một file trong `RacehorseTransport.Services/EmailTemplates/`. Chỗ cần điền dữ liệu viết dạng `{{FullName}}`, `{{BookingCode}}`, `{{Link}}`. Danh sách mẫu: đặt lại mật khẩu, đơn được duyệt, đơn bị từ chối, cần bổ sung giấy tờ, hồ sơ đã thông quan, có sự cố trên chuyến, ngựa đã tới điểm giao. Phần gửi mail do Thiên làm (T-29).
 
-### [ ] B-07 · Danh mục giá trị cho dropdown
+### [x] B-07 · Danh mục giá trị cho dropdown
 `GET /api/lookups/enums` (không cần service, không cần DB) — trả về các mảng `All` trong `DomainConstants.cs` để FE đổ dropdown:
 
 ```json
 { "bookingStatuses": ["Submitted", "..."], "transportModes": ["Ground", "Air"], "stallClasses": ["..."], "...": [] }
 ```
 
-### [ ] B-08 · Bộ request thử nghiệm
+### [x] B-08 · Bộ request thử nghiệm
 Hoàn thiện file `RacehorseTransport.API.http`: mỗi endpoint của B-01 → B-07 có ít nhất một request đúng và một request sai. Ghi lại lỗi phát hiện được thành issue.
 
-### [ ] B-09 · Unit test công thức giá và KPI
+### [x] B-09 · Unit test công thức giá và KPI
 Làm sau khi T-05 và T-26 xong. Tạo project `RacehorseTransport.Tests` (xUnit). Thiên viết sẵn 2 test mẫu; Tú viết thêm các trường hợp theo bảng trong phụ lục cuối file: mỗi hạng chuồng, từng bậc chiết khấu (1, 2, 4, 7 ngựa), có/không phụ phí gấp và điều hòa, có/không bảo hiểm; KPI khi trễ 0, 30, 31, 120, 600 phút, có và không có sự cố.
 
 ---

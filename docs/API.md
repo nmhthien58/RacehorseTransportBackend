@@ -27,8 +27,9 @@ Tài liệu này hướng dẫn gọi API của hệ thống vận chuyển ng�
 15. [Quản lý phương tiện](#15-quản-lý-phương-tiện)
 16. [Quy định giấy tờ theo quốc gia](#16-quy-định-giấy-tờ-theo-quốc-gia)
 17. [Bảng giá](#17-bảng-giá)
-18. [Những phần chưa có API](#18-những-phần-chưa-có-api)
-19. [Bảng tra nhanh mọi endpoint](#19-bảng-tra-nhanh-mọi-endpoint)
+18. [Danh mục giá trị cho dropdown](#18-danh-mục-giá-trị-cho-dropdown)
+19. [Những phần chưa có API](#19-những-phần-chưa-có-api)
+20. [Bảng tra nhanh mọi endpoint](#20-bảng-tra-nhanh-mọi-endpoint)
 
 ---
 
@@ -5442,22 +5443,248 @@ await api.patch(`/api/price-items/${item.priceItemId}/active`, { isActive: !item
 
 ---
 
-## 18. Những phần chưa có API
+## 18. Danh mục giá trị cho dropdown
+
+### GET /api/lookups/enums — Lấy mọi danh sách giá trị cố định
+
+Trả về **trong một lần gọi** tất cả các giá trị cố định (enum) mà backend chấp nhận, để frontend đổ vào các ô chọn (dropdown) và bộ lọc thay vì tự gõ cứng trong code. Đây chính là các giá trị liệt kê ở mục 3. Danh sách không đổi khi chạy, nên chỉ cần gọi **một lần sau khi đăng nhập** rồi giữ lại dùng chung.
+
+- **Ai gọi được:** Mọi người đã đăng nhập (cần `accessToken`)
+- **Dữ liệu gửi lên:** không có
+
+Các danh sách trong `data`:
+
+| Trường | Dùng cho |
+|---|---|
+| `userRoles` | Vai trò người dùng (lọc danh sách người dùng, form tạo tài khoản của Admin) |
+| `horseGenders` | Giới tính ngựa |
+| `bookingStatuses` | Trạng thái đơn |
+| `bookingHorseStatuses` | Trạng thái từng ngựa trong đơn |
+| `transportModes` | Hình thức vận chuyển (đường bộ / hàng không) |
+| `stallClasses` | Hạng chuồng |
+| `dossierStatuses` | Trạng thái hồ sơ kiểm dịch |
+| `documentStatuses` | Trạng thái giấy tờ đã nộp |
+| `requirementDirections` | Chiều quy định (xuất / nhập khẩu) |
+| `assetTypes` | Loại phương tiện |
+| `assetStatuses` | Trạng thái phương tiện |
+| `tripStatuses` | Trạng thái chuyến |
+| `onTimeStatuses` | Kết quả đúng giờ khi đóng chuyến |
+| `crewRoles` | Vai trò trong tổ lái |
+| `checkpointTypes` | Loại điểm dừng |
+| `checkpointStatuses` | Trạng thái điểm dừng |
+| `feedStatuses` | Tình trạng ăn uống của ngựa |
+| `stressLevels` | Mức căng thẳng của ngựa |
+| `incidentTypes` | Loại sự cố |
+| `incidentSeverities` | Mức độ sự cố |
+| `incidentStatuses` | Trạng thái sự cố |
+| `handoverConditions` | Tình trạng ngựa lúc bàn giao |
+| `priceCategories` | Nhóm dòng giá |
+| `priceCalcTypes` | Cách tính dòng giá |
+
+Mỗi trường là một mảng chuỗi. Giá trị trong mảng là đúng chuỗi phải gửi lên API (phân biệt hoa thường); muốn hiện tiếng Việt cho người dùng thì frontend tự đổi tên hiển thị.
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Enum lookups retrieved successfully",
+  "data": {
+    "userRoles": [
+      "Customer",
+      "LogisticsManager",
+      "TransportSpecialist",
+      "FleetCoordinator",
+      "DriverEscort",
+      "Admin"
+    ],
+    "horseGenders": [
+      "Stallion",
+      "Mare",
+      "Gelding"
+    ],
+    "bookingStatuses": [
+      "Submitted",
+      "Approved",
+      "Assigned",
+      "Completed",
+      "Rejected",
+      "Expired",
+      "Cancelled"
+    ],
+    "bookingHorseStatuses": [
+      "Pending",
+      "Approved",
+      "Cancelled"
+    ],
+    "transportModes": [
+      "Ground",
+      "Air"
+    ],
+    "stallClasses": [
+      "Shared",
+      "Comfort",
+      "Private"
+    ],
+    "dossierStatuses": [
+      "Draft",
+      "AwaitingDocs",
+      "Reviewing",
+      "SubmittedToAuthorities",
+      "Cleared",
+      "Issue"
+    ],
+    "documentStatuses": [
+      "Pending",
+      "Approved",
+      "Rejected"
+    ],
+    "requirementDirections": [
+      "Export",
+      "Import"
+    ],
+    "assetTypes": [
+      "HorseTruck_AirSuspension",
+      "HorseVan",
+      "AirStall"
+    ],
+    "assetStatuses": [
+      "Available",
+      "InTransit",
+      "Maintenance"
+    ],
+    "tripStatuses": [
+      "Draft",
+      "PendingApproval",
+      "Scheduled",
+      "InTransit",
+      "EmergencyRerouting",
+      "ArrivedDestination",
+      "Completed",
+      "Cancelled"
+    ],
+    "onTimeStatuses": [
+      "OnTime",
+      "Delayed_AcceptableForceMajeure",
+      "Delayed_OperationalFault"
+    ],
+    "crewRoles": [
+      "Driver",
+      "Escort"
+    ],
+    "checkpointTypes": [
+      "Origin",
+      "RestStop",
+      "BorderGate",
+      "Destination"
+    ],
+    "checkpointStatuses": [
+      "Pending",
+      "Arrived",
+      "Cleared",
+      "Departed",
+      "Cancelled"
+    ],
+    "feedStatuses": [
+      "Normal",
+      "Reduced",
+      "Refused"
+    ],
+    "stressLevels": [
+      "Calm",
+      "MildStress",
+      "Agitated"
+    ],
+    "incidentTypes": [
+      "MechanicalBreakdown",
+      "BorderCongestion",
+      "EquineHealthIssue",
+      "Weather",
+      "ClimateControlFailure",
+      "CustomsHold",
+      "Other"
+    ],
+    "incidentSeverities": [
+      "Minor",
+      "Moderate",
+      "Major",
+      "Critical"
+    ],
+    "incidentStatuses": [
+      "Reported",
+      "PlanProposed",
+      "Approved",
+      "Rejected",
+      "Resolved"
+    ],
+    "handoverConditions": [
+      "Excellent",
+      "NormalFatigue",
+      "Injured"
+    ],
+    "priceCategories": [
+      "Freight",
+      "StallClass",
+      "Surcharge",
+      "Discount",
+      "Clearance",
+      "Escort",
+      "Insurance"
+    ],
+    "priceCalcTypes": [
+      "PerHorse",
+      "PerKmPerHorse",
+      "Multiplier",
+      "Percent",
+      "PerBooking",
+      "PerGroom",
+      "PerGroomDay"
+    ]
+  },
+  "errors": null
+}
+```
+
+Lỗi thường gặp:
+
+| HTTP | Khi nào |
+|---|---|
+| 401 | Chưa đăng nhập hoặc `accessToken` hết hạn |
+
+```js
+import api from './api'; // file axios dùng chung ở mục 1
+
+let cached = null;
+export async function getLookups() {
+  if (!cached) {
+    const res = await api.get('/api/lookups/enums');
+    cached = res.data.data;
+  }
+  return cached;
+}
+
+// Ví dụ đổ dropdown hạng chuồng:
+// const { stallClasses } = await getLookups();
+// stallClasses.map(v => <option key={v} value={v}>{v}</option>)
+```
+
+---
+
+## 19. Những phần chưa có API
 
 Các phần dưới đây backend chưa làm. Frontend có thể dựng giao diện trước nhưng chưa nối được.
 
 | Phần | Ghi chú |
 |---|---|
-| API trả danh sách enum cho dropdown | Tạm dùng bảng ở mục 3 |
 | Đẩy thông báo tức thời (WebSocket / push) | Hiện chỉ có API đọc thông báo (mục 14); frontend gọi lại `unread-count` định kỳ |
 
 Tiến độ từng phần xem ở [TASKS.md](TASKS.md).
 
 ---
 
-## 19. Bảng tra nhanh mọi endpoint
+## 20. Bảng tra nhanh mọi endpoint
 
-Tổng cộng 104 endpoint. Chi tiết từng cái xem ở mục tương ứng.
+Tổng cộng 105 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 
 **4. Đăng nhập và tài khoản của tôi**
 
@@ -5632,3 +5859,9 @@ Tổng cộng 104 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/price-items` | Thêm dòng giá | LogisticsManager, Admin |
 | PUT | `/api/price-items/{id}` | Sửa dòng giá | LogisticsManager, Admin |
 | PATCH | `/api/price-items/{id}/active` | Bật hoặc tắt dòng giá | LogisticsManager, Admin |
+
+**18. Danh mục giá trị cho dropdown**
+
+| Method | Đường dẫn | Việc | Ai gọi được |
+|---|---|---|---|
+| GET | `/api/lookups/enums` | Lấy mọi danh sách giá trị cố định | Mọi người đã đăng nhập |
