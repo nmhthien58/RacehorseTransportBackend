@@ -179,7 +179,7 @@ namespace RacehorseTransport.Services.Implementations
             var customerIds = await GetCustomerIdsAsync(tripId);
             var bookingRecipients = await _tripHorseRepo.GetQueryable().GetBookingRecipientsAsync(tripId);
 
-            var incident =await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            var incident = await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 var created = new TripIncident
                 {
