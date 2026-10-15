@@ -141,5 +141,17 @@ namespace RacehorseTransport.API.Controllers
             var quote = await _pricingService.CalculateQuoteAsync(request.ToBusinessModel());
             return Ok(ApiResponse<QuoteResponse>.SuccessResult(quote.ToResponse(), "Quote calculated successfully"));
         }
+
+        /// <summary>
+        /// Estimate ground transit distance (km) and duration based on pickup and dropoff locations.
+        /// </summary>
+        [HttpPost("estimate-distance")]
+        [ProducesResponseType(typeof(ApiResponse<DistanceEstimateResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> EstimateDistance([FromBody] EstimateDistanceRequest request, [FromServices] IDistanceService distanceService)
+        {
+            var result = await distanceService.EstimateGroundDistanceAsync(request.ToBusinessModel());
+            return Ok(ApiResponse<DistanceEstimateResponse>.SuccessResult(result.ToResponse(), "Distance estimated successfully"));
+        }
     }
 }

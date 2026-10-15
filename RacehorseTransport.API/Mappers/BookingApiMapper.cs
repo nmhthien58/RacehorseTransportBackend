@@ -25,9 +25,11 @@ namespace RacehorseTransport.API.Mappers
         {
             return new CreateBookingModel
             {
-                PickupAddress = request.PickupAddress.Trim(),
+                PickupAddress = FormatAddress(request.PickupAddress, request.PickupCity),
+                PickupCity = request.PickupCity?.Trim(),
                 PickupCountryCode = request.PickupCountryCode.Trim().ToUpperInvariant(),
-                DropoffAddress = request.DropoffAddress.Trim(),
+                DropoffAddress = FormatAddress(request.DropoffAddress, request.DropoffCity),
+                DropoffCity = request.DropoffCity?.Trim(),
                 DropoffCountryCode = request.DropoffCountryCode.Trim().ToUpperInvariant(),
                 DepartureDate = request.DepartureDate!.Value,
                 DeliveryDate = request.DeliveryDate!.Value,
@@ -50,13 +52,42 @@ namespace RacehorseTransport.API.Mappers
             return new QuoteInputModel
             {
                 TransportMode = request.TransportMode.Trim(),
+                PickupCountryCode = request.PickupCountryCode?.Trim().ToUpperInvariant(),
+                PickupCity = request.PickupCity?.Trim(),
+                PickupAddress = request.PickupAddress?.Trim(),
                 DropoffCountryCode = request.DropoffCountryCode.Trim().ToUpperInvariant(),
+                DropoffCity = request.DropoffCity?.Trim(),
+                DropoffAddress = request.DropoffAddress?.Trim(),
                 DistanceKm = request.DistanceKm,
                 RequiresClimateControl = request.RequiresClimateControl,
                 DeclaredValue = request.DeclaredValue,
                 DepartureDate = request.DepartureDate!.Value,
                 DeliveryDate = request.DeliveryDate!.Value,
                 StallClasses = request.Horses.Select(h => h.StallClass.Trim()).ToList()
+            };
+        }
+
+        public static DistanceEstimateInputModel ToBusinessModel(this EstimateDistanceRequest request)
+        {
+            return new DistanceEstimateInputModel
+            {
+                PickupCountryCode = string.IsNullOrWhiteSpace(request.PickupCountryCode) ? "VN" : request.PickupCountryCode.Trim().ToUpperInvariant(),
+                PickupCity = request.PickupCity?.Trim(),
+                PickupAddress = request.PickupAddress?.Trim(),
+                DropoffCountryCode = request.DropoffCountryCode.Trim().ToUpperInvariant(),
+                DropoffCity = request.DropoffCity?.Trim(),
+                DropoffAddress = request.DropoffAddress?.Trim()
+            };
+        }
+
+        public static DistanceEstimateResponse ToResponse(this DistanceEstimateResultModel model)
+        {
+            return new DistanceEstimateResponse
+            {
+                DistanceKm = model.DistanceKm,
+                EstimatedHours = model.EstimatedHours,
+                RouteSummary = model.RouteSummary,
+                Source = model.Source
             };
         }
 
@@ -82,8 +113,20 @@ namespace RacehorseTransport.API.Mappers
                 HorseCount = model.HorseCount,
                 GroomCount = model.GroomCount,
                 TransitDays = model.TransitDays,
-                IsExpress = model.IsExpress
+                IsExpress = model.IsExpress,
+                DistanceKm = model.DistanceKm,
+                EstimatedHours = model.EstimatedHours,
+                RouteSummary = model.RouteSummary
             };
+        }
+
+        private static string FormatAddress(string address, string? city)
+        {
+            string trimmed = (address ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(city)) return trimmed;
+            string cityTrimmed = city.Trim();
+            if (trimmed.Contains(cityTrimmed, StringComparison.OrdinalIgnoreCase)) return trimmed;
+            return string.IsNullOrWhiteSpace(trimmed) ? cityTrimmed : $"{trimmed}, {cityTrimmed}";
         }
 
         public static BookingSummaryResponse ToResponse(this BookingSummaryModel model)

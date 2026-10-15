@@ -24,15 +24,31 @@ namespace RacehorseTransport.Services.Implementations
 
         private readonly IRepository<PriceItem> _priceItemRepo;
         private readonly ICacheService _cache;
+        private readonly IDistanceService _distanceService;
 
-        public PricingService(IRepository<PriceItem> priceItemRepo, ICacheService cache)
+        public PricingService(IRepository<PriceItem> priceItemRepo, ICacheService cache, IDistanceService distanceService)
         {
             _priceItemRepo = priceItemRepo;
             _cache = cache;
+            _distanceService = distanceService;
         }
 
         public async Task<QuoteModel> CalculateQuoteAsync(QuoteInputModel input)
         {
+            if (input.TransportMode == TransportModes.Ground && (input.DistanceKm == null || input.DistanceKm <= 0))
+            {
+                var estimate = await _distanceService.EstimateGroundDistanceAsync(new DistanceEstimateInputModel
+                {
+                    PickupCountryCode = input.PickupCountryCode ?? "VN",
+                    PickupCity = input.PickupCity,
+                    PickupAddress = input.PickupAddress,
+                    DropoffCountryCode = input.DropoffCountryCode,
+                    DropoffCity = input.DropoffCity,
+                    DropoffAddress = input.DropoffAddress
+                });
+                input.DistanceKm = estimate.DistanceKm;
+            }
+
             ValidateInput(input);
 
             string mode = input.TransportMode;
@@ -158,7 +174,8 @@ namespace RacehorseTransport.Services.Implementations
                 HorseCount = horseCount,
                 GroomCount = groomCount,
                 TransitDays = transitDays,
-                IsExpress = isExpress
+                IsExpress = isExpress,
+                DistanceKm = input.TransportMode == TransportModes.Ground ? input.DistanceKm : null
             };
         }
 

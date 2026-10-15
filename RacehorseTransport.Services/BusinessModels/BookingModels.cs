@@ -11,8 +11,10 @@ namespace RacehorseTransport.Services.BusinessModels
     public class CreateBookingModel
     {
         public string PickupAddress { get; set; } = string.Empty;
+        public string? PickupCity { get; set; }
         public string PickupCountryCode { get; set; } = string.Empty;
         public string DropoffAddress { get; set; } = string.Empty;
+        public string? DropoffCity { get; set; }
         public string DropoffCountryCode { get; set; } = string.Empty;
         public DateTimeOffset DepartureDate { get; set; }
         public DateTimeOffset DeliveryDate { get; set; }

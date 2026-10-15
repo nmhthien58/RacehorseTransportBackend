@@ -18,6 +18,17 @@ namespace RacehorseTransport.API.ResponseModels
         public int GroomCount { get; set; }
         public int TransitDays { get; set; }
         public bool IsExpress { get; set; }
+        public int? DistanceKm { get; set; }
+        public decimal? EstimatedHours { get; set; }
+        public string? RouteSummary { get; set; }
+    }
+
+    public class DistanceEstimateResponse
+    {
+        public int DistanceKm { get; set; }
+        public decimal EstimatedHours { get; set; }
+        public string RouteSummary { get; set; } = string.Empty;
+        public string Source { get; set; } = string.Empty;
     }
 
     public class BookingSummaryResponse

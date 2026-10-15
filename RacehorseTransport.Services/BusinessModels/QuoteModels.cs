@@ -11,6 +11,13 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset DepartureDate { get; set; }
         public DateTimeOffset DeliveryDate { get; set; }
 
+        // Thông tin địa chỉ phục vụ tự động tính khoảng cách đường bộ
+        public string? PickupCountryCode { get; set; }
+        public string? PickupCity { get; set; }
+        public string? PickupAddress { get; set; }
+        public string? DropoffCity { get; set; }
+        public string? DropoffAddress { get; set; }
+
         // Hạng chuồng của từng con ngựa trong đơn (mỗi phần tử một con)
         public List<string> StallClasses { get; set; } = new();
     }
@@ -33,5 +40,8 @@ namespace RacehorseTransport.Services.BusinessModels
         public int GroomCount { get; set; }
         public int TransitDays { get; set; }
         public bool IsExpress { get; set; } // hệ thống tự xác định: khởi hành dưới 7 ngày kể từ lúc báo giá
+        public int? DistanceKm { get; set; }
+        public decimal? EstimatedHours { get; set; }
+        public string? RouteSummary { get; set; }
     }
 }

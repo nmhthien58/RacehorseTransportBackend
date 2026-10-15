@@ -25,6 +25,9 @@ namespace RacehorseTransport.API.RequestModels
         [MaxLength(255, ErrorMessage = "PickupAddress cannot exceed 255 characters.")]
         public string PickupAddress { get; set; } = string.Empty;
 
+        [MaxLength(100, ErrorMessage = "PickupCity cannot exceed 100 characters.")]
+        public string? PickupCity { get; set; }
+
         [Required(ErrorMessage = "PickupCountryCode is required.")]
         [RegularExpression("^[A-Za-z]{2}$", ErrorMessage = "PickupCountryCode must be a 2-letter country code.")]
         public string PickupCountryCode { get; set; } = string.Empty;
@@ -32,6 +35,9 @@ namespace RacehorseTransport.API.RequestModels
         [Required(ErrorMessage = "DropoffAddress is required.")]
         [MaxLength(255, ErrorMessage = "DropoffAddress cannot exceed 255 characters.")]
         public string DropoffAddress { get; set; } = string.Empty;
+
+        [MaxLength(100, ErrorMessage = "DropoffCity cannot exceed 100 characters.")]
+        public string? DropoffCity { get; set; }
 
         [Required(ErrorMessage = "DropoffCountryCode is required.")]
         [RegularExpression("^[A-Za-z]{2}$", ErrorMessage = "DropoffCountryCode must be a 2-letter country code.")]
@@ -94,9 +100,16 @@ namespace RacehorseTransport.API.RequestModels
         [Required(ErrorMessage = "TransportMode is required.")]
         public string TransportMode { get; set; } = string.Empty;
 
+        public string? PickupCountryCode { get; set; }
+        public string? PickupCity { get; set; }
+        public string? PickupAddress { get; set; }
+
         [Required(ErrorMessage = "DropoffCountryCode is required.")]
         [RegularExpression("^[A-Za-z]{2}$", ErrorMessage = "DropoffCountryCode must be a 2-letter country code.")]
         public string DropoffCountryCode { get; set; } = string.Empty;
+
+        public string? DropoffCity { get; set; }
+        public string? DropoffAddress { get; set; }
 
         [Range(1, 50000, ErrorMessage = "DistanceKm must be between 1 and 50000.")]
         public int? DistanceKm { get; set; }
@@ -121,5 +134,19 @@ namespace RacehorseTransport.API.RequestModels
     {
         [Required(ErrorMessage = "StallClass is required.")]
         public string StallClass { get; set; } = string.Empty;
+    }
+
+    public class EstimateDistanceRequest
+    {
+        public string PickupCountryCode { get; set; } = "VN";
+        public string? PickupCity { get; set; }
+        public string? PickupAddress { get; set; }
+
+        [Required(ErrorMessage = "DropoffCountryCode is required.")]
+        [RegularExpression("^[A-Za-z]{2}$", ErrorMessage = "DropoffCountryCode must be a 2-letter country code.")]
+        public string DropoffCountryCode { get; set; } = string.Empty;
+
+        public string? DropoffCity { get; set; }
+        public string? DropoffAddress { get; set; }
     }
 }

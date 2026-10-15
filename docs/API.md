@@ -1478,9 +1478,37 @@ Thứ tự gọi thông thường:
 
 Ai thấy đơn nào: khách thấy đơn của mình; chuyên viên thấy đơn mình phụ trách; `LogisticsManager`, `FleetCoordinator`, `Admin` thấy tất cả; tài xế không xem đơn (gọi vào nhận 403).
 
+### POST /api/bookings/estimate-distance — Ước tính quãng đường đường bộ
+
+Backend tự động tính toán quãng đường (km) và thời gian di chuyển (giờ) dựa trên địa điểm đón và giao (hỗ trợ Goong API, OSRM và bảng cự ly chuẩn của hệ thống).
+
+- **Ai gọi được:** Mọi người đã đăng nhập
+- **Dữ liệu gửi lên:** JSON
+
+Các trường gửi lên:
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `pickupCountryCode` | chuỗi | Không | Mã quốc gia đón (mặc định `VN`) |
+| `pickupCity` | chuỗi | Không | Tỉnh / Thành phố đón (ví dụ: `TP. Hồ Chí Minh`, `Hà Nội`) |
+| `pickupAddress` | chuỗi | Không | Địa chỉ đón chi tiết |
+| `dropoffCountryCode` | chuỗi | Có | Mã quốc gia giao (2 chữ cái, ví dụ: `KH`, `TH`, `LA`, `CN`) |
+| `dropoffCity` | chuỗi | Không | Tỉnh / Thành phố giao (ví dụ: `Phnom Penh`, `Bangkok`) |
+| `dropoffAddress` | chuỗi | Không | Địa chỉ giao chi tiết |
+
+Response `200` — phần `data`:
+```json
+{
+  "distanceKm": 250,
+  "estimatedHours": 4.5,
+  "routeSummary": "250 km (TP.HCM/Miền Nam → Cửa khẩu Mộc Bài/Bavet → Phnom Penh)",
+  "source": "RouteMatrix"
+}
+```
+
 ### POST /api/bookings/quote-preview — Xem giá trước khi gửi đơn
 
-Tính giá cho một đơn dự kiến. Không lưu gì vào hệ thống, gọi bao nhiêu lần cũng được.
+Tính giá cho một đơn dự kiến. Không lưu gì vào hệ thống, gọi bao nhiêu lần cũng được. Nếu không gửi `distanceKm` cho đơn đường bộ, server tự động tính quãng đường dựa trên điểm đón và trả.
 
 - **Ai gọi được:** Mọi người đã đăng nhập
 - **Dữ liệu gửi lên:** JSON
@@ -1491,7 +1519,11 @@ Các trường gửi lên:
 |---|---|---|---|
 | `transportMode` | chuỗi | Có | `Ground` (đường bộ) hoặc `Air` (hàng không) |
 | `dropoffCountryCode` | chuỗi | Có | Mã nước đến, 2 chữ cái, ví dụ `CN`, `TH` |
-| `distanceKm` | số nguyên | Có với `Ground` | Quãng đường (km), 1–50000. Đường hàng không thì bỏ qua |
+| `pickupCity` | chuỗi | Không | Tỉnh/thành phố đón (dùng để tự động tính quãng đường đường bộ) |
+| `pickupAddress` | chuỗi | Không | Địa chỉ đón chi tiết |
+| `dropoffCity` | chuỗi | Không | Tỉnh/thành phố giao (dùng để tự động tính quãng đường đường bộ) |
+| `dropoffAddress` | chuỗi | Không | Địa chỉ giao chi tiết |
+| `distanceKm` | số nguyên | Không | Quãng đường (km). Nếu bỏ trống với `Ground`, server sẽ tự động tính |
 | `requiresClimateControl` | true / false | Không | Cần khoang điều hòa (có phụ phí) |
 | `declaredValue` | số | Không | Giá trị khai báo để mua bảo hiểm. Bỏ trống hoặc `null` là không mua |
 | `departureDate` | ngày giờ | Có | Ngày khởi hành, phải ở tương lai |
@@ -1592,12 +1624,14 @@ Các trường gửi lên:
 
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
-| `pickupAddress` | chuỗi | Có | Địa chỉ nhận ngựa, tối đa 255 ký tự |
+| `pickupAddress` | chuỗi | Có | Địa chỉ nhận ngựa chi tiết (số nhà, tên đường, trang trại), tối đa 255 ký tự |
+| `pickupCity` | chuỗi | Không | Tỉnh / Thành phố đón (ví dụ `TP. Hồ Chí Minh`, `Hà Nội`) |
 | `pickupCountryCode` | chuỗi | Có | Mã nước đi, 2 chữ cái, ví dụ `VN` |
-| `dropoffAddress` | chuỗi | Có | Địa chỉ giao ngựa |
-| `dropoffCountryCode` | chuỗi | Có | Mã nước đến, 2 chữ cái |
+| `dropoffAddress` | chuỗi | Có | Địa chỉ giao ngựa chi tiết (trường đua, trang trại đích) |
+| `dropoffCity` | chuỗi | Không | Tỉnh / Thành phố giao (ví dụ `Phnom Penh`, `Bangkok`) |
+| `dropoffCountryCode` | chuỗi | Có | Mã nước đến, 2 chữ cái (ví dụ `KH`, `TH`, `LA`, `CN`) |
 | `transportMode` | chuỗi | Có | `Ground` (đường bộ) hoặc `Air` (hàng không) |
-| `distanceKm` | số nguyên | Có với `Ground` | Quãng đường (km), 1–50000. Đường hàng không thì bỏ qua |
+| `distanceKm` | số nguyên | Không | Quãng đường (km). Bỏ trống thì server tự động tính toán |
 | `requiresClimateControl` | true / false | Không | Cần khoang điều hòa (có phụ phí) |
 | `declaredValue` | số | Không | Giá trị khai báo để mua bảo hiểm. Bỏ trống hoặc `null` là không mua |
 | `departureDate` | ngày giờ | Có | Ngày khởi hành, phải ở tương lai |
