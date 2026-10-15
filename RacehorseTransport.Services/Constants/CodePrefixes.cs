@@ -17,4 +17,11 @@ namespace RacehorseTransport.Services.Constants
         public const string Trip = "Trip";
         public const string Incident = "Incident";
     }
+
+    // Đường dẫn trang của khách hàng trên frontend (src/routes/routes.js), dùng làm {{Link}} trong email
+    public static class CustomerPages
+    {
+        public static string Booking(int bookingId) => $"/customer/bookings/{bookingId}";
+        public static string Trip(int tripId) => $"/customer/trips/{tripId}";
+    }
 }

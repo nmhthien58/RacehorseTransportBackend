@@ -177,8 +177,9 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             var customerIds = await GetCustomerIdsAsync(tripId);
+            var bookingRecipients = await _tripHorseRepo.GetQueryable().GetBookingRecipientsAsync(tripId);
 
-            var incident = await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            var incident =await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 var created = new TripIncident
                 {
@@ -217,7 +218,23 @@ namespace RacehorseTransport.Services.Implementations
                     $"An incident was reported on trip {trip.TripCode}",
                     $"{created.IncidentType} at {created.Location}. Our team is working on it and will keep you updated.",
                     NotificationReferenceTypes.Incident,
-                    created.IncidentId, emailCustomers: true);
+                    created.IncidentId);
+
+                foreach (var recipient in bookingRecipients)
+                {
+                    await _notificationService.EmailCustomerAsync(
+                        recipient.CustomerUserId,
+                        EmailTemplateNames.TripIncident,
+                        CustomerPages.Trip(trip.TripId),
+                        new Dictionary<string, string>
+                        {
+                            ["TripCode"] = trip.TripCode,
+                            ["BookingCode"] = recipient.BookingCode,
+                            ["IncidentCode"] = created.IncidentCode,
+                            ["Severity"] = SeverityLabel(created.Severity),
+                            ["IncidentDescription"] = $"{created.Description} (vị trí: {created.Location})"
+                        });
+                }
 
                 return created;
             });
@@ -586,6 +603,16 @@ namespace RacehorseTransport.Services.Implementations
             }
             return string.Join(" ", parts);
         }
+
+        // Email gửi khách viết tiếng Việt
+        private static string SeverityLabel(string severity) => severity switch
+        {
+            IncidentSeverities.Minor => "Nhẹ",
+            IncidentSeverities.Moderate => "Trung bình",
+            IncidentSeverities.Major => "Nghiêm trọng",
+            IncidentSeverities.Critical => "Rất nghiêm trọng",
+            _ => severity
+        };
 
         private async Task<List<int>> GetCustomerIdsAsync(int tripId)
         {

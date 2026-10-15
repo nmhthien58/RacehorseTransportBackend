@@ -80,6 +80,27 @@ namespace RacehorseTransport.Services.Implementations
             }
         }
 
+        public async Task EmailCustomerAsync(int customerUserId, string templateName, string linkPath, IDictionary<string, string> values)
+        {
+            var customer = await _userRepo.GetQueryable()
+                .AsNoTracking()
+                .Where(u => u.UserId == customerUserId && u.Role == UserRoles.Customer && u.IsActive)
+                .Select(u => new { u.Email, u.FullName })
+                .FirstOrDefaultAsync();
+            if (customer == null)
+            {
+                return;
+            }
+
+            // Biến nào thiếu thì mẫu điền chuỗi rỗng, nên mail không bao giờ lộ "{{...}}"
+            var filled = new Dictionary<string, string>(values)
+            {
+                ["FullName"] = customer.FullName,
+                ["Link"] = $"{_emailOptions.FrontendBaseUrl.TrimEnd('/')}/{linkPath.TrimStart('/')}"
+            };
+            _emailService.Queue(customer.Email, customer.FullName, templateName, filled);
+        }
+
         public async Task SendToRoleAsync(string role, string title, string message, string? referenceType = null, int? referenceId = null)
         {
             var userIds = await _userRepo.GetQueryable()
