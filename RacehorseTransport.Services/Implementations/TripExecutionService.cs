@@ -138,6 +138,9 @@ namespace RacehorseTransport.Services.Implementations
 
             bool isDestination = checkpoint.CheckpointType == CheckpointTypes.Destination;
             var customerIds = await GetCustomerIdsAsync(trip.TripId);
+            var bookingRecipients = isDestination
+                ? await _tripHorseRepo.GetQueryable().GetBookingRecipientsAsync(trip.TripId)
+                : new List<TripBookingRecipient>();
             var now = DateTimeOffset.UtcNow;
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
@@ -160,7 +163,22 @@ namespace RacehorseTransport.Services.Implementations
                         ? $"The horses have arrived at {checkpoint.CheckpointName} and are ready for handover."
                         : $"The transport reached {checkpoint.CheckpointName} ({checkpoint.CheckpointType}).",
                     NotificationReferenceTypes.Trip,
-                    trip.TripId, emailCustomers: isDestination);
+                    trip.TripId);
+
+                // Chỉ tới điểm giao mới gửi email (bookingRecipients rỗng với mốc khác)
+                foreach (var recipient in bookingRecipients)
+                {
+                    await _notificationService.EmailCustomerAsync(
+                        recipient.CustomerUserId,
+                        EmailTemplateNames.HorseArrived,
+                        CustomerPages.Trip(trip.TripId),
+                        new Dictionary<string, string>
+                        {
+                            ["BookingCode"] = recipient.BookingCode,
+                            ["HorseName"] = recipient.HorseNames,
+                            ["Destination"] = checkpoint.CheckpointName
+                        });
+                }
             });
 
             await _trackingService.InvalidateTripAsync(trip.TripId);

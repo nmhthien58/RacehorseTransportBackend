@@ -20,5 +20,13 @@ namespace RacehorseTransport.Services.BusinessModels
     {
         public const string ResetPassword = "ResetPassword";   // {{FullName}}, {{Link}}, {{ExpiresInMinutes}}
         public const string Notification = "Notification";     // {{FullName}}, {{Title}}, {{Message}}, {{Link}}
+
+        // Mẫu riêng cho từng sự kiện gửi khách hàng. {{FullName}} và {{Link}} do NotificationService điền.
+        public const string BookingApproved = "BookingApproved";         // {{BookingCode}}
+        public const string BookingRejected = "BookingRejected";         // {{BookingCode}}, {{RejectionReason}}
+        public const string DocumentsRequested = "DocumentsRequested";   // {{BookingCode}}, {{HorseName}}, {{DocumentRequest}}
+        public const string DossierCleared = "DossierCleared";           // {{BookingCode}}, {{HorseName}}, {{ClearanceNumber}}
+        public const string TripIncident = "TripIncident";               // {{TripCode}}, {{BookingCode}}, {{IncidentCode}}, {{Severity}}, {{IncidentDescription}}
+        public const string HorseArrived = "HorseArrived";               // {{BookingCode}}, {{HorseName}}, {{Destination}}
     }
 }

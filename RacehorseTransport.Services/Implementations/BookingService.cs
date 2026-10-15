@@ -283,7 +283,13 @@ namespace RacehorseTransport.Services.Implementations
                     $"Booking {booking.BookingCode} approved",
                     $"Your transport request has been approved. {specialist.FullName} will handle the documents and quarantine clearance.",
                     NotificationReferenceTypes.Booking,
-                    booking.BookingId, emailCustomers: true);
+                    booking.BookingId);
+
+                await _notificationService.EmailCustomerAsync(
+                    booking.CustomerUserId,
+                    EmailTemplateNames.BookingApproved,
+                    CustomerPages.Booking(booking.BookingId),
+                    new Dictionary<string, string> { ["BookingCode"] = booking.BookingCode });
 
                 await _notificationService.SendAsync(
                     specialist.UserId,
@@ -316,7 +322,17 @@ namespace RacehorseTransport.Services.Implementations
                     $"Booking {booking.BookingCode} rejected",
                     $"Your transport request was not accepted. Reason: {booking.RejectionReason}",
                     NotificationReferenceTypes.Booking,
-                    booking.BookingId, emailCustomers: true);
+                    booking.BookingId);
+
+                await _notificationService.EmailCustomerAsync(
+                    booking.CustomerUserId,
+                    EmailTemplateNames.BookingRejected,
+                    CustomerPages.Booking(booking.BookingId),
+                    new Dictionary<string, string>
+                    {
+                        ["BookingCode"] = booking.BookingCode,
+                        ["RejectionReason"] = booking.RejectionReason
+                    });
             });
 
             return await GetBookingByIdAsync(id, currentUser);

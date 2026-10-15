@@ -57,7 +57,26 @@ namespace RacehorseTransport.Services.Implementations
                     $"Documents needed for {dossier.BookingHorse.Horse!.Name}",
                     message,
                     NotificationReferenceTypes.Dossier,
-                    dossier.DossierId, emailCustomers: true);
+                    dossier.DossierId);
+
+                string documentRequest = outstanding.Count > 0
+                    ? $"Vui lòng tải lên: {string.Join("; ", outstanding)}."
+                    : "Vui lòng kiểm tra hồ sơ và tải lên các giấy tờ được yêu cầu.";
+                if (!string.IsNullOrWhiteSpace(note))
+                {
+                    documentRequest += $" Ghi chú của chuyên viên: {note.Trim()}";
+                }
+
+                await _notificationService.EmailCustomerAsync(
+                    booking.CustomerUserId,
+                    EmailTemplateNames.DocumentsRequested,
+                    CustomerPages.Booking(booking.BookingId),
+                    new Dictionary<string, string>
+                    {
+                        ["BookingCode"] = booking.BookingCode,
+                        ["HorseName"] = dossier.BookingHorse.Horse.Name,
+                        ["DocumentRequest"] = documentRequest
+                    });
             });
 
             return await GetDossierByIdAsync(dossierId, currentUser);
@@ -311,7 +330,18 @@ namespace RacehorseTransport.Services.Implementations
                         ? $"Clearance number {dossier.ClearanceNumber}. Other horses in this booking are still being processed."
                         : "Every horse in this booking has completed quarantine and customs clearance.",
                     NotificationReferenceTypes.Dossier,
-                    dossier.DossierId, emailCustomers: true);
+                    dossier.DossierId);
+
+                await _notificationService.EmailCustomerAsync(
+                    booking.CustomerUserId,
+                    EmailTemplateNames.DossierCleared,
+                    CustomerPages.Booking(booking.BookingId),
+                    new Dictionary<string, string>
+                    {
+                        ["BookingCode"] = booking.BookingCode,
+                        ["HorseName"] = dossier.BookingHorse.Horse!.Name,
+                        ["ClearanceNumber"] = dossier.ClearanceNumber
+                    });
 
                 if (!othersPending)
                 {
