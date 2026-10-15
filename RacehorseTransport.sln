@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RacehorseTransport.Services
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RacehorseTransport.Repositories", "RacehorseTransport.Repositories\RacehorseTransport.Repositories.csproj", "{06E9EFE8-44DA-4BE6-9F3C-BFAD314AD913}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RacehorseTransport.Tests", "RacehorseTransport.Tests\RacehorseTransport.Tests.csproj", "{16C22795-49F0-46EC-BA7F-0942CB208CA6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{06E9EFE8-44DA-4BE6-9F3C-BFAD314AD913}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{06E9EFE8-44DA-4BE6-9F3C-BFAD314AD913}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{06E9EFE8-44DA-4BE6-9F3C-BFAD314AD913}.Release|Any CPU.Build.0 = Release|Any CPU
+		{16C22795-49F0-46EC-BA7F-0942CB208CA6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{16C22795-49F0-46EC-BA7F-0942CB208CA6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{16C22795-49F0-46EC-BA7F-0942CB208CA6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{16C22795-49F0-46EC-BA7F-0942CB208CA6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
