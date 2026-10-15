@@ -104,6 +104,7 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IHorseService, HorseService>();
             services.AddScoped<IPricingService, PricingService>();
+            services.AddScoped<IPriceItemService, PriceItemService>();
             services.AddScoped<IBookingService, BookingService>();
             services.AddScoped<ITripService, TripService>();
             services.AddScoped<ITripPlanningService, TripPlanningService>();
@@ -114,7 +115,8 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<IReportService, ReportService>();
             services.AddScoped<IDossierService, DossierService>();
             services.AddScoped<IDocumentTypeService, DocumentTypeService>();
-
+            services.AddScoped<ITransportAssetService, TransportAssetService>();
+            services.AddScoped<ICountryDocRequirementService, CountryDocRequirementService>();
             // Việc chạy nền
             services.AddHostedService<BookingExpiryJob>();
             services.AddHostedService<EmailDispatchJob>();
