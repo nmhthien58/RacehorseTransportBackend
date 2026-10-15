@@ -491,3 +491,7 @@ appsettings.Local.json
 docs/*.xlsx
 ~$*
 
+
+# Bản Word xuất từ docs/API.md để gửi đi; nguồn chính vẫn là file .md
+docs/*.docx
+
