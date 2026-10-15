@@ -147,10 +147,10 @@ public class PricingServiceTests
 
         // PricingService chỉ cần kho dữ liệu khi bộ nhớ đệm chưa có dữ liệu. Kiểm thử đơn vị cung cấp
         // sẵn bảng giá qua bộ nhớ đệm để tập trung kiểm tra đúng công thức nghiệp vụ.
-            return new PricingService(
-                 new UnusedRepository<PriceItem>(),
-                 new SeededPriceCache(prices),
-                 new UnusedDistanceService());
+        return new PricingService(
+            new UnusedRepository<PriceItem>(),
+            new SeededPriceCache(prices),
+            new UnusedDistanceService());
     }
 
     private static QuoteInputModel CreateInput(
@@ -215,13 +215,18 @@ public class PricingServiceTests
         }
     }
 
-    private sealed class UnusedRepository<T> : IRepository<T> where T : class
+    // Các ca kiểm thử chỉ dùng đường hàng không nên không được gọi tới dịch vụ tính quãng đường.
+    private sealed class UnusedDistanceService : IDistanceService
     {
         public Task<DistanceEstimateResultModel> EstimateGroundDistanceAsync(
-        DistanceEstimateInputModel input,
-        CancellationToken cancellationToken = default) =>
-        throw new InvalidOperationException(
-            "Distance service must not be called for air-pricing tests.");
+            DistanceEstimateInputModel input,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException(
+                "Distance service must not be called for air-pricing tests.");
+    }
+
+    private sealed class UnusedRepository<T> : IRepository<T> where T : class
+    {
         private static InvalidOperationException UnexpectedCall() =>
             new("The repository must not be called when the test cache is pre-populated.");
 
