@@ -64,7 +64,18 @@ Server trả về một **mã trạng thái** (200 là thành công, 4xx là l�
 | `duc.pham@transport.com` | `DriverEscort` | Tài xế: chạy chuyến, nhật ký ngựa, báo sự cố |
 | `admin@logistics.com` | `Admin` | Quản lý tài khoản |
 
-Cả 6 tài khoản dùng chung một mật khẩu, ghi ở dòng đầu file `database/02_seed.sql` trong repo backend. Trong các ví dụ bên dưới mật khẩu được viết là `<mật khẩu>`.
+Ngoài ra mỗi vai trò có một tài khoản dễ nhớ, tên tài khoản chính là tên vai trò:
+
+| Email | Vai trò (`role`) |
+|---|---|
+| `customer@racehorsetransport.com` | `Customer` |
+| `manager@racehorsetransport.com` | `LogisticsManager` |
+| `specialist@racehorsetransport.com` | `TransportSpecialist` |
+| `coordinator@racehorsetransport.com` | `FleetCoordinator` |
+| `driver@racehorsetransport.com` | `DriverEscort` |
+| `admin@racehorsetransport.com` | `Admin` |
+
+Mọi tài khoản mẫu dùng chung một mật khẩu, ghi ở dòng đầu file `database/02_seed.sql` trong repo backend. Trong các ví dụ bên dưới mật khẩu được viết là `<mật khẩu>`.
 
 ### Lời gọi đầu tiên bằng JavaScript
 

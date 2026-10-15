@@ -156,7 +156,14 @@ INSERT INTO identity.users (user_id, full_name, email, password_hash, phone_numb
 (11, 'Đặng Thu Trang',   'trang.dang@logistics.com',      '$2b$11$TnDrEeOPp7Ni9YMVwIVSq.rPey.BcO0yibgrIxaflXe4t3Q9XmoYK', '+84912000011', 'Admin'),
 -- Hai khách hàng mới; tất cả tài khoản dữ liệu mẫu cùng dùng mật khẩu Racehorse@123.
 (12, 'Trần Ngọc Anh',    'ngocanh.tran@horseowner.com',   '$2b$11$TnDrEeOPp7Ni9YMVwIVSq.rPey.BcO0yibgrIxaflXe4t3Q9XmoYK', '+84988111223', 'Customer'),
-(13, 'Hoàng Minh Châu',  'minhchau.hoang@horseowner.com', '$2b$11$TnDrEeOPp7Ni9YMVwIVSq.rPey.BcO0yibgrIxaflXe4t3Q9XmoYK', '+84988111224', 'Customer');
+(13, 'Hoàng Minh Châu',  'minhchau.hoang@horseowner.com', '$2b$11$TnDrEeOPp7Ni9YMVwIVSq.rPey.BcO0yibgrIxaflXe4t3Q9XmoYK', '+84988111224', 'Customer'),
+-- Mỗi vai trò một tài khoản dễ nhớ (tên = vai trò) để demo và kiểm thử nhanh.
+(14, 'Customer',             'customer@racehorsetransport.com',    '$2b$11$TnDrEeOPp7Ni9YMVwIVSq.rPey.BcO0yibgrIxaflXe4t3Q9XmoYK', '+84900000001', 'Customer'),
+(15, 'Logistics Manager',    'manager@racehorsetransport.com',     '$2b$11$TnDrEeOPp7Ni9YMVwIVSq.rPey.BcO0yibgrIxaflXe4t3Q9XmoYK', '+84900000002', 'LogisticsManager'),
+(16, 'Transport Specialist', 'specialist@racehorsetransport.com',  '$2b$11$TnDrEeOPp7Ni9YMVwIVSq.rPey.BcO0yibgrIxaflXe4t3Q9XmoYK', '+84900000003', 'TransportSpecialist'),
+(17, 'Fleet Coordinator',    'coordinator@racehorsetransport.com', '$2b$11$TnDrEeOPp7Ni9YMVwIVSq.rPey.BcO0yibgrIxaflXe4t3Q9XmoYK', '+84900000004', 'FleetCoordinator'),
+(18, 'Driver Escort',        'driver@racehorsetransport.com',      '$2b$11$TnDrEeOPp7Ni9YMVwIVSq.rPey.BcO0yibgrIxaflXe4t3Q9XmoYK', '+84900000005', 'DriverEscort'),
+(19, 'Admin',                'admin@racehorsetransport.com',       '$2b$11$TnDrEeOPp7Ni9YMVwIVSq.rPey.BcO0yibgrIxaflXe4t3Q9XmoYK', '+84900000006', 'Admin');
 
 -- ---------- B.2 Ngựa của Jane Smith ----------
 INSERT INTO racehorse.horses (horse_id, owner_user_id, name, breed, gender, date_of_birth, color, microchip_number, passport_number, special_care_requirements) VALUES
