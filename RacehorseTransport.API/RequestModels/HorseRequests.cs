@@ -55,4 +55,28 @@ namespace RacehorseTransport.API.RequestModels
         // true: xóa ảnh đang có (bỏ qua nếu gửi kèm Photo mới)
         public bool RemovePhoto { get; set; }
     }
+
+    // multipart/form-data: file hồ sơ gửi kèm trong trường "file"
+    public class CreateHorseDocumentRequest
+    {
+        [Range(1, int.MaxValue, ErrorMessage = "DocTypeId is required.")]
+        public int DocTypeId { get; set; }
+
+        [MaxLength(100, ErrorMessage = "DocumentNumber cannot exceed 100 characters.")]
+        public string? DocumentNumber { get; set; }
+
+        [MaxLength(200, ErrorMessage = "IssuedBy cannot exceed 200 characters.")]
+        public string? IssuedBy { get; set; }
+
+        public DateOnly? IssueDate { get; set; }
+
+        public DateOnly? ExpiryDate { get; set; }
+
+        [MaxLength(500, ErrorMessage = "Notes cannot exceed 500 characters.")]
+        public string? Notes { get; set; }
+
+        // pdf, jpg, png; tối đa 10 MB
+        [Required(ErrorMessage = "File is required.")]
+        public IFormFile? File { get; set; }
+    }
 }

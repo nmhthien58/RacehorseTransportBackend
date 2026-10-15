@@ -17,4 +17,23 @@ namespace RacehorseTransport.API.ResponseModels
         public bool IsActive { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
     }
+
+    public class HorseDocumentResponse
+    {
+        public int DocumentId { get; set; }
+        public int HorseId { get; set; }
+        public int DocTypeId { get; set; }
+        public string DocTypeCode { get; set; } = string.Empty;
+        public string DocTypeName { get; set; } = string.Empty;
+        public string? DocumentNumber { get; set; }
+        public string? IssuedBy { get; set; }
+        public DateOnly? IssueDate { get; set; }
+        public DateOnly? ExpiryDate { get; set; }
+        public string Validity { get; set; } = string.Empty;
+        public string FileUrl { get; set; } = string.Empty;
+        public string? Notes { get; set; }
+        public int UploadedByUserId { get; set; }
+        public string? UploadedByName { get; set; }
+        public DateTimeOffset UploadedAt { get; set; }
+    }
 }

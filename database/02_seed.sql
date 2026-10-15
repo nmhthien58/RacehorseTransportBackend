@@ -9,80 +9,121 @@
 -- =====================================================================================
 
 -- ---------- A.1 Loại giấy tờ ----------
+-- Danh mục theo mẫu giấy chứng nhận vận chuyển ngựa quốc tế của WOAH và yêu cầu nhập khẩu công bố của
+-- một số nước (Singapore AVS, Hong Kong AFCD...). Dữ liệu minh họa cho đồ án, không thay thế quy định hiện hành.
+-- is_mandatory: loại giấy mặc định bắt buộc khi tuyến đi chưa có quy định riêng trong country_doc_requirements.
 INSERT INTO clearance.document_types (doc_type_id, code, name, description, is_mandatory) VALUES
-(1, 'HORSE_PASSPORT', 'Hộ chiếu ngựa quốc tế (FEI Passport)', 'Hộ chiếu định danh cá thể do FEI cấp', true),
-(2, 'COGGINS_EIA',    'Chứng nhận xét nghiệm Coggins âm tính', 'Xét nghiệm thiếu máu truyền nhiễm ngựa trong 30 ngày', true),
-(3, 'HEALTH_CERT',    'Giấy chứng nhận kiểm dịch xuất nhập khẩu', 'Cục Thú Y cấp trước ngày đi', true),
-(4, 'VACCINE',        'Chứng nhận tiêm phòng cúm ngựa', 'Lịch tiêm phòng đầy đủ trong 6 tháng', true);
+(1, 'HORSE_PASSPORT',     'Hộ chiếu ngựa',                                   'Hộ chiếu định danh cá thể (FEI hoặc hộ chiếu quốc gia có số UELN), có sơ đồ nhận dạng và lịch tiêm phòng', true),
+(2, 'COGGINS_EIA',        'Xét nghiệm thiếu máu truyền nhiễm (EIA/Coggins)', 'Kết quả âm tính bằng AGID hoặc ELISA, lấy mẫu trong vòng 30 ngày trước ngày đi', true),
+(3, 'HEALTH_CERT',        'Giấy chứng nhận kiểm dịch xuất khẩu',             'Cơ quan thú y nước xuất khẩu cấp theo mẫu của nước nhập khẩu (ở Việt Nam: Cục Chăn nuôi và Thú y)', true),
+(4, 'VACCINE',            'Chứng nhận tiêm phòng cúm ngựa',                  'Mũi nhắc gần nhất trong vòng 6 tháng và không tiêm trong 7 ngày trước ngày đi', true),
+(5, 'IMPORT_PERMIT',      'Giấy phép nhập khẩu',                             'Cơ quan thú y nước nhập khẩu cấp trước khi xuất phát (ví dụ: AVS Singapore, AFCD Hong Kong)', false),
+(6, 'GLANDERS_TEST',      'Xét nghiệm bệnh tỵ (Glanders)',                   'Kết quả âm tính bằng phản ứng kết hợp bổ thể (CFT)', false),
+(7, 'PIROPLASMOSIS_TEST', 'Xét nghiệm lê dạng trùng (Piroplasmosis)',        'Âm tính với Theileria equi và Babesia caballi (cELISA hoặc IFAT)', false),
+(8, 'EVA_TEST',           'Xét nghiệm viêm động mạch do virus (EVA)',        'Áp dụng cho ngựa đực chưa thiến ở các nước yêu cầu', false);
 
 -- ---------- A.2 Quy định giấy tờ theo quốc gia ----------
+-- validity_days: giấy phải được cấp / lấy mẫu trong vòng N ngày trước ngày đi (NULL = còn hiệu lực là được)
 INSERT INTO clearance.country_doc_requirements (country_code, direction, doc_type_id, validity_days, is_mandatory, regulation_note)
-SELECT c.country_code, c.direction, d.doc_type_id, c.validity_days, true, c.note
+SELECT c.country_code, c.direction, d.doc_type_id, c.validity_days, c.is_mandatory, c.note
 FROM (VALUES
-    ('VN', 'Export', 'HORSE_PASSPORT', NULL, 'Hộ chiếu ngựa còn hiệu lực'),
-    ('VN', 'Export', 'HEALTH_CERT',    10,   'Cục Thú y cấp trong 10 ngày trước ngày đi'),
-    -- Các nước đến có trong bảng giá: mỗi nước có đủ bộ giấy tờ mẫu để minh họa danh sách kiểm tra.
-    ('TH', 'Import', 'HORSE_PASSPORT', NULL, 'Hộ chiếu FEI còn hiệu lực'),
-    ('TH', 'Import', 'COGGINS_EIA',    30,   'Xét nghiệm EIA âm tính trong 30 ngày'),
-    ('TH', 'Import', 'HEALTH_CERT',    10,   'Chứng nhận sức khỏe trong 10 ngày trước khi nhập cảnh'),
-    ('TH', 'Import', 'VACCINE',        180,  'Tiêm phòng cúm ngựa trong 6 tháng'),
-    ('SG', 'Import', 'HORSE_PASSPORT', NULL, 'Hộ chiếu FEI còn hiệu lực'),
-    ('SG', 'Import', 'COGGINS_EIA',    30,   'Xét nghiệm EIA âm tính trong 30 ngày'),
-    ('SG', 'Import', 'HEALTH_CERT',    7,    'Chứng nhận sức khỏe trong 7 ngày trước khi nhập cảnh'),
-    ('SG', 'Import', 'VACCINE',        180,  'Tiêm phòng cúm ngựa trong 6 tháng'),
-    ('MY', 'Import', 'HORSE_PASSPORT', NULL, 'Hộ chiếu FEI còn hiệu lực'),
-    ('MY', 'Import', 'COGGINS_EIA',    30,   'Xét nghiệm EIA âm tính trong 30 ngày'),
-    ('MY', 'Import', 'HEALTH_CERT',    7,    'Chứng nhận sức khỏe trong 7 ngày trước khi nhập cảnh'),
-    ('MY', 'Import', 'VACCINE',        180,  'Tiêm phòng cúm ngựa trong 6 tháng'),
-    ('HK', 'Import', 'HORSE_PASSPORT', NULL, 'Hộ chiếu FEI còn hiệu lực'),
-    ('HK', 'Import', 'COGGINS_EIA',    30,   'Xét nghiệm EIA âm tính trong 30 ngày'),
-    ('HK', 'Import', 'HEALTH_CERT',    10,   'Chứng nhận sức khỏe trong 10 ngày trước khi nhập cảnh'),
-    ('HK', 'Import', 'VACCINE',        180,  'Tiêm phòng cúm ngựa trong 6 tháng'),
-    ('KR', 'Import', 'HORSE_PASSPORT', NULL, 'Hộ chiếu FEI còn hiệu lực'),
-    ('KR', 'Import', 'COGGINS_EIA',    30,   'Xét nghiệm EIA âm tính trong 30 ngày'),
-    ('KR', 'Import', 'HEALTH_CERT',    10,   'Chứng nhận sức khỏe trong 10 ngày trước khi nhập cảnh'),
-    ('KR', 'Import', 'VACCINE',        180,  'Tiêm phòng cúm ngựa trong 6 tháng'),
-    ('JP', 'Import', 'HORSE_PASSPORT', NULL, 'Hộ chiếu FEI còn hiệu lực'),
-    ('JP', 'Import', 'COGGINS_EIA',    30,   'Xét nghiệm EIA âm tính trong 30 ngày'),
-    ('JP', 'Import', 'HEALTH_CERT',    10,   'Chứng nhận sức khỏe trong 10 ngày trước khi nhập cảnh'),
-    ('JP', 'Import', 'VACCINE',        180,  'Tiêm phòng cúm ngựa trong 6 tháng'),
-    ('AE', 'Import', 'HORSE_PASSPORT', NULL, 'Hộ chiếu FEI còn hiệu lực'),
-    ('AE', 'Import', 'COGGINS_EIA',    30,   'Xét nghiệm EIA âm tính trong 30 ngày'),
-    ('AE', 'Import', 'HEALTH_CERT',    10,   'Chứng nhận sức khỏe trong 10 ngày trước khi nhập cảnh'),
-    ('AE', 'Import', 'VACCINE',        180,  'Tiêm phòng cúm ngựa trong 6 tháng'),
-    ('AU', 'Import', 'HORSE_PASSPORT', NULL, 'Hộ chiếu FEI còn hiệu lực'),
-    ('AU', 'Import', 'COGGINS_EIA',    30,   'Xét nghiệm EIA âm tính trong 30 ngày'),
-    ('AU', 'Import', 'HEALTH_CERT',    2,    'Chứng nhận sức khỏe trong 48 giờ trước khi bay'),
-    ('AU', 'Import', 'VACCINE',        180,  'Tiêm phòng cúm ngựa trong 6 tháng'),
-    ('CN', 'Import', 'COGGINS_EIA',    30,   'Xét nghiệm EIA âm tính trong 30 ngày'),
-    ('CN', 'Import', 'VACCINE',        180,  'Tiêm phòng cúm ngựa trong 6 tháng'),
-    ('CN', 'Import', 'HORSE_PASSPORT', NULL, 'Hộ chiếu FEI còn hiệu lực'),
-    ('CN', 'Import', 'HEALTH_CERT',    10,   'Chứng nhận sức khỏe trong 10 ngày trước khi nhập cảnh'),
-    ('FR', 'Import', 'HORSE_PASSPORT', NULL, 'EU Regulation 2020/692'),
-    ('FR', 'Import', 'COGGINS_EIA',    30,   'EU Regulation 2020/692'),
-    ('FR', 'Import', 'HEALTH_CERT',    2,    'Chứng nhận sức khỏe trong 48 giờ trước khi bay'),
-    ('FR', 'Import', 'VACCINE',        180,  'Equine Influenza'),
-    ('GB', 'Import', 'HORSE_PASSPORT', NULL, 'Hộ chiếu FEI còn hiệu lực'),
-    ('GB', 'Import', 'COGGINS_EIA',    30,   'Xét nghiệm EIA âm tính trong 30 ngày'),
-    ('GB', 'Import', 'HEALTH_CERT',    2,    'Chứng nhận sức khỏe trong 48 giờ trước khi bay'),
-    ('GB', 'Import', 'VACCINE',        180,  'Tiêm phòng cúm ngựa trong 6 tháng'),
-    ('DE', 'Import', 'HORSE_PASSPORT', NULL, 'EU Regulation 2020/692'),
-    ('DE', 'Import', 'COGGINS_EIA',    30,   'EU Regulation 2020/692'),
-    ('DE', 'Import', 'HEALTH_CERT',    2,    'Chứng nhận sức khỏe trong 48 giờ trước khi bay'),
-    ('DE', 'Import', 'VACCINE',        180,  'Equine Influenza'),
-    ('US', 'Import', 'HORSE_PASSPORT', NULL, 'Hộ chiếu FEI còn hiệu lực'),
-    ('US', 'Import', 'COGGINS_EIA',    30,   'Xét nghiệm EIA âm tính trong 30 ngày'),
-    ('US', 'Import', 'HEALTH_CERT',    10,   'Chứng nhận sức khỏe trong 10 ngày trước khi nhập cảnh'),
-    ('US', 'Import', 'VACCINE',        180,  'Tiêm phòng cúm ngựa trong 6 tháng'),
-    ('KH', 'Import', 'HORSE_PASSPORT', NULL, 'Hộ chiếu FEI còn hiệu lực'),
-    ('KH', 'Import', 'COGGINS_EIA',    30,   'Xét nghiệm EIA âm tính trong 30 ngày'),
-    ('KH', 'Import', 'HEALTH_CERT',    10,   'Chứng nhận sức khỏe trong 10 ngày trước khi nhập cảnh'),
-    ('KH', 'Import', 'VACCINE',        180,  'Tiêm phòng cúm ngựa trong 6 tháng'),
-    ('LA', 'Import', 'HORSE_PASSPORT', NULL, 'Hộ chiếu FEI còn hiệu lực'),
-    ('LA', 'Import', 'COGGINS_EIA',    30,   'Xét nghiệm EIA âm tính trong 30 ngày'),
-    ('LA', 'Import', 'HEALTH_CERT',    10,   'Chứng nhận sức khỏe trong 10 ngày trước khi nhập cảnh'),
-    ('LA', 'Import', 'VACCINE',        180,  'Tiêm phòng cúm ngựa trong 6 tháng')
-) AS c (country_code, direction, doc_code, validity_days, note)
+    -- Xuất khẩu từ Việt Nam
+    ('VN', 'Export', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa còn hiệu lực'),
+    ('VN', 'Export', 'HEALTH_CERT',        10,   true,  'Cục Chăn nuôi và Thú y cấp trong 10 ngày trước ngày đi'),
+    -- Đông Nam Á
+    ('TH', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa còn hiệu lực'),
+    ('TH', 'Import', 'IMPORT_PERMIT',      NULL, true,  'Giấy phép nhập khẩu của Cục Phát triển Chăn nuôi Thái Lan'),
+    ('TH', 'Import', 'HEALTH_CERT',        10,   true,  'Chứng nhận kiểm dịch trong 10 ngày trước khi nhập cảnh'),
+    ('TH', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính trong 30 ngày'),
+    ('TH', 'Import', 'GLANDERS_TEST',      30,   true,  'Glanders CFT âm tính trong 30 ngày'),
+    ('TH', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    ('SG', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa được AVS chấp nhận'),
+    ('SG', 'Import', 'IMPORT_PERMIT',      NULL, true,  'Giấy phép nhập khẩu AVS cho từng chuyến'),
+    ('SG', 'Import', 'HEALTH_CERT',        7,    true,  'Chứng nhận kiểm dịch trong 7 ngày trước khi xuất'),
+    ('SG', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính trong 30 ngày'),
+    ('SG', 'Import', 'GLANDERS_TEST',      30,   true,  'Glanders CFT âm tính trong 30 ngày'),
+    ('SG', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    ('MY', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa còn hiệu lực'),
+    ('MY', 'Import', 'IMPORT_PERMIT',      NULL, true,  'Giấy phép nhập khẩu của DVS Malaysia'),
+    ('MY', 'Import', 'HEALTH_CERT',        7,    true,  'Chứng nhận kiểm dịch trong 7 ngày trước khi xuất'),
+    ('MY', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính trong 30 ngày'),
+    ('MY', 'Import', 'GLANDERS_TEST',      30,   true,  'Glanders CFT âm tính trong 30 ngày'),
+    ('MY', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    ('KH', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa còn hiệu lực'),
+    ('KH', 'Import', 'HEALTH_CERT',        10,   true,  'Chứng nhận kiểm dịch trong 10 ngày trước khi nhập cảnh'),
+    ('KH', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính trong 30 ngày'),
+    ('KH', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    ('LA', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa còn hiệu lực'),
+    ('LA', 'Import', 'HEALTH_CERT',        10,   true,  'Chứng nhận kiểm dịch trong 10 ngày trước khi nhập cảnh'),
+    ('LA', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính trong 30 ngày'),
+    ('LA', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    -- Đông Á
+    ('HK', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa còn hiệu lực'),
+    ('HK', 'Import', 'IMPORT_PERMIT',      NULL, true,  'Special Permit của AFCD, xin trước khi xuất'),
+    ('HK', 'Import', 'HEALTH_CERT',        10,   true,  'Chứng nhận kiểm dịch bằng tiếng Anh, đi kèm ngựa'),
+    ('HK', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính, lấy mẫu sau ít nhất 7 ngày cách ly trước xuất'),
+    ('HK', 'Import', 'GLANDERS_TEST',      30,   true,  'Glanders CFT âm tính trong 30 ngày'),
+    ('HK', 'Import', 'VACCINE',            180,  true,  'Không tiêm phòng trong 14 ngày trước khi xuất'),
+    ('CN', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa còn hiệu lực'),
+    ('CN', 'Import', 'IMPORT_PERMIT',      NULL, true,  'Giấy phép kiểm dịch nhập khẩu của GACC'),
+    ('CN', 'Import', 'HEALTH_CERT',        10,   true,  'Chứng nhận kiểm dịch trong 10 ngày trước khi nhập cảnh'),
+    ('CN', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính trong 30 ngày'),
+    ('CN', 'Import', 'GLANDERS_TEST',      30,   true,  'Glanders CFT âm tính trong 30 ngày'),
+    ('CN', 'Import', 'PIROPLASMOSIS_TEST', 30,   true,  'Piroplasmosis cELISA âm tính trong 30 ngày'),
+    ('CN', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    ('KR', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa còn hiệu lực'),
+    ('KR', 'Import', 'HEALTH_CERT',        10,   true,  'Chứng nhận kiểm dịch trong 10 ngày trước khi nhập cảnh'),
+    ('KR', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính trong 30 ngày'),
+    ('KR', 'Import', 'GLANDERS_TEST',      30,   true,  'Glanders CFT âm tính trong 30 ngày'),
+    ('KR', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    ('JP', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa còn hiệu lực'),
+    ('JP', 'Import', 'HEALTH_CERT',        10,   true,  'Chứng nhận kiểm dịch trong 10 ngày trước khi nhập cảnh'),
+    ('JP', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính trong 30 ngày'),
+    ('JP', 'Import', 'GLANDERS_TEST',      30,   true,  'Glanders CFT âm tính trong 30 ngày'),
+    ('JP', 'Import', 'PIROPLASMOSIS_TEST', 30,   true,  'Piroplasmosis âm tính trong 30 ngày'),
+    ('JP', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    -- Trung Đông, Úc
+    ('AE', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa còn hiệu lực'),
+    ('AE', 'Import', 'IMPORT_PERMIT',      NULL, true,  'Giấy phép nhập khẩu của Bộ Biến đổi Khí hậu và Môi trường UAE'),
+    ('AE', 'Import', 'HEALTH_CERT',        10,   true,  'Chứng nhận kiểm dịch trong 10 ngày trước khi nhập cảnh'),
+    ('AE', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính trong 30 ngày'),
+    ('AE', 'Import', 'GLANDERS_TEST',      30,   true,  'Glanders CFT âm tính trong 30 ngày'),
+    ('AE', 'Import', 'PIROPLASMOSIS_TEST', 30,   true,  'Piroplasmosis cELISA âm tính trong 30 ngày'),
+    ('AE', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    ('AU', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa còn hiệu lực'),
+    ('AU', 'Import', 'IMPORT_PERMIT',      NULL, true,  'Giấy phép nhập khẩu của Bộ Nông nghiệp Úc'),
+    ('AU', 'Import', 'HEALTH_CERT',        2,    true,  'Chứng nhận kiểm dịch trong 48 giờ trước khi bay'),
+    ('AU', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính trong thời gian cách ly trước xuất'),
+    ('AU', 'Import', 'GLANDERS_TEST',      30,   true,  'Glanders CFT âm tính trong thời gian cách ly trước xuất'),
+    ('AU', 'Import', 'PIROPLASMOSIS_TEST', 30,   true,  'Âm tính bằng cELISA, IFAT và PCR'),
+    ('AU', 'Import', 'EVA_TEST',           30,   false, 'Chỉ ngựa đực chưa thiến'),
+    ('AU', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    -- Châu Âu, Mỹ
+    ('FR', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Quy định (EU) 2020/692'),
+    ('FR', 'Import', 'HEALTH_CERT',        2,    true,  'Chứng nhận kiểm dịch trong 48 giờ trước khi bay'),
+    ('FR', 'Import', 'COGGINS_EIA',        30,   true,  'Quy định (EU) 2020/692'),
+    ('FR', 'Import', 'GLANDERS_TEST',      30,   true,  'Quy định (EU) 2020/692'),
+    ('FR', 'Import', 'EVA_TEST',           28,   false, 'Chỉ ngựa đực chưa thiến'),
+    ('FR', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    ('DE', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Quy định (EU) 2020/692'),
+    ('DE', 'Import', 'HEALTH_CERT',        2,    true,  'Chứng nhận kiểm dịch trong 48 giờ trước khi bay'),
+    ('DE', 'Import', 'COGGINS_EIA',        30,   true,  'Quy định (EU) 2020/692'),
+    ('DE', 'Import', 'GLANDERS_TEST',      30,   true,  'Quy định (EU) 2020/692'),
+    ('DE', 'Import', 'EVA_TEST',           28,   false, 'Chỉ ngựa đực chưa thiến'),
+    ('DE', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    ('GB', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa còn hiệu lực'),
+    ('GB', 'Import', 'HEALTH_CERT',        2,    true,  'Chứng nhận kiểm dịch (EHC) trong 48 giờ trước khi bay'),
+    ('GB', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính trong 30 ngày'),
+    ('GB', 'Import', 'GLANDERS_TEST',      30,   true,  'Glanders CFT âm tính trong 30 ngày'),
+    ('GB', 'Import', 'EVA_TEST',           28,   false, 'Chỉ ngựa đực chưa thiến'),
+    ('GB', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    ('US', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa còn hiệu lực'),
+    ('US', 'Import', 'HEALTH_CERT',        10,   true,  'Chứng nhận kiểm dịch trong 10 ngày trước khi nhập cảnh'),
+    ('US', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính trong 30 ngày'),
+    ('US', 'Import', 'GLANDERS_TEST',      30,   true,  'Glanders CFT âm tính trong 30 ngày'),
+    ('US', 'Import', 'PIROPLASMOSIS_TEST', 30,   true,  'Piroplasmosis cELISA âm tính trong 30 ngày'),
+    ('US', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng')
+) AS c (country_code, direction, doc_code, validity_days, is_mandatory, note)
 JOIN clearance.document_types d ON d.code = c.doc_code;
 
 -- ---------- A.3 Bảng giá ----------
@@ -208,7 +249,20 @@ INSERT INTO clearance.dossier_documents (document_id, dossier_id, doc_type_id, d
 (5, 1, 4, 'VACCINE-RF-2026-001',          'https://storage.racehorse.vn/docs/rf_vaccine.pdf',  5, '2026-09-22 08:20:00+07', 'Approved', 2, '2026-09-23 10:20:00+07'),
 (6, 2, 2, 'COGGINS-LAB-2026-889',         'https://storage.racehorse.vn/docs/gp_coggins.pdf',  5, '2026-09-22 08:25:00+07', 'Approved', 2, '2026-09-23 10:25:00+07'),
 (7, 2, 3, 'HEALTH-CERT-GP-2026-002',      'https://storage.racehorse.vn/docs/gp_health.pdf',   5, '2026-09-22 08:30:00+07', 'Approved', 2, '2026-09-23 10:30:00+07'),
-(8, 2, 4, 'VACCINE-GP-2026-002',          'https://storage.racehorse.vn/docs/gp_vaccine.pdf',  5, '2026-09-22 08:35:00+07', 'Approved', 2, '2026-09-23 10:35:00+07');
+(8, 2, 4, 'VACCINE-GP-2026-002',          'https://storage.racehorse.vn/docs/gp_vaccine.pdf',  5, '2026-09-22 08:35:00+07', 'Approved', 2, '2026-09-23 10:35:00+07'),
+(9,  1, 5, 'GACC-IP-2026-0915',            'https://storage.racehorse.vn/docs/rf_permit.pdf',   5, '2026-09-22 08:40:00+07', 'Approved', 2, '2026-09-23 10:40:00+07'),
+(10, 1, 6, 'GLANDERS-LAB-2026-501',        'https://storage.racehorse.vn/docs/rf_glanders.pdf', 5, '2026-09-22 08:45:00+07', 'Approved', 2, '2026-09-23 10:45:00+07'),
+(11, 1, 7, 'PIRO-LAB-2026-502',            'https://storage.racehorse.vn/docs/rf_piro.pdf',     5, '2026-09-22 08:50:00+07', 'Approved', 2, '2026-09-23 10:50:00+07'),
+(12, 2, 5, 'GACC-IP-2026-0915',            'https://storage.racehorse.vn/docs/gp_permit.pdf',   5, '2026-09-22 08:55:00+07', 'Approved', 2, '2026-09-23 10:55:00+07'),
+(13, 2, 6, 'GLANDERS-LAB-2026-503',        'https://storage.racehorse.vn/docs/gp_glanders.pdf', 5, '2026-09-22 09:00:00+07', 'Approved', 2, '2026-09-23 11:00:00+07'),
+(14, 2, 7, 'PIRO-LAB-2026-504',            'https://storage.racehorse.vn/docs/gp_piro.pdf',     5, '2026-09-22 09:05:00+07', 'Approved', 2, '2026-09-23 11:05:00+07');
+
+-- Hồ sơ thú y lưu theo ngựa (chủ ngựa tự bổ sung, dùng lại khi nộp hồ sơ cho từng đơn)
+INSERT INTO racehorse.horse_documents (document_id, horse_id, doc_type_id, document_number, issued_by, issue_date, expiry_date, file_url, notes, uploaded_by_user_id, uploaded_at) VALUES
+(1, 1, 1, '704001000000001',      'Liên đoàn Đua ngựa Việt Nam',     '2023-03-01', '2033-03-01', 'https://storage.racehorse.vn/docs/rf_passport.pdf', NULL,                                5, '2026-09-01 09:00:00+07'),
+(2, 1, 4, 'VACCINE-RF-2026-001',  'BS. Trần Minh Khoa - Phòng khám Thú y Phú Thọ', '2026-08-20', '2027-02-20', 'https://storage.racehorse.vn/docs/rf_vaccine.pdf', 'Mũi nhắc cúm ngựa, không phản ứng phụ', 5, '2026-09-01 09:05:00+07'),
+(3, 2, 1, '704001000000002',      'Liên đoàn Đua ngựa Việt Nam',     '2023-05-10', '2033-05-10', 'https://storage.racehorse.vn/docs/gp_passport.pdf', NULL,                                5, '2026-09-01 09:10:00+07'),
+(4, 2, 4, 'VACCINE-GP-2026-002',  'BS. Trần Minh Khoa - Phòng khám Thú y Phú Thọ', '2026-08-20', '2027-02-20', 'https://storage.racehorse.vn/docs/gp_vaccine.pdf', NULL,                                5, '2026-09-01 09:15:00+07');
 
 -- Luồng 3: Nam lập kế hoạch chuyến, Bảo duyệt. Luồng 6: Bảo đóng chuyến
 -- (trễ 30 phút, chưa quá ngưỡng 30 nên trạng thái vẫn là OnTime; chi phí thực tế = kế hoạch 4200 + phát sinh sự cố 400)
@@ -274,6 +328,7 @@ SELECT setval(pg_get_serial_sequence('booking.booking_horses', 'booking_horse_id
 SELECT setval(pg_get_serial_sequence('clearance.document_types', 'doc_type_id'),       (SELECT max(doc_type_id) FROM clearance.document_types));
 SELECT setval(pg_get_serial_sequence('clearance.digital_dossiers', 'dossier_id'),      (SELECT max(dossier_id) FROM clearance.digital_dossiers));
 SELECT setval(pg_get_serial_sequence('clearance.dossier_documents', 'document_id'),    (SELECT max(document_id) FROM clearance.dossier_documents));
+SELECT setval(pg_get_serial_sequence('racehorse.horse_documents', 'document_id'),     (SELECT max(document_id) FROM racehorse.horse_documents));
 SELECT setval(pg_get_serial_sequence('fleet.transport_assets', 'asset_id'),            (SELECT max(asset_id) FROM fleet.transport_assets));
 SELECT setval(pg_get_serial_sequence('fleet.trips', 'trip_id'),                        (SELECT max(trip_id) FROM fleet.trips));
 SELECT setval(pg_get_serial_sequence('fleet.trip_horses', 'trip_horse_id'),            (SELECT max(trip_horse_id) FROM fleet.trip_horses));

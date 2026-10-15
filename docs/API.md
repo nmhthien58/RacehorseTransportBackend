@@ -1314,6 +1314,144 @@ Lỗi thường gặp:
 | 400 | `This horse is part of a booking that is still in progress and cannot be deleted.` | Ngựa đang nằm trong một đơn chưa kết thúc |
 | 403 | `You can only modify your own horses.` | Xóa ngựa của người khác |
 
+### Hồ sơ thú y của ngựa
+
+Mỗi con ngựa có một "tủ hồ sơ" riêng: hộ chiếu, kết quả xét nghiệm, giấy tiêm phòng... Chủ ngựa bổ sung bất cứ lúc nào, **không bắt buộc khi thêm ngựa** và không cần ai duyệt.
+
+Đừng nhầm với giấy tờ trong **hồ sơ kiểm dịch** (mục 8): đó là giấy tờ nộp cho từng đơn vận chuyển và được chuyên viên duyệt. Hồ sơ thú y của ngựa chỉ là nơi khách lưu sẵn giấy tờ của mình.
+
+Một hồ sơ có dạng:
+
+```json
+{
+  "documentId": 5,
+  "horseId": 1,
+  "docTypeId": 6,
+  "docTypeCode": "GLANDERS_TEST",
+  "docTypeName": "Xét nghiệm bệnh tỵ (Glanders)",
+  "documentNumber": "GL-2026-77",
+  "issuedBy": "Phòng xét nghiệm NAVETCO",
+  "issueDate": "2026-10-10",
+  "expiryDate": "2026-11-04",
+  "validity": "ExpiringSoon",
+  "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/9a1c....pdf?token=eyJ...",
+  "notes": "CFT âm tính",
+  "uploadedByUserId": 5,
+  "uploadedByName": "Jane Smith",
+  "uploadedAt": "2026-10-15T08:30:00+00:00"
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `documentId` | Mã hồ sơ, dùng khi xóa |
+| `docTypeId`, `docTypeCode`, `docTypeName` | Loại giấy tờ (xem danh mục ở mục 13) |
+| `documentNumber` | Số giấy tờ, có thể trống |
+| `issuedBy` | Bác sĩ thú y / phòng xét nghiệm / cơ quan cấp, có thể trống |
+| `issueDate`, `expiryDate` | Ngày cấp, ngày hết hạn (dạng `2026-10-10`), có thể trống |
+| `validity` | Tình trạng hiệu lực, server tự tính từ `expiryDate`: `Valid` (còn hạn), `ExpiringSoon` (hết hạn trong 30 ngày tới), `Expired` (đã hết hạn), `NoExpiry` (không có ngày hết hạn) |
+| `fileUrl` | Link xem file, có hạn khoảng 60 phút. Hết hạn thì gọi lại API danh sách để lấy link mới |
+| `notes` | Ghi chú, có thể trống |
+
+### GET /api/horses/{id}/documents — Danh sách hồ sơ thú y của ngựa
+
+Lấy toàn bộ hồ sơ của một con ngựa, mới nhất trước. Không phân trang.
+
+- **Ai gọi được:** Chủ ngựa, hoặc nhân sự
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã ngựa (`horseId`) |
+
+Response `200`: `data` là một mảng hồ sơ (dạng ở trên). Ngựa chưa có hồ sơ nào thì là `[]`.
+
+Ví dụ code:
+
+```js
+const res = await api.get(`/horses/${horseId}/documents`);
+const documents = res.data.data;
+```
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 403 | `You can only view your own horses.` | Khách xem hồ sơ ngựa của người khác |
+| 404 | `Horse with ID 9999 was not found.` | Không có ngựa với mã đó |
+
+### POST /api/horses/{id}/documents — Thêm một hồ sơ thú y
+
+Thêm **một** hồ sơ cho ngựa. Muốn thêm nhiều hồ sơ một lúc thì gọi API này nhiều lần, mỗi lần một hồ sơ.
+
+- **Ai gọi được:** Chủ ngựa (Customer)
+- **Dữ liệu gửi lên:** `multipart/form-data` (xem mục 2.5)
+
+Các trường gửi lên:
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `docTypeId` | số | Có | Loại giấy tờ, lấy từ `GET /api/document-types/lookup` |
+| `file` | file | Có | `pdf`, `jpg`, `jpeg`, `png`, tối đa 10 MB |
+| `documentNumber` | chuỗi | Không | Số giấy tờ, tối đa 100 ký tự |
+| `issuedBy` | chuỗi | Không | Nơi cấp, tối đa 200 ký tự |
+| `issueDate` | ngày | Không | Dạng `2026-10-10`, không được ở tương lai |
+| `expiryDate` | ngày | Không | Dạng `2026-11-04`, không được trước `issueDate` |
+| `notes` | chuỗi | Không | Ghi chú, tối đa 500 ký tự |
+
+Ví dụ code:
+
+```js
+const form = new FormData();
+form.append("docTypeId", 6);
+form.append("documentNumber", "GL-2026-77");
+form.append("issuedBy", "Phòng xét nghiệm NAVETCO");
+form.append("issueDate", "2026-10-10");
+form.append("expiryDate", "2026-11-04");
+form.append("file", fileInput.files[0]);
+
+const res = await api.post(`/horses/${horseId}/documents`, form, {
+  headers: { "Content-Type": "multipart/form-data" },
+});
+const created = res.data.data;
+```
+
+Response `201`: `data` là hồ sơ vừa thêm.
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Validation failed`, trong `errors` có `File is required.` | Không gửi file |
+| 400 | `Document type with ID 99 does not exist.` | `docTypeId` sai |
+| 400 | `IssueDate cannot be in the future.` | Ngày cấp ở tương lai |
+| 400 | `ExpiryDate must be on or after IssueDate.` | Ngày hết hạn trước ngày cấp |
+| 400 | `File type '.docx' is not allowed. Allowed types: ...` | Sai loại file |
+| 400 | `The file is too large. Maximum size is 10 MB.` | File quá 10 MB |
+| 403 | `You can only modify your own horses.` | Thêm hồ sơ cho ngựa của người khác |
+| 404 | `Horse with ID 9999 was not found.` | Không có ngựa với mã đó, hoặc ngựa đã bị xóa |
+
+### DELETE /api/horses/{id}/documents/{documentId} — Xóa một hồ sơ thú y
+
+- **Ai gọi được:** Chủ ngựa (Customer)
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã ngựa |
+| `documentId` | Mã hồ sơ cần xóa |
+
+Response `200`: `data` là `null`, `message` là `Horse document deleted successfully`.
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 403 | `You can only modify your own horses.` | Xóa hồ sơ ngựa của người khác |
+| 404 | `Document with ID 12 was not found for horse 1.` | Hồ sơ không có hoặc không thuộc con ngựa này |
+
 ---
 
 ## 7. Flow 1 – Đơn vận chuyển
@@ -1981,7 +2119,7 @@ Response `200` — phần `data`:
     {
       "docTypeId": 2,
       "docTypeCode": "COGGINS_EIA",
-      "docTypeName": "Chứng nhận xét nghiệm Coggins âm tính",
+      "docTypeName": "Xét nghiệm thiếu máu truyền nhiễm (EIA/Coggins)",
       "isMandatory": true,
       "validityDays": 30,
       "regulationNote": "Xét nghiệm EIA âm tính trong 30 ngày",
@@ -1993,7 +2131,7 @@ Response `200` — phần `data`:
         "documentId": 4,
         "docTypeId": 2,
         "docTypeCode": "COGGINS_EIA",
-        "docTypeName": "Chứng nhận xét nghiệm Coggins âm tính",
+        "docTypeName": "Xét nghiệm thiếu máu truyền nhiễm (EIA/Coggins)",
         "documentNumber": "DOC-4-2",
         "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/398ccb....pdf?token=eyJ...",
         "status": "Pending",
@@ -2010,7 +2148,7 @@ Response `200` — phần `data`:
     {
       "docTypeId": 3,
       "docTypeCode": "HEALTH_CERT",
-      "docTypeName": "Giấy chứng nhận kiểm dịch xuất nhập khẩu",
+      "docTypeName": "Giấy chứng nhận kiểm dịch xuất khẩu",
       "isMandatory": true,
       "validityDays": 10,
       "regulationNote": "Cục Thú y cấp trong 10 ngày trước ngày đi",
@@ -2029,7 +2167,7 @@ Response `200` — phần `data`:
       "documentId": 4,
       "docTypeId": 2,
       "docTypeCode": "COGGINS_EIA",
-      "docTypeName": "Chứng nhận xét nghiệm Coggins âm tính",
+      "docTypeName": "Xét nghiệm thiếu máu truyền nhiễm (EIA/Coggins)",
       "documentNumber": "DOC-4-2",
       "fileUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/398ccb....pdf?token=eyJ...",
       "status": "Pending",
@@ -4076,14 +4214,29 @@ Lỗi thường gặp:
 
 Danh mục các loại giấy tờ dùng trong hồ sơ kiểm dịch (hộ chiếu ngựa, chứng nhận sức khỏe...). Mọi người đọc được; chuyên viên thủ tục và Admin quản lý.
 
+Danh mục dùng chung cho hồ sơ kiểm dịch của đơn (mục 8) và hồ sơ thú y của ngựa (mục 6). Dữ liệu mẫu có 8 loại:
+
+| `code` | Tên | Mặc định bắt buộc |
+|---|---|---|
+| `HORSE_PASSPORT` | Hộ chiếu ngựa | Có |
+| `COGGINS_EIA` | Xét nghiệm thiếu máu truyền nhiễm (EIA/Coggins) | Có |
+| `HEALTH_CERT` | Giấy chứng nhận kiểm dịch xuất khẩu | Có |
+| `VACCINE` | Chứng nhận tiêm phòng cúm ngựa | Có |
+| `IMPORT_PERMIT` | Giấy phép nhập khẩu | Không |
+| `GLANDERS_TEST` | Xét nghiệm bệnh tỵ (Glanders) | Không |
+| `PIROPLASMOSIS_TEST` | Xét nghiệm lê dạng trùng (Piroplasmosis) | Không |
+| `EVA_TEST` | Xét nghiệm viêm động mạch do virus (EVA) | Không |
+
+"Mặc định bắt buộc" (`isMandatory`) chỉ dùng khi tuyến đi chưa có quy định riêng. Giấy nào bắt buộc cho tuyến nào thì xem mục 16: ví dụ đi Singapore cần thêm giấy phép nhập khẩu và xét nghiệm Glanders.
+
 Một loại giấy tờ có dạng:
 
 ```json
 {
   "docTypeId": 1,
   "code": "HORSE_PASSPORT",
-  "name": "Hộ chiếu ngựa quốc tế (FEI Passport)",
-  "description": "Hộ chiếu định danh cá thể do FEI cấp",
+  "name": "Hộ chiếu ngựa",
+  "description": "Hộ chiếu định danh cá thể (FEI hoặc hộ chiếu quốc gia có số UELN), có sơ đồ nhận dạng và lịch tiêm phòng",
   "isMandatory": true
 }
 ```
@@ -4102,14 +4255,14 @@ Response `200` — phần `data`:
     "docTypeId": 4,
     "code": "VACCINE",
     "name": "Chứng nhận tiêm phòng cúm ngựa",
-    "description": "Lịch tiêm phòng đầy đủ trong 6 tháng",
+    "description": "Mũi nhắc gần nhất trong vòng 6 tháng và không tiêm trong 7 ngày trước ngày đi",
     "isMandatory": true
   },
   {
     "docTypeId": 2,
     "code": "COGGINS_EIA",
-    "name": "Chứng nhận xét nghiệm Coggins âm tính",
-    "description": "Xét nghiệm thiếu máu truyền nhiễm ngựa trong 30 ngày",
+    "name": "Xét nghiệm thiếu máu truyền nhiễm (EIA/Coggins)",
+    "description": "Kết quả âm tính bằng AGID hoặc ELISA, lấy mẫu trong vòng 30 ngày trước ngày đi",
     "isMandatory": true
   }
 ]
@@ -4719,7 +4872,7 @@ Một quy định có dạng:
   "direction": "Import",
   "docTypeId": 2,
   "docTypeCode": "COGGINS_EIA",
-  "docTypeName": "Chứng nhận xét nghiệm Coggins âm tính",
+  "docTypeName": "Xét nghiệm thiếu máu truyền nhiễm (EIA/Coggins)",
   "validityDays": 30,
   "isMandatory": true,
   "regulationNote": "Xét nghiệm EIA âm tính trong 30 ngày"
@@ -4768,7 +4921,7 @@ Response `200`:
       "direction": "Import",
       "docTypeId": 1,
       "docTypeCode": "HORSE_PASSPORT",
-      "docTypeName": "Hộ chiếu ngựa quốc tế (FEI Passport)",
+      "docTypeName": "Hộ chiếu ngựa",
       "validityDays": null,
       "isMandatory": true,
       "regulationNote": "Hộ chiếu FEI còn hiệu lực"
@@ -4779,7 +4932,7 @@ Response `200`:
       "direction": "Import",
       "docTypeId": 2,
       "docTypeCode": "COGGINS_EIA",
-      "docTypeName": "Chứng nhận xét nghiệm Coggins âm tính",
+      "docTypeName": "Xét nghiệm thiếu máu truyền nhiễm (EIA/Coggins)",
       "validityDays": 30,
       "isMandatory": true,
       "regulationNote": "Xét nghiệm EIA âm tính trong 30 ngày"
@@ -5270,7 +5423,7 @@ Tiến độ từng phần xem ở [TASKS.md](TASKS.md).
 
 ## 19. Bảng tra nhanh mọi endpoint
 
-Tổng cộng 101 endpoint. Chi tiết từng cái xem ở mục tương ứng.
+Tổng cộng 104 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 
 **4. Đăng nhập và tài khoản của tôi**
 
@@ -5308,6 +5461,9 @@ Tổng cộng 101 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/horses` | Thêm ngựa | Customer |
 | PUT | `/api/horses/{id}` | Sửa ngựa | Chủ ngựa (Customer) |
 | DELETE | `/api/horses/{id}` | Xóa ngựa | Chủ ngựa (Customer) |
+| GET | `/api/horses/{id}/documents` | Danh sách hồ sơ thú y của ngựa | Chủ ngựa, hoặc nhân sự |
+| POST | `/api/horses/{id}/documents` | Thêm một hồ sơ thú y | Chủ ngựa (Customer) |
+| DELETE | `/api/horses/{id}/documents/{documentId}` | Xóa một hồ sơ thú y | Chủ ngựa (Customer) |
 
 **7. Flow 1 – Đơn vận chuyển**
 

@@ -104,6 +104,7 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IHorseService, HorseService>();
+            services.AddScoped<IHorseDocumentService, HorseDocumentService>();
             services.AddScoped<IPricingService, PricingService>();
             services.AddScoped<IPriceItemService, PriceItemService>();
             services.AddScoped<IBookingService, BookingService>();

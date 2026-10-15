@@ -17,6 +17,7 @@ namespace RacehorseTransport.Repositories.Context
         public virtual DbSet<User> Users { get; set; } = null!;
         public virtual DbSet<UserToken> UserTokens { get; set; } = null!;
         public virtual DbSet<Horse> Horses { get; set; } = null!;
+        public virtual DbSet<HorseDocument> HorseDocuments { get; set; } = null!;
         public virtual DbSet<BookingRequest> BookingRequests { get; set; } = null!;
         public virtual DbSet<BookingHorse> BookingHorses { get; set; } = null!;
         public virtual DbSet<DocumentType> DocumentTypes { get; set; } = null!;
@@ -61,6 +62,19 @@ namespace RacehorseTransport.Repositories.Context
                 entity.HasOne(e => e.Owner)
                       .WithMany(u => u.Horses)
                       .HasForeignKey(e => e.OwnerUserId);
+            });
+
+            modelBuilder.Entity<HorseDocument>(entity =>
+            {
+                entity.ToTable("horse_documents", "racehorse");
+                entity.HasKey(e => e.DocumentId);
+
+                entity.HasOne(e => e.Horse)
+                      .WithMany(h => h.Documents)
+                      .HasForeignKey(e => e.HorseId);
+
+                entity.HasOne(e => e.DocumentType).WithMany().HasForeignKey(e => e.DocTypeId);
+                entity.HasOne(e => e.UploadedBy).WithMany().HasForeignKey(e => e.UploadedByUserId);
             });
 
             // ---------- booking ----------

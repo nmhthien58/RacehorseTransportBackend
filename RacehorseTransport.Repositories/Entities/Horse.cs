@@ -20,5 +20,6 @@ namespace RacehorseTransport.Repositories.Entities
         // Navigation properties
         public virtual User? Owner { get; set; }
         public virtual ICollection<BookingHorse> BookingHorses { get; set; } = new List<BookingHorse>();
+        public virtual ICollection<HorseDocument> Documents { get; set; } = new List<HorseDocument>();
     }
 }

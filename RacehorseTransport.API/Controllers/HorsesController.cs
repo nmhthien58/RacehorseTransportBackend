@@ -19,10 +19,12 @@ namespace RacehorseTransport.API.Controllers
     public class HorsesController : ControllerBase
     {
         private readonly IHorseService _horseService;
+        private readonly IHorseDocumentService _documentService;
 
-        public HorsesController(IHorseService horseService)
+        public HorsesController(IHorseService horseService, IHorseDocumentService documentService)
         {
             _horseService = horseService;
+            _documentService = documentService;
         }
 
         /// <summary>
@@ -106,6 +108,54 @@ namespace RacehorseTransport.API.Controllers
         {
             await _horseService.DeleteHorseAsync(id, User.ToCurrentUser());
             return Ok(ApiResponse<object?>.SuccessResult(null, "Horse deleted successfully"));
+        }
+
+        /// <summary>
+        /// Get the vet records (passport, lab tests, vaccinations...) stored for a horse, newest first (owner or staff).
+        /// </summary>
+        [HttpGet("{id:int}/documents")]
+        [ProducesResponseType(typeof(ApiResponse<List<HorseDocumentResponse>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetDocuments(int id)
+        {
+            var documents = await _documentService.GetDocumentsAsync(id, User.ToCurrentUser());
+            return Ok(ApiResponse<List<HorseDocumentResponse>>.SuccessResult(
+                documents.Select(d => d.ToResponse()).ToList(), "Horse documents retrieved successfully"));
+        }
+
+        /// <summary>
+        /// Add one vet record to a horse (owner only). multipart/form-data; attach the file (pdf, jpg, png; up to 10 MB) in the "file" field.
+        /// </summary>
+        [HttpPost("{id:int}/documents")]
+        [Authorize(Roles = UserRoles.Customer)]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(SupabaseFileStorageService.MaxFileSizeBytes + 1024 * 1024)]
+        [ProducesResponseType(typeof(ApiResponse<HorseDocumentResponse>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> AddDocument(int id, [FromForm] CreateHorseDocumentRequest request)
+        {
+            using var file = request.File.ToUploadModel()!;
+            var created = await _documentService.AddDocumentAsync(id, request.ToBusinessModel(file), User.ToCurrentUser());
+
+            return StatusCode(StatusCodes.Status201Created,
+                ApiResponse<HorseDocumentResponse>.SuccessResult(created.ToResponse(), "Horse document added successfully"));
+        }
+
+        /// <summary>
+        /// Delete a vet record from a horse (owner only).
+        /// </summary>
+        [HttpDelete("{id:int}/documents/{documentId:int}")]
+        [Authorize(Roles = UserRoles.Customer)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DeleteDocument(int id, int documentId)
+        {
+            await _documentService.DeleteDocumentAsync(id, documentId, User.ToCurrentUser());
+            return Ok(ApiResponse<object?>.SuccessResult(null, "Horse document deleted successfully"));
         }
     }
 }

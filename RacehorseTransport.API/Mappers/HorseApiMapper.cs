@@ -56,5 +56,42 @@ namespace RacehorseTransport.API.Mappers
                 CreatedAt = model.CreatedAt
             };
         }
+
+        // Stream của file do controller giữ và giải phóng (request.File.ToUploadModel())
+        public static CreateHorseDocumentModel ToBusinessModel(this CreateHorseDocumentRequest request, FileUploadModel file)
+        {
+            return new CreateHorseDocumentModel
+            {
+                DocTypeId = request.DocTypeId,
+                DocumentNumber = string.IsNullOrWhiteSpace(request.DocumentNumber) ? null : request.DocumentNumber.Trim(),
+                IssuedBy = string.IsNullOrWhiteSpace(request.IssuedBy) ? null : request.IssuedBy.Trim(),
+                IssueDate = request.IssueDate,
+                ExpiryDate = request.ExpiryDate,
+                Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+                File = file
+            };
+        }
+
+        public static HorseDocumentResponse ToResponse(this HorseDocumentModel model)
+        {
+            return new HorseDocumentResponse
+            {
+                DocumentId = model.DocumentId,
+                HorseId = model.HorseId,
+                DocTypeId = model.DocTypeId,
+                DocTypeCode = model.DocTypeCode,
+                DocTypeName = model.DocTypeName,
+                DocumentNumber = model.DocumentNumber,
+                IssuedBy = model.IssuedBy,
+                IssueDate = model.IssueDate,
+                ExpiryDate = model.ExpiryDate,
+                Validity = model.Validity,
+                FileUrl = model.FileUrl,
+                Notes = model.Notes,
+                UploadedByUserId = model.UploadedByUserId,
+                UploadedByName = model.UploadedByName,
+                UploadedAt = model.UploadedAt
+            };
+        }
     }
 }

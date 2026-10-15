@@ -96,6 +96,17 @@ namespace RacehorseTransport.Repositories.Constants
         public static readonly string[] All = { Pending, Approved, Rejected };
     }
 
+    // Tình trạng hiệu lực của hồ sơ thú y lưu theo ngựa (tính từ ExpiryDate, không lưu trong DB)
+    public static class HorseDocumentValidity
+    {
+        public const string Valid = "Valid";
+        public const string ExpiringSoon = "ExpiringSoon"; // còn <= ExpiringSoonDays ngày
+        public const string Expired = "Expired";
+        public const string NoExpiry = "NoExpiry";
+
+        public const int ExpiringSoonDays = 30;
+    }
+
     public static class RequirementDirections
     {
         public const string Export = "Export";
