@@ -1,0 +1,20 @@
+Subject: Đơn {{BookingCode}} cần bổ sung giấy tờ
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Yêu cầu bổ sung giấy tờ</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#9a6700;">Yêu cầu bổ sung giấy tờ</h2>
+    <p>Xin chào {{FullName}},</p>
+    <p>Hồ sơ của ngựa <strong>{{HorseName}}</strong> thuộc đơn <strong>{{BookingCode}}</strong> cần được bổ sung hoặc cập nhật giấy tờ.</p>
+    <p><strong>Nội dung yêu cầu:</strong> {{DocumentRequest}}</p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Bổ sung giấy tờ</a>
+    </p>
+    <p>Vui lòng hoàn thành sớm để không ảnh hưởng đến kế hoạch vận chuyển.</p>
+  </div>
+</body>
+</html>

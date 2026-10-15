@@ -1,9 +1,20 @@
 Subject: Xác thực địa chỉ email của bạn
-<div style="font-family: Arial, sans-serif; font-size: 15px; color: #1f2937; line-height: 1.6; max-width: 560px;">
-  <p>Xin chào {{FullName}},</p>
-  <p>Cảm ơn bạn đã đăng ký tài khoản tại Racehorse Transport. Vui lòng bấm nút dưới đây để xác thực địa chỉ email:</p>
-  <p><a href="{{Link}}" style="display: inline-block; padding: 10px 18px; background: #1f3864; color: #ffffff; text-decoration: none; border-radius: 6px;">Xác thực email</a></p>
-  <p>Nếu nút không bấm được, hãy chép đường dẫn sau vào trình duyệt:<br>{{Link}}</p>
-  <p>Đường dẫn có hiệu lực trong {{ExpiresInHours}} giờ. Nếu bạn không đăng ký tài khoản, hãy bỏ qua email này.</p>
-  <p>Racehorse Transport</p>
-</div>
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Xác thực địa chỉ email</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#174c3c;">Xác thực địa chỉ email</h2>
+    <p>Xin chào {{FullName}},</p>
+    <p>Cảm ơn bạn đã đăng ký tài khoản tại Racehorse Transport. Vui lòng xác thực địa chỉ email để sử dụng đầy đủ các tính năng của hệ thống.</p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Xác thực email</a>
+    </p>
+    <p>Nếu bạn không tạo tài khoản này, bạn có thể bỏ qua email.</p>
+    <p style="font-size:12px;color:#6b7280;">Liên kết có hiệu lực trong {{ExpiresInHours}} giờ và chỉ được sử dụng một lần.</p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,20 @@
+Subject: Ngựa của đơn {{BookingCode}} đã tới điểm giao
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Ngựa đã tới điểm giao</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#174c3c;">Ngựa đã tới điểm giao</h2>
+    <p>Xin chào {{FullName}},</p>
+    <p>Ngựa <strong>{{HorseName}}</strong> thuộc đơn <strong>{{BookingCode}}</strong> đã tới <strong>{{Destination}}</strong>.</p>
+    <p>Vui lòng kiểm tra tình trạng ngựa và hoàn tất biên bản bàn giao điện tử theo hướng dẫn.</p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Xem và ký bàn giao</a>
+    </p>
+    <p>Cảm ơn bạn đã đồng hành cùng Racehorse Transport.</p>
+  </div>
+</body>
+</html>
