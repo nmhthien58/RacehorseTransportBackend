@@ -20,12 +20,14 @@ namespace RacehorseTransport.API.RequestModels
         [MaxLength(100, ErrorMessage = "Name cannot exceed 100 characters.")]
         public string Name { get; set; } = string.Empty;
 
+        // Chuẩn ISO 11784/11785: đúng 15 chữ số (3 số mã quốc gia/nhà sản xuất + 12 số định danh)
         [Required(ErrorMessage = "MicrochipNumber is required.")]
-        [MaxLength(30, ErrorMessage = "MicrochipNumber cannot exceed 30 characters.")]
+        [RegularExpression(@"^\s*[0-9]{15}\s*$", ErrorMessage = "MicrochipNumber must be exactly 15 digits (ISO 11784/11785).")]
         public string MicrochipNumber { get; set; } = string.Empty;
 
+        // Số UELN: 15 ký tự = 3 số mã quốc gia + 3 số mã cơ quan cấp + 9 chữ/số định danh
         [Required(ErrorMessage = "PassportNumber is required.")]
-        [MaxLength(50, ErrorMessage = "PassportNumber cannot exceed 50 characters.")]
+        [RegularExpression(@"^\s*[0-9]{6}[A-Za-z0-9]{9}\s*$", ErrorMessage = "PassportNumber must be a 15-character UELN: 6 digits followed by 9 letters or digits.")]
         public string PassportNumber { get; set; } = string.Empty;
 
         [MaxLength(50, ErrorMessage = "Breed cannot exceed 50 characters.")]

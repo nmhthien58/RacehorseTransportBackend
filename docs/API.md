@@ -349,7 +349,7 @@ Cách gửi: tạo `FormData`, thêm từng trường bằng `append`, thêm fil
 const form = new FormData();
 form.append("name", "Silver Wind");
 form.append("microchipNumber", "982000412345699");
-form.append("passportNumber", "FEI-VN-2024-09");
+form.append("passportNumber", "704001000000009");
 form.append("gender", "Gelding");
 form.append("dateOfBirth", "2019-05-20");
 form.append("color", "Xám");
@@ -1141,7 +1141,7 @@ Một con ngựa (`horse`) có dạng:
   "ownerName": "Jane Smith",
   "name": "Silver Wind",
   "microchipNumber": "982000412345699",
-  "passportNumber": "FEI-VN-2024-09",
+  "passportNumber": "704001000000009",
   "breed": "Thoroughbred",
   "gender": "Gelding",
   "dateOfBirth": "2019-05-20",
@@ -1157,8 +1157,8 @@ Một con ngựa (`horse`) có dạng:
 |---|---|
 | `horseId` | Mã ngựa, dùng khi đặt chuyến |
 | `ownerUserId`, `ownerName` | Chủ ngựa |
-| `microchipNumber` | Mã vi mạch gắn trên ngựa, không trùng trong toàn hệ thống |
-| `passportNumber` | Số hộ chiếu ngựa, không trùng trong toàn hệ thống |
+| `microchipNumber` | Mã vi mạch gắn trên ngựa (15 chữ số), không trùng trong toàn hệ thống |
+| `passportNumber` | Số hộ chiếu ngựa dạng UELN (15 ký tự, chữ hoa), không trùng trong toàn hệ thống |
 | `breed` | Giống ngựa |
 | `gender` | `Stallion`, `Mare` hoặc `Gelding` |
 | `dateOfBirth` | Ngày sinh, dạng `2019-05-20` |
@@ -1221,8 +1221,8 @@ Các trường gửi lên:
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
 | `name` | chuỗi | Có | Tên ngựa, tối đa 100 ký tự |
-| `microchipNumber` | chuỗi | Có | Mã vi mạch, tối đa 30 ký tự, không trùng |
-| `passportNumber` | chuỗi | Có | Số hộ chiếu, tối đa 50 ký tự, không trùng |
+| `microchipNumber` | chuỗi | Có | Mã vi mạch theo chuẩn ISO 11784/11785: **đúng 15 chữ số**, ví dụ `982000412345699`. Không trùng |
+| `passportNumber` | chuỗi | Có | Số hộ chiếu dạng UELN: **đúng 15 ký tự** = 3 số mã quốc gia + 3 số mã cơ quan cấp + 9 chữ/số định danh, ví dụ `704001000000009` hoặc `250001A12345678`. Không trùng; chữ thường tự đổi thành chữ hoa |
 | `breed` | chuỗi | Không | Giống ngựa; bỏ trống thì mặc định `Thoroughbred` |
 | `gender` | chuỗi | Có | `Stallion`, `Mare` hoặc `Gelding` |
 | `dateOfBirth` | ngày | Có | Dạng `2019-05-20`, phải ở quá khứ |
@@ -1238,6 +1238,8 @@ Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
+| 400 | `Validation failed`, trong `errors` có `MicrochipNumber must be exactly 15 digits (ISO 11784/11785).` | Mã vi mạch không đủ/thừa số hoặc có chữ |
+| 400 | `Validation failed`, trong `errors` có `PassportNumber must be a 15-character UELN: 6 digits followed by 9 letters or digits.` | Số hộ chiếu sai định dạng UELN |
 | 400 | `Microchip number '...' is already registered.` | Mã vi mạch đã có trong hệ thống |
 | 400 | `Passport number '...' is already registered.` | Số hộ chiếu đã có trong hệ thống |
 | 400 | `DateOfBirth must be in the past.` | Ngày sinh ở tương lai |
@@ -1262,8 +1264,8 @@ Các trường gửi lên:
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
 | `name` | chuỗi | Có | Tên ngựa, tối đa 100 ký tự |
-| `microchipNumber` | chuỗi | Có | Mã vi mạch, tối đa 30 ký tự, không trùng |
-| `passportNumber` | chuỗi | Có | Số hộ chiếu, tối đa 50 ký tự, không trùng |
+| `microchipNumber` | chuỗi | Có | Mã vi mạch theo chuẩn ISO 11784/11785: **đúng 15 chữ số**, ví dụ `982000412345699`. Không trùng |
+| `passportNumber` | chuỗi | Có | Số hộ chiếu dạng UELN: **đúng 15 ký tự** = 3 số mã quốc gia + 3 số mã cơ quan cấp + 9 chữ/số định danh, ví dụ `704001000000009` hoặc `250001A12345678`. Không trùng; chữ thường tự đổi thành chữ hoa |
 | `breed` | chuỗi | Không | Giống ngựa; bỏ trống thì mặc định `Thoroughbred` |
 | `gender` | chuỗi | Có | `Stallion`, `Mare` hoặc `Gelding` |
 | `dateOfBirth` | ngày | Có | Dạng `2019-05-20`, phải ở quá khứ |
@@ -1285,6 +1287,8 @@ Lỗi thường gặp:
 | HTTP | `message` | Khi nào |
 |---|---|---|
 | 403 | `You can only modify your own horses.` | Sửa ngựa của người khác |
+| 400 | `Validation failed`, trong `errors` có `MicrochipNumber must be exactly 15 digits (ISO 11784/11785).` | Mã vi mạch không đủ/thừa số hoặc có chữ |
+| 400 | `Validation failed`, trong `errors` có `PassportNumber must be a 15-character UELN: 6 digits followed by 9 letters or digits.` | Số hộ chiếu sai định dạng UELN |
 | 400 | `Microchip number '...' is already registered.` | Mã vi mạch đã có trong hệ thống |
 | 400 | `Passport number '...' is already registered.` | Số hộ chiếu đã có trong hệ thống |
 | 400 | `DateOfBirth must be in the past.` | Ngày sinh ở tương lai |
@@ -1971,7 +1975,7 @@ Response `200` — phần `data`:
   "clearanceNumber": null,
   "clearedAt": null,
   "createdAt": "2026-10-08T07:24:30+00:00",
-  "passportNumber": "FEI-VN-2023-02",
+  "passportNumber": "704001000000002",
   "issueReason": null,
   "checklist": [
     {

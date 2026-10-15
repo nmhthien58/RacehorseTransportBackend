@@ -167,16 +167,16 @@ INSERT INTO identity.users (user_id, full_name, email, password_hash, phone_numb
 
 -- ---------- B.2 Ngựa của Jane Smith ----------
 INSERT INTO racehorse.horses (horse_id, owner_user_id, name, breed, gender, date_of_birth, color, microchip_number, passport_number, special_care_requirements) VALUES
-(1, 5, 'Red Flash (Tia Chớp Đỏ)',  'Thoroughbred', 'Stallion', '2020-04-15', 'Hồng sắc', '982000412345671', 'FEI-VN-2023-01', 'Cần lót đệm rơm dày, nhiệt độ cabin 16-19°C'),
-(2, 5, 'Golden Pegasus (Kim Mã)', 'Thoroughbred', 'Mare',     '2021-03-10', 'Bạch sắc', '982000412345672', 'FEI-VN-2023-02', 'Dễ say xe nhẹ, cần treo bao cỏ tươi');
+(1, 5, 'Red Flash (Tia Chớp Đỏ)',  'Thoroughbred', 'Stallion', '2020-04-15', 'Hồng sắc', '982000412345671', '704001000000001', 'Cần lót đệm rơm dày, nhiệt độ cabin 16-19°C'),
+(2, 5, 'Golden Pegasus (Kim Mã)', 'Thoroughbred', 'Mare',     '2021-03-10', 'Bạch sắc', '982000412345672', '704001000000002', 'Dễ say xe nhẹ, cần treo bao cỏ tươi');
 
 -- ---------- B.3 Ngựa của hai khách hàng mới ----------
 INSERT INTO racehorse.horses (horse_id, owner_user_id, name, breed, gender, date_of_birth, color, microchip_number, passport_number, special_care_requirements) VALUES
-(3, 12, 'Silver Comet',   'Thoroughbred', 'Stallion', '2019-05-21', 'Xám bạc',  '982000412345673', 'FEI-VN-2024-03', 'Cần không gian yên tĩnh khi lên xe'),
-(4, 12, 'Emerald Belle',  'Thoroughbred', 'Mare',     '2020-11-08', 'Nâu sẫm',  '982000412345674', 'FEI-VN-2024-04', 'Bổ sung nước điện giải mỗi 4 giờ'),
-(5, 13, 'Midnight Crown', 'Thoroughbred', 'Gelding',  '2018-07-14', 'Đen tuyền','982000412345675', 'FEI-VN-2024-05', 'Không đứng cạnh ngựa đực chưa thiến'),
-(6, 13, 'Sakura Wind',    'Thoroughbred', 'Mare',     '2021-02-27', 'Hạt dẻ',   '982000412345676', 'FEI-VN-2024-06', 'Duy trì nhiệt độ cabin 17-20°C'),
-(7, 13, 'Royal Thunder',  'Thoroughbred', 'Stallion', '2019-09-03', 'Nâu đỏ',   '982000412345677', 'FEI-VN-2024-07', 'Dùng lưới cỏ chậm ăn trong suốt hành trình');
+(3, 12, 'Silver Comet',   'Thoroughbred', 'Stallion', '2019-05-21', 'Xám bạc',  '982000412345673', '704001000000003', 'Cần không gian yên tĩnh khi lên xe'),
+(4, 12, 'Emerald Belle',  'Thoroughbred', 'Mare',     '2020-11-08', 'Nâu sẫm',  '982000412345674', '704001000000004', 'Bổ sung nước điện giải mỗi 4 giờ'),
+(5, 13, 'Midnight Crown', 'Thoroughbred', 'Gelding',  '2018-07-14', 'Đen tuyền','982000412345675', '704001000000005', 'Không đứng cạnh ngựa đực chưa thiến'),
+(6, 13, 'Sakura Wind',    'Thoroughbred', 'Mare',     '2021-02-27', 'Hạt dẻ',   '982000412345676', '704001000000006', 'Duy trì nhiệt độ cabin 17-20°C'),
+(7, 13, 'Royal Thunder',  'Thoroughbred', 'Stallion', '2019-09-03', 'Nâu đỏ',   '982000412345677', '704001000000007', 'Dùng lưới cỏ chậm ăn trong suốt hành trình');
 
 -- =====================================================================================
 -- C. KỊCH BẢN ĐÃ HOÀN TẤT 6 LUỒNG
@@ -201,9 +201,9 @@ INSERT INTO clearance.digital_dossiers (dossier_id, dossier_code, booking_horse_
 (2, 'DOS-2026-0002', 2, 2, 'Cleared', 'VET-CERT-VN-CN-2026-001', '2026-09-28 16:00:00+07', '2026-09-20 10:00:00+07');
 
 INSERT INTO clearance.dossier_documents (document_id, dossier_id, doc_type_id, document_number, file_url, uploaded_by_user_id, uploaded_at, status, reviewed_by_user_id, reviewed_at) VALUES
-(1, 1, 1, 'FEI-PASSPORT-982000412345671', 'https://storage.racehorse.vn/docs/rf_passport.pdf', 5, '2026-09-22 08:00:00+07', 'Approved', 2, '2026-09-23 10:00:00+07'),
+(1, 1, 1, '704001000000001',              'https://storage.racehorse.vn/docs/rf_passport.pdf', 5, '2026-09-22 08:00:00+07', 'Approved', 2, '2026-09-23 10:00:00+07'),
 (2, 1, 2, 'COGGINS-LAB-2026-888',         'https://storage.racehorse.vn/docs/rf_coggins.pdf',  5, '2026-09-22 08:05:00+07', 'Approved', 2, '2026-09-23 10:05:00+07'),
-(3, 2, 1, 'FEI-PASSPORT-982000412345672', 'https://storage.racehorse.vn/docs/gp_passport.pdf', 5, '2026-09-22 08:10:00+07', 'Approved', 2, '2026-09-23 10:10:00+07'),
+(3, 2, 1, '704001000000002',              'https://storage.racehorse.vn/docs/gp_passport.pdf', 5, '2026-09-22 08:10:00+07', 'Approved', 2, '2026-09-23 10:10:00+07'),
 (4, 1, 3, 'HEALTH-CERT-RF-2026-001',      'https://storage.racehorse.vn/docs/rf_health.pdf',   5, '2026-09-22 08:15:00+07', 'Approved', 2, '2026-09-23 10:15:00+07'),
 (5, 1, 4, 'VACCINE-RF-2026-001',          'https://storage.racehorse.vn/docs/rf_vaccine.pdf',  5, '2026-09-22 08:20:00+07', 'Approved', 2, '2026-09-23 10:20:00+07'),
 (6, 2, 2, 'COGGINS-LAB-2026-889',         'https://storage.racehorse.vn/docs/gp_coggins.pdf',  5, '2026-09-22 08:25:00+07', 'Approved', 2, '2026-09-23 10:25:00+07'),
