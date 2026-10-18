@@ -7,6 +7,7 @@ namespace RacehorseTransport.API.ResponseModels
         public int PaymentId { get; set; }
         public string PaymentCode { get; set; } = string.Empty;
         public int BookingId { get; set; }
+        public string? BookingCode { get; set; }
         public string PaymentType { get; set; } = string.Empty;
         public string Provider { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
@@ -48,6 +49,36 @@ namespace RacehorseTransport.API.ResponseModels
         public decimal? NextPaymentAmount { get; set; }
         public long? NextPaymentAmountVnd { get; set; }
         public List<PaymentResponse> Payments { get; set; } = new();
+    }
+
+    public class CustomerBillingResponse
+    {
+        public string CurrencyCode { get; set; } = "USD";
+        public decimal UsdVndRate { get; set; }
+        public decimal TotalPaid { get; set; }
+        public decimal TotalRefunded { get; set; }
+        public decimal TotalOutstanding { get; set; }
+        public long TotalOutstandingVnd { get; set; }
+        public decimal TotalPayableNow { get; set; }
+        public long TotalPayableNowVnd { get; set; }
+        public int PayableNowCount { get; set; }
+        public int OverdueCount { get; set; }
+        public List<CustomerBillingBookingResponse> Bookings { get; set; } = new();
+        public List<PaymentResponse> Payments { get; set; } = new();
+    }
+
+    public class CustomerBillingBookingResponse
+    {
+        public int BookingId { get; set; }
+        public string BookingCode { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string PickupCountryCode { get; set; } = string.Empty;
+        public string DropoffCountryCode { get; set; } = string.Empty;
+        public string PickupAddress { get; set; } = string.Empty;
+        public string DropoffAddress { get; set; } = string.Empty;
+        public int TotalHorses { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public BookingPaymentSummaryResponse Summary { get; set; } = new();
     }
 
     public class CreatePaymentResponse

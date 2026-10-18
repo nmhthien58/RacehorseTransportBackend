@@ -17,6 +17,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public int PaymentId { get; set; }
         public string PaymentCode { get; set; } = string.Empty;
         public int BookingId { get; set; }
+        public string? BookingCode { get; set; }
         public string PaymentType { get; set; } = string.Empty;
         public string Provider { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
@@ -65,6 +66,38 @@ namespace RacehorseTransport.Services.BusinessModels
         public long? NextPaymentAmountVnd { get; set; }
 
         public List<PaymentModel> Payments { get; set; } = new();
+    }
+
+    // Trang "Thanh toán" của khách: tình hình tiền của mọi đơn + toàn bộ giao dịch
+    public class CustomerBillingModel
+    {
+        public string CurrencyCode { get; set; } = "USD";
+        public decimal UsdVndRate { get; set; }
+        public decimal TotalPaid { get; set; }            // tổng đã trả (cọc + phần còn lại + phát sinh)
+        public decimal TotalRefunded { get; set; }
+        public decimal TotalOutstanding { get; set; }     // tổng còn phải trả của các đơn đang mở
+        public long TotalOutstandingVnd { get; set; }
+        public decimal TotalPayableNow { get; set; }      // tổng các khoản trả được ngay (khoản kế tiếp của từng đơn)
+        public long TotalPayableNowVnd { get; set; }
+        public int PayableNowCount { get; set; }          // số đơn có khoản trả được ngay
+        public int OverdueCount { get; set; }             // số đơn có chi phí phát sinh quá hạn
+        public List<CustomerBillingBookingModel> Bookings { get; set; } = new();
+        public List<PaymentModel> Payments { get; set; } = new();
+    }
+
+    // Một đơn trên trang Thanh toán: thông tin đơn + tóm tắt tiền (danh sách giao dịch nằm ở CustomerBillingModel.Payments)
+    public class CustomerBillingBookingModel
+    {
+        public int BookingId { get; set; }
+        public string BookingCode { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string PickupCountryCode { get; set; } = string.Empty;
+        public string DropoffCountryCode { get; set; } = string.Empty;
+        public string PickupAddress { get; set; } = string.Empty;
+        public string DropoffAddress { get; set; } = string.Empty;
+        public int TotalHorses { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public BookingPaymentSummaryModel Summary { get; set; } = new();
     }
 
     public class CreatePaymentResultModel

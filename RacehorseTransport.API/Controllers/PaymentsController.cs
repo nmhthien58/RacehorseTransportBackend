@@ -45,6 +45,18 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
+        /// Customer billing page: payment status of every booking of the current customer, totals, and all transactions.
+        /// </summary>
+        [HttpGet("payments/my")]
+        [Authorize(Roles = UserRoles.Customer)]
+        [ProducesResponseType(typeof(ApiResponse<CustomerBillingResponse>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetMyBilling()
+        {
+            var billing = await _paymentService.GetMyBillingAsync(User.ToCurrentUser());
+            return Ok(ApiResponse<CustomerBillingResponse>.SuccessResult(billing.ToResponse(), "Billing retrieved successfully"));
+        }
+
+        /// <summary>
         /// Customer starts a payment (Deposit / Balance / Extra) and gets the VNPay (or mock) payment URL to open.
         /// </summary>
         [HttpPost("bookings/{id:int}/payments")]

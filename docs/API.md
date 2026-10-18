@@ -5924,6 +5924,7 @@ Response `200` (đơn đã cọc rồi bị khách hủy, được hoàn 50% c�
         "paymentId": 12,
         "paymentCode": "PAY-2026-0012",
         "bookingId": 6,
+        "bookingCode": "BKG-2026-0006",
         "paymentType": "Refund",
         "provider": "Mock",
         "status": "Succeeded",
@@ -5944,6 +5945,7 @@ Response `200` (đơn đã cọc rồi bị khách hủy, được hoàn 50% c�
         "paymentId": 11,
         "paymentCode": "PAY-2026-0011",
         "bookingId": 6,
+        "bookingCode": "BKG-2026-0006",
         "paymentType": "Deposit",
         "provider": "Mock",
         "status": "Succeeded",
@@ -5986,6 +5988,7 @@ Response `200` (đơn đã cọc rồi bị khách hủy, được hoàn 50% c�
 | `payments[].amountVnd`, `exchangeRate` | Số VND thực trả và tỉ giá tại thời điểm tạo giao dịch |
 | `payments[].refundOfPaymentId` | Với dòng `Refund`: giao dịch gốc được hoàn |
 | `payments[].providerTxnNo` | Mã giao dịch phía cổng / mã chuyển khoản |
+| `payments[].bookingCode` | Mã đơn của giao dịch |
 
 Lỗi thường gặp:
 
@@ -5994,6 +5997,143 @@ Lỗi thường gặp:
 | 403 | `You do not have access to this booking.` | Khách xem đơn của khách khác |
 | 403 | `Drivers and escorts do not see booking payments.` | Tài xế / áp tải gọi |
 | 404 | `Booking with ID 99 was not found.` | Không có đơn |
+
+### GET /api/payments/my — Trang Thanh toán của khách
+
+Dữ liệu cho trang "Thanh toán" của khách hàng (menu Thanh toán). Một lần gọi trả về:
+
+- các con số tổng: đã trả, đã được hoàn, còn phải trả, khoản trả được ngay;
+- danh sách **đơn có liên quan đến tiền** của khách (đơn đã duyệt có cọc, đơn có phát sinh hoặc đã có giao dịch), mỗi đơn kèm tóm tắt thanh toán giống `GET /api/bookings/{id}/payments`;
+- **toàn bộ giao dịch** của khách trên mọi đơn, mới nhất trước.
+
+Đơn còn `Submitted` (chưa duyệt) và đơn cũ không có thanh toán sẽ không xuất hiện.
+
+- **Ai gọi được:** Customer (chỉ thấy đơn của chính mình)
+- **Dữ liệu gửi lên:** không có, không có tham số
+
+Response `200` (rút gọn: khách có 4 đơn, ở đây chỉ giữ 1 đơn và 1 giao dịch):
+
+```json
+{
+  "success": true,
+  "message": "Billing retrieved successfully",
+  "data": {
+    "currencyCode": "USD",
+    "usdVndRate": 26000,
+    "totalPaid": 13900.0,
+    "totalRefunded": 750.0,
+    "totalOutstanding": 10500.0,
+    "totalOutstandingVnd": 273000000,
+    "totalPayableNow": 10500.0,
+    "totalPayableNowVnd": 273000000,
+    "payableNowCount": 2,
+    "overdueCount": 0,
+    "bookings": [
+      {
+        "bookingId": 101,
+        "bookingCode": "BKG-2026-0101",
+        "status": "Approved",
+        "pickupCountryCode": "VN",
+        "dropoffCountryCode": "TH",
+        "pickupAddress": "Ba Vì, Hà Nội",
+        "dropoffAddress": "Bangkok",
+        "totalHorses": 1,
+        "createdAt": "2026-10-17T02:00:00+00:00",
+        "summary": {
+          "paymentRequired": true,
+          "currencyCode": "USD",
+          "usdVndRate": 26000,
+          "estimatedCost": 6000.0,
+          "depositPercent": 30.0,
+          "depositAmount": 1800.0,
+          "depositPaid": 1800.0,
+          "balanceAmount": 4200.0,
+          "balancePaid": 0,
+          "balanceDueAt": null,
+          "extraAmount": 0.0,
+          "extraPaid": 0,
+          "extraDueAt": null,
+          "extraOverdue": false,
+          "refundedAmount": 0,
+          "totalDue": 6000.0,
+          "totalPaid": 1800.0,
+          "outstanding": 4200.0,
+          "nextPaymentType": "Balance",
+          "nextPaymentAmount": 4200.0,
+          "nextPaymentAmountVnd": 109200000,
+          "payments": []
+        }
+      }
+    ],
+    "payments": [
+      {
+        "paymentId": 5,
+        "paymentCode": "PAY-2026-0005",
+        "bookingId": 101,
+        "bookingCode": "BKG-2026-0101",
+        "paymentType": "Deposit",
+        "provider": "Mock",
+        "status": "Succeeded",
+        "amount": 1800.0,
+        "currencyCode": "USD",
+        "exchangeRate": 26000.0,
+        "amountVnd": 46800000,
+        "providerTxnNo": "MOCK20261018084618",
+        "bankCode": null,
+        "responseCode": "00",
+        "refundOfPaymentId": null,
+        "note": null,
+        "createdByName": "Jane Smith",
+        "createdAt": "2026-10-18T08:46:04.929332+00:00",
+        "paidAt": "2026-10-18T08:46:18.67219+00:00"
+      }
+    ]
+  },
+  "errors": null
+}
+```
+
+Ý nghĩa các trường:
+
+| Trường | Ý nghĩa |
+|---|---|
+| `currencyCode`, `usdVndRate` | Đơn vị tiền của báo giá (USD) và tỉ giá hiện tại trong cấu hình |
+| `totalPaid` | Tổng khách đã trả thành công (cọc + phần còn lại + phát sinh) trên mọi đơn, USD |
+| `totalRefunded` | Tổng đã được hoàn (khi hủy đơn), USD |
+| `totalOutstanding`, `totalOutstandingVnd` | Tổng còn phải trả của các đơn đang mở, **gồm cả phần còn lại chưa đến hạn**. Đơn đã hủy / từ chối / hết hạn không tính |
+| `totalPayableNow`, `totalPayableNowVnd` | Tổng các khoản khách **trả được ngay bây giờ** (cộng `nextPaymentAmount` của từng đơn) |
+| `payableNowCount` | Số đơn đang có khoản trả được ngay |
+| `overdueCount` | Số đơn có chi phí phát sinh đã quá hạn. Lớn hơn 0 thì khách đang bị chặn tạo đơn mới, nên hiện cảnh báo |
+| `bookings[]` | Các đơn, mới tạo trước |
+| `bookings[].summary` | Tóm tắt thanh toán của đơn, các trường giống `data` của `GET /api/bookings/{id}/payments`; riêng `summary.payments` luôn là mảng rỗng (giao dịch nằm ở `payments[]` bên dưới) |
+| `payments[]` | Mọi giao dịch của khách, mới nhất trước. Các trường giống `payments[]` của `GET /api/bookings/{id}/payments`, có thêm `bookingCode` để hiện mã đơn |
+
+Cách dùng trên giao diện:
+
+1. Bốn ô thống kê lấy từ `totalPayableNow`, `totalOutstanding`, `totalPaid`, `totalRefunded`.
+2. Bảng "Khoản có thể thanh toán": lọc `bookings` có `summary.nextPaymentType` khác `null`. Nút "Thanh toán" làm giống trang chi tiết đơn: `POST /api/bookings/{bookingId}/payments` với `{ "paymentType": summary.nextPaymentType }` rồi chuyển sang `paymentUrl`.
+3. Hạn trả: `summary.balanceDueAt` cho khoản `Balance` (chỉ có khi đã xếp chuyến), `summary.extraDueAt` cho khoản `Extra`.
+4. Bảng lịch sử giao dịch: hiển thị `payments`, lọc theo `paymentType` / `status` ngay trên frontend.
+
+```js
+const res = await api.get('/api/payments/my');
+const billing = res.data.data;
+const payable = billing.bookings.filter((b) => b.summary.nextPaymentType);
+
+async function pay(booking) {
+  const r = await api.post(`/api/bookings/${booking.bookingId}/payments`, {
+    paymentType: booking.summary.nextPaymentType,
+  });
+  window.location.href = r.data.data.paymentUrl;
+}
+```
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 401 | (không có body) | Chưa đăng nhập hoặc token hết hạn |
+| 403 | `You do not have permission to perform this action.` | Tài khoản không phải Customer (nhân viên xem thanh toán theo từng đơn bằng `GET /api/bookings/{id}/payments`) |
 
 ### POST /api/bookings/{id}/payments — Tạo link thanh toán
 
@@ -6025,6 +6165,7 @@ Response `201`:
       "paymentId": 14,
       "paymentCode": "PAY-2026-0014",
       "bookingId": 7,
+      "bookingCode": "BKG-2026-0007",
       "paymentType": "Balance",
       "provider": "Mock",
       "status": "Pending",
@@ -6250,7 +6391,7 @@ Tiến độ từng phần xem ở [TASKS.md](TASKS.md).
 
 ## 21. Bảng tra nhanh mọi endpoint
 
-Tổng cộng 115 endpoint. Chi tiết từng cái xem ở mục tương ứng.
+Tổng cộng 116 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 
 **4. Đăng nhập và tài khoản của tôi**
 
@@ -6437,6 +6578,7 @@ Tổng cộng 115 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | Method | Đường dẫn | Việc | Ai gọi được |
 |---|---|---|---|
 | GET | `/api/bookings/{id}/payments` | Tóm tắt thanh toán của đơn | Customer (chủ đơn), LogisticsManager, TransportSpecialist, FleetCoordinator, Admin |
+| GET | `/api/payments/my` | Trang Thanh toán của khách: mọi đơn có thanh toán + mọi giao dịch | Customer |
 | POST | `/api/bookings/{id}/payments` | Tạo link thanh toán | Customer (chủ đơn) |
 | POST | `/api/bookings/{id}/payments/manual` | Ghi nhận khoản trả ngoài hệ thống | LogisticsManager, Admin |
 | GET | `/api/payments/vnpay-return` | VNPay đưa khách về (frontend không gọi) | Không cần đăng nhập |

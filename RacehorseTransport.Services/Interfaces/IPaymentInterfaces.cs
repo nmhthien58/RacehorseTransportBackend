@@ -41,6 +41,10 @@ namespace RacehorseTransport.Services.Interfaces
     {
         Task<BookingPaymentSummaryModel> GetBookingPaymentsAsync(int bookingId, CurrentUser currentUser);
 
+        // Trang Thanh toán của khách: mọi đơn có thanh toán + mọi giao dịch của khách
+        Task<CustomerBillingModel> GetMyBillingAsync(CurrentUser currentUser);
+        CustomerBillingModel BuildCustomerBilling(IEnumerable<BookingRequest> bookings, PaymentSettingsModel settings);
+
         // Tính tình hình tiền từ đơn đã nạp kèm Payments (và chuyến của ngựa để biết hạn trả phần còn lại)
         BookingPaymentSummaryModel BuildSummary(BookingRequest booking, PaymentSettingsModel settings);
 
