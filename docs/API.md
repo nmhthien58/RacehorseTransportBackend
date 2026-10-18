@@ -422,8 +422,9 @@ Các trường dưới đây chỉ nhận đúng những giá trị liệt kê, 
 | Trạng thái dòng checklist (`state`) | `Missing` chưa nộp · `Pending` · `Approved` · `Rejected` |
 | Trạng thái chuyến (`overallStatus`) | `Draft` bản nháp · `PendingApproval` chờ duyệt · `Scheduled` đã lên lịch · `InTransit` đang đi · `EmergencyRerouting` đang nắn tuyến vì sự cố · `ArrivedDestination` đã tới đích · `Completed` đã đóng · `Cancelled` đã hủy |
 | `crewRole` | `Driver` lái xe · `Escort` áp tải |
-| `checkpointType` (loại mốc) | `Origin` điểm đi · `RestStop` trạm nghỉ · `BorderGate` cửa khẩu · `Destination` điểm giao |
+| `checkpointType` (loại mốc) | `Origin` điểm đi · `PickUp` điểm đón ngựa của một đơn · `RestStop` trạm nghỉ · `BorderGate` cửa khẩu · `DropOff` điểm trả ngựa của một đơn · `Destination` điểm giao (mốc cuối) |
 | Trạng thái mốc | `Pending` chưa tới · `Arrived` đã tới · `Cleared` đã thông quan (chỉ cửa khẩu) · `Departed` đã rời · `Cancelled` bị bỏ khi nắn tuyến |
+| Trạng thái ngựa trên chuyến (`horses[].status`) | `Planned` đã xếp chuyến, chưa lên xe · `InTransit` đang trên xe · `Delivered` đã ký bàn giao · `Offloaded` rớt lại giữa đường (sự cố / thú y), quay về hàng chờ xếp chuyến · `Cancelled` chuyến bị hủy |
 | `feedStatus` (ăn uống) | `Normal` bình thường · `Reduced` ăn ít · `Refused` bỏ ăn |
 | `stressLevel` | `Calm` bình tĩnh · `MildStress` hơi căng thẳng · `Agitated` kích động |
 | `incidentType` (loại sự cố) | `MechanicalBreakdown` hỏng xe · `BorderCongestion` tắc biên · `EquineHealthIssue` sức khỏe ngựa · `Weather` thời tiết · `ClimateControlFailure` hỏng điều hòa · `CustomsHold` bị giữ ở hải quan · `Other` khác |
@@ -2622,10 +2623,19 @@ Thứ tự gọi thông thường:
 
 1. `GET /api/trips/unplanned-horses` để xem hàng chờ ngựa chưa xếp chuyến.
 2. `GET /api/trips/available-vehicles` và `GET /api/trips/available-crew` để xem xe và người còn rảnh trong khoảng thời gian dự kiến.
-3. `POST /api/trips` để tạo bản nháp.
-4. Chỉnh sửa nếu cần: `PUT /api/trips/{id}`, các API mốc lộ trình.
-5. `POST /api/trips/{id}/submit` để trình duyệt.
-6. Quản lý: `POST /api/trips/{id}/approve` hoặc `/reject`.
+3. (Nên dùng, nhất là khi ghép nhiều đơn) `POST /api/trips/suggest-route` để hệ thống gợi ý lộ trình và giờ dự kiến; chép `checkpoints` của gợi ý vào bản nháp.
+4. `POST /api/trips` để tạo bản nháp.
+5. Chỉnh sửa nếu cần: `PUT /api/trips/{id}`, các API mốc lộ trình.
+6. `POST /api/trips/{id}/submit` để trình duyệt.
+7. Quản lý: `POST /api/trips/{id}/approve` hoặc `/reject`.
+
+**Ghép nhiều đơn vào một chuyến.** Một chuyến chở được ngựa của nhiều đơn (cùng phương thức Ground / Air), mỗi đơn có thể được đón và trả ở chỗ riêng:
+
+- Mốc `PickUp` (điểm đón) và `DropOff` (điểm trả) luôn gắn với **một đơn** qua trường `bookingId`. Các loại mốc khác để `bookingId` trống.
+- Đơn **không có** mốc `PickUp` riêng thì lên xe ở mốc `Origin`; **không có** mốc `DropOff` riêng thì được giao ở mốc `Destination` (mốc cuối). Chuyến chỉ có một đơn thì không cần hai loại mốc này.
+- Mỗi đơn tối đa một `PickUp` và một `DropOff`, đón phải đứng trước trả.
+- Khi trình / duyệt, hệ thống kiểm tra **theo từng đơn**: giờ tới điểm đón của đơn nằm trong khoảng pickup khách chọn, và giờ tới điểm trả của đơn không trễ hạn giao (`deliveryDeadline`) của đơn đó. Đơn được trả giữa đường không bị ràng buộc bởi giờ kết thúc của cả chuyến.
+- Trên đường, đoàn xe ký biên bản bàn giao (e-POD) cho đơn ngay tại điểm trả của đơn đó (mục 12); đơn hoàn tất luôn mà không chờ đóng chuyến.
 
 Mọi API ghi trong mục này trả về **chi tiết chuyến** mới nhất (dạng của `GET /api/trips/{id}`).
 
@@ -2742,6 +2752,187 @@ Response `200` — phần `data`:
 
 `userId` là giá trị gửi vào `crew[].userId` khi tạo chuyến.
 
+### POST /api/trips/suggest-route — Gợi ý lộ trình
+
+Hệ thống đề xuất lộ trình cho các con ngựa đã chọn (một hoặc nhiều đơn). Kết quả **chỉ là gợi ý**, không lưu gì: frontend hiển thị cho điều phối viên xem, rồi chép `checkpoints` vào body của `POST /api/trips` / `PUT /api/trips/{id}` (có thể sửa trước khi lưu).
+
+Cách hệ thống xếp:
+
+1. Mốc `Origin` là điểm đón của đơn có khoảng pickup sớm nhất. Đơn đón cùng chỗ thì lên xe ở đó luôn.
+2. Các điểm đón còn lại: lần lượt tới chỗ **gần nhất** → mốc `PickUp`.
+3. Các điểm trả: lần lượt tới chỗ gần nhất → mốc `DropOff`; điểm trả cuối cùng là `Destination`.
+4. Đổi nước giữa hai điểm thì chèn mốc `BorderGate` (đi theo danh sách nước quá cảnh của đơn nếu có). Tên / địa chỉ cửa khẩu chỉ là tạm, điều phối viên nên sửa lại cho đúng cửa khẩu thật.
+5. Giờ dự kiến tính theo quãng đường (bản đồ Goong / OSRM, dự phòng bảng cự ly) và các tham số ước tính thời gian của mục Transit: tốc độ xe tải, nghỉ giữa chặng, nghỉ qua đêm, 6 giờ mỗi cửa khẩu, 1 giờ xếp / dỡ ngựa mỗi điểm. Đường bay: chặng từ điểm đón cuối tới điểm trả đầu là chặng bay.
+
+- **Ai gọi được:** FleetCoordinator, Admin
+- **Dữ liệu gửi lên:** JSON
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `bookingHorseIds` | mảng số | Có | Các con ngựa định xếp lên chuyến (`bookingHorseId` từ hàng chờ). Không được trộn đơn Ground với Air |
+| `plannedStartDate` | ngày giờ | Có | Giờ xuất phát dự kiến (giờ tới mốc `Origin`) |
+| `driverCount` | số | Không | Số tài xế thay ca, 1–4 (mặc định 1). Từ 2 tài xế được lái nhiều giờ hơn mỗi ngày nên giờ dự kiến ngắn hơn |
+
+Ví dụ request:
+
+```json
+{
+  "bookingHorseIds": [201, 202, 203],
+  "plannedStartDate": "2026-11-10T06:00:00+07:00",
+  "driverCount": 1
+}
+```
+
+Response `200` (2 đơn cùng đón ở Hà Nội: BKG-2026-0201 trả ở Lạng Sơn, BKG-2026-0202 trả ở Nam Ninh, Trung Quốc):
+
+```json
+{
+  "success": true,
+  "message": "Route suggested successfully",
+  "data": {
+    "transportMode": "Ground",
+    "plannedStartDate": "2026-11-09T23:00:00+00:00",
+    "suggestedEndDate": "2026-11-10T17:56:00+00:00",
+    "totalDistanceKm": 500,
+    "totalHours": 18.9,
+    "checkpoints": [
+      {
+        "checkpointName": "Hà Nội",
+        "checkpointType": "Origin",
+        "address": "Hà Nội",
+        "plannedTime": "2026-11-09T23:00:00+00:00",
+        "mandatoryRestMinutes": 60,
+        "bookingId": null,
+        "bookingCode": null,
+        "legDistanceKm": 0
+      },
+      {
+        "checkpointName": "Drop off BKG-2026-0201 - Lạng Sơn",
+        "checkpointType": "DropOff",
+        "address": "Lạng Sơn",
+        "plannedTime": "2026-11-10T02:42:00+00:00",
+        "mandatoryRestMinutes": 60,
+        "bookingId": 201,
+        "bookingCode": "BKG-2026-0201",
+        "legDistanceKm": 150
+      },
+      {
+        "checkpointName": "Border VN - CN",
+        "checkpointType": "BorderGate",
+        "address": "Border crossing VN -> CN",
+        "plannedTime": "2026-11-10T03:44:00+00:00",
+        "mandatoryRestMinutes": 0,
+        "bookingId": null,
+        "bookingCode": null,
+        "legDistanceKm": 0
+      },
+      {
+        "checkpointName": "Nanning",
+        "checkpointType": "Destination",
+        "address": "Nanning",
+        "plannedTime": "2026-11-10T16:56:00+00:00",
+        "mandatoryRestMinutes": 0,
+        "bookingId": null,
+        "bookingCode": null,
+        "legDistanceKm": 350
+      }
+    ],
+    "bookings": [
+      {
+        "bookingId": 201,
+        "bookingCode": "BKG-2026-0201",
+        "pickupAt": "2026-11-09T23:00:00+00:00",
+        "estimatedDeliveryAt": "2026-11-10T02:42:00+00:00",
+        "deliveryDeadline": "2026-11-12T11:00:00+00:00",
+        "onTime": true,
+        "routeDistanceKm": 150,
+        "directDistanceKm": 160,
+        "detourRatio": 0.94
+      },
+      {
+        "bookingId": 202,
+        "bookingCode": "BKG-2026-0202",
+        "pickupAt": "2026-11-09T23:00:00+00:00",
+        "estimatedDeliveryAt": "2026-11-10T16:56:00+00:00",
+        "deliveryDeadline": "2026-11-13T11:00:00+00:00",
+        "onTime": true,
+        "routeDistanceKm": 500,
+        "directDistanceKm": 380,
+        "detourRatio": 1.32
+      }
+    ],
+    "warnings": [
+      {
+        "code": "Detour",
+        "severity": "Warning",
+        "message": "Booking BKG-2026-0202 travels 500 km on this route instead of 380 km direct (1.32x, limit 1.3x).",
+        "bookingCode": "BKG-2026-0202",
+        "params": {
+          "routeKm": "500",
+          "directKm": "380",
+          "ratio": "1.32",
+          "limit": "1.3",
+          "bookingCode": "BKG-2026-0202"
+        }
+      }
+    ]
+  },
+  "errors": null
+}
+```
+
+Ý nghĩa các trường:
+
+| Trường | Ý nghĩa |
+|---|---|
+| `suggestedEndDate` | Giờ tới mốc cuối + thời gian dỡ ngựa. Dùng làm `plannedEndDate` của chuyến |
+| `totalDistanceKm`, `totalHours` | Tổng quãng đường và tổng thời gian dự kiến |
+| `checkpoints[]` | Các mốc theo thứ tự đi, cùng dạng với `checkpoints` khi tạo chuyến (thêm `bookingCode`, `legDistanceKm` để hiển thị) |
+| `checkpoints[].mandatoryRestMinutes` | Ở điểm đón / trả là thời gian xếp / dỡ ngựa |
+| `checkpoints[].legDistanceKm` | Quãng đường từ mốc trước tới mốc này (cửa khẩu nằm giữa chặng nên là 0) |
+| `bookings[]` | Từng đơn: `pickupAt` giờ đón, `estimatedDeliveryAt` giờ tới điểm trả, `deliveryDeadline` hạn giao, `onTime` kịp hạn hay không |
+| `bookings[].routeDistanceKm`, `directDistanceKm`, `detourRatio` | Quãng đường ngựa của đơn thực đi trên tuyến ghép, quãng đường nếu đi thẳng (lúc báo giá), và tỉ lệ giữa hai số |
+| `warnings[]` | Cảnh báo khi ghép đơn, xem bảng dưới |
+| `warnings[].severity` | `Error`: khi trình duyệt sẽ bị chặn · `Warning`: nên xem lại · `Info`: gợi ý |
+| `warnings[].params` | Các giá trị để frontend tự dựng câu theo ngôn ngữ người dùng; `message` là câu tiếng Anh dự phòng. Ngày giờ ở dạng ISO |
+
+Các mã cảnh báo (`warnings[].code`):
+
+| `code` | Mức | Khi nào | `params` |
+|---|---|---|---|
+| `DeadlineMissed` | Error | Giờ tới điểm trả trễ hơn hạn giao của đơn | `bookingCode`, `eta`, `deadline` |
+| `PickupOutsideWindow` | Error | Giờ đón nằm ngoài khoảng pickup khách chọn | `bookingCode`, `pickupAt`, `from`, `to` |
+| `Detour` | Warning | Đơn phải đi vòng: quãng đường trên tuyến ghép / đi thẳng > 1,3 (cấu hình `Transit:MaxDetourRatio`) | `bookingCode`, `routeKm`, `directKm`, `ratio`, `limit` |
+| `PickupsFarApart` | Warning | Điểm đón của một đơn cách điểm xuất phát quá 150 km (cấu hình `Transit:MaxPickupSpreadKm`) | `bookingCode`, `km`, `limit` |
+| `DifferentPickupCountry` | Warning | Các đơn được đón ở nhiều nước khác nhau | `countries` |
+| `DossierNotCleared` | Warning | Hồ sơ của một con ngựa chưa thông quan: vẫn lập kế hoạch được nhưng xe chưa xuất phát được | `horseName`, `bookingCode`, `status` |
+| `OvernightRest` | Info | Một chặng dài cần nghỉ qua đêm: nên thêm mốc `RestStop` | `from`, `to`, `km`, `count` |
+
+```js
+const res = await api.post("/api/trips/suggest-route", {
+  bookingHorseIds: selectedIds,
+  plannedStartDate: start.toISOString(),
+});
+const suggestion = res.data.data;
+// Chép vào form lập chuyến
+const checkpoints = suggestion.checkpoints.map((c) => ({
+  checkpointName: c.checkpointName,
+  checkpointType: c.checkpointType,
+  address: c.address,
+  plannedTime: c.plannedTime,
+  mandatoryRestMinutes: c.mandatoryRestMinutes,
+  bookingId: c.bookingId,
+}));
+```
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Choose at least one horse.` | `bookingHorseIds` rỗng |
+| 400 | `Booking horse(s) with ID 999 were not found.` | Mã ngựa không tồn tại |
+| 400 | `Ground and air bookings cannot be combined on the same trip.` | Trộn đơn đường bộ với đường bay |
+
 ### POST /api/trips — Tạo bản nháp chuyến
 
 Tạo một chuyến ở trạng thái `Draft`. Ngay từ lúc tạo, xe, người và ngựa đã được giữ chỗ (không ai khác xếp trùng được). Một người có thể vừa là `Driver` vừa là `Escort` (khai hai dòng).
@@ -2783,10 +2974,11 @@ Mỗi phần tử của `checkpoints`:
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
 | `checkpointName` | chuỗi | Có | Tên mốc, tối đa 100 ký tự |
-| `checkpointType` | chuỗi | Có | `Origin` (mốc đầu), `RestStop`, `BorderGate`, `Destination` (mốc cuối) |
+| `checkpointType` | chuỗi | Có | `Origin` (mốc đầu), `PickUp`, `RestStop`, `BorderGate`, `DropOff`, `Destination` (mốc cuối) |
 | `address` | chuỗi | Có | Địa chỉ, tối đa 255 ký tự |
 | `plannedTime` | ngày giờ | Có | Giờ dự kiến tới mốc |
 | `mandatoryRestMinutes` | số | Không | Số phút bắt buộc nghỉ tại mốc (0–2880). Đoàn xe chưa nghỉ đủ thì chưa rời mốc được |
+| `bookingId` | số | Với `PickUp` / `DropOff` | Đơn được đón / trả ở mốc này (phải có ngựa trên chuyến). Để trống với các loại mốc khác |
 
 Ví dụ request:
 
@@ -2907,10 +3099,11 @@ Các trường gửi lên:
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
 | `checkpointName` | chuỗi | Có | Tên mốc |
-| `checkpointType` | chuỗi | Có | `Origin`, `RestStop`, `BorderGate`, `Destination` |
+| `checkpointType` | chuỗi | Có | `Origin`, `PickUp`, `RestStop`, `BorderGate`, `DropOff`, `Destination` |
 | `address` | chuỗi | Có | Địa chỉ |
 | `plannedTime` | ngày giờ | Có | Giờ dự kiến tới mốc |
 | `mandatoryRestMinutes` | số | Không | Số phút bắt buộc nghỉ (0–2880) |
+| `bookingId` | số | Với `PickUp` / `DropOff` | Đơn được đón / trả ở mốc này; để trống với loại mốc khác |
 | `position` | số | Không | Vị trí chèn, 1 là đầu tiên. Bỏ trống thì thêm vào cuối |
 
 Ví dụ request:
@@ -2947,10 +3140,11 @@ Các trường gửi lên:
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
 | `checkpointName` | chuỗi | Có | Tên mốc |
-| `checkpointType` | chuỗi | Có | `Origin`, `RestStop`, `BorderGate`, `Destination` |
+| `checkpointType` | chuỗi | Có | `Origin`, `PickUp`, `RestStop`, `BorderGate`, `DropOff`, `Destination` |
 | `address` | chuỗi | Có | Địa chỉ |
 | `plannedTime` | ngày giờ | Có | Giờ dự kiến tới mốc |
 | `mandatoryRestMinutes` | số | Không | Số phút bắt buộc nghỉ (0–2880) |
+| `bookingId` | số | Với `PickUp` / `DropOff` | Đơn được đón / trả ở mốc này; để trống với loại mốc khác |
 
 Ví dụ request:
 
@@ -3051,6 +3245,13 @@ Lỗi thường gặp:
 | 400 | `The last checkpoint must be of type Destination.` | Mốc cuối không phải `Destination` |
 | 400 | `Checkpoint 'B' must be planned after 'A'.` | Giờ dự kiến của các mốc không tăng dần |
 | 400 | `Checkpoint times must fall between the trip's planned start and end.` | Giờ của mốc nằm ngoài khoảng thời gian của chuyến |
+| 400 | `Checkpoint 'X' (PickUp) must say which booking is picked up / dropped off there.` | Mốc `PickUp` / `DropOff` thiếu `bookingId` |
+| 400 | `Booking BKG-2026-0201 can have at most one PickUp and one DropOff checkpoint.` | Một đơn có hai mốc đón hoặc hai mốc trả |
+| 400 | `Booking BKG-2026-0201 must be picked up before it is dropped off.` | Mốc trả đứng trước mốc đón |
+| 400 | `Booking BKG-2026-0201 can only be picked up between 2026-11-09 and 2026-11-12; it is planned at 'X' on ...` | Giờ đón của đơn (mốc `PickUp` hoặc `Origin`) nằm ngoài khoảng pickup |
+| 400 | `Booking BKG-2026-0201 must be delivered by ...; it reaches 'X' at ...` | Giờ tới điểm trả của đơn (mốc `DropOff` hoặc `Destination`) trễ hạn giao |
+
+`POST /api/trips/{id}/approve` kiểm tra lại đúng các quy tắc này trước khi duyệt.
 
 ### POST /api/trips/{id}/approve — Duyệt kế hoạch chuyến
 
@@ -3325,12 +3526,79 @@ Response `200` — phần `data`:
 | `horses[].stallSlotNumber` | Ô chuồng |
 | `horses[].specialCareRequirements`, `photoUrl` | Yêu cầu chăm sóc và ảnh, để tài xế nhận diện |
 | `horses[].dossierStatus` | Trạng thái hồ sơ; chuyến chỉ xuất phát được khi mọi con đều `Cleared` |
+| `horses[].status` | Trạng thái của con ngựa trên chuyến (mục 3): `Planned`, `InTransit`, `Delivered`, `Offloaded`, `Cancelled` |
+| `horses[].pickedUpAt`, `deliveredAt` | Lúc xe rời điểm đón của con ngựa, lúc ký bàn giao |
+| `horses[].offloadedAt`, `offloadReason` | Lúc và lý do con ngựa rớt lại giữa đường |
+| `checkpoints[].bookingId`, `bookingCode` | Với mốc `PickUp` / `DropOff`: đơn được đón / trả ở đây; `null` với mốc khác |
 | `checkpoints[]` | Các mốc, đã sắp theo thứ tự đi |
 | `checkpoints[].sequenceOrder` | Thứ tự |
 | `checkpoints[].plannedTime`, `actualArrivalTime`, `actualDepartureTime` | Giờ dự kiến và giờ thực tế |
 | `checkpoints[].status` | Trạng thái mốc (mục 3) |
 | `checkpoints[].isActive` | `false` là mốc đã bị bỏ khi nắn tuyến; nên hiện mờ hoặc gạch ngang |
 | `bookings[]` | Các đơn có ngựa trên chuyến: khách, điểm giao, `horseCountOnTrip`, và `handoverCompleted` (đơn đã có biên bản bàn giao chưa, mục 12) |
+| `bookings[].pickupCheckpointId`, `dropoffCheckpointId` | Mốc đón / mốc trả của đơn: `PickUp` / `DropOff` riêng, không có thì `Origin` / `Destination`. Tài xế ký e-POD cho đơn khi đang ở mốc `dropoffCheckpointId` |
+| `bookings[].estimatedDeliveryAt`, `deliveryDeadline` | Giờ dự kiến tới mốc trả và hạn giao của đơn |
+| `bookings[].deliveredHorseCount`, `offloadedHorseCount` | Số con đã giao, số con rớt lại giữa đường |
+
+Ví dụ một phần tử `horses[]`, `checkpoints[]` và `bookings[]` của chuyến ghép đơn (lấy từ chuyến thật trên máy test):
+
+```json
+{
+  "horse": {
+    "tripHorseId": 14,
+    "stallSlotNumber": 3,
+    "notes": null,
+    "bookingHorseId": 203,
+    "bookingId": 202,
+    "bookingCode": "BKG-2026-0202",
+    "horseId": 6,
+    "horseName": "Sakura Wind",
+    "microchipNumber": "982000412345676",
+    "gender": "Mare",
+    "color": "Hạt dẻ",
+    "specialCareRequirements": "Duy trì nhiệt độ cabin 17-20°C",
+    "photoUrl": null,
+    "stallClass": "Shared",
+    "dossierStatus": "Cleared",
+    "status": "Offloaded",
+    "pickedUpAt": "2026-10-18T12:59:25.307849+00:00",
+    "deliveredAt": null,
+    "offloadedAt": "2026-10-18T13:00:48.509219+00:00",
+    "offloadReason": "Lameness, vet stop"
+  },
+  "checkpoint": {
+    "checkpointId": 19,
+    "sequenceOrder": 2,
+    "checkpointName": "Drop off BKG-2026-0201 - Lạng Sơn",
+    "checkpointType": "DropOff",
+    "address": "Lạng Sơn",
+    "plannedTime": "2026-11-09T02:42:00+00:00",
+    "mandatoryRestMinutes": 0,
+    "actualArrivalTime": "2026-10-18T12:59:46.397787+00:00",
+    "actualDepartureTime": null,
+    "status": "Arrived",
+    "isActive": true,
+    "bookingId": 201,
+    "bookingCode": "BKG-2026-0201"
+  },
+  "booking": {
+    "bookingId": 201,
+    "bookingCode": "BKG-2026-0201",
+    "customerName": "Trần Ngọc Anh",
+    "customerPhone": "+84988111223",
+    "pickupAddress": "Hà Nội",
+    "dropoffAddress": "Lạng Sơn",
+    "horseCountOnTrip": 1,
+    "handoverCompleted": true,
+    "pickupCheckpointId": 18,
+    "dropoffCheckpointId": 19,
+    "estimatedDeliveryAt": "2026-11-09T02:42:00+00:00",
+    "deliveryDeadline": "2026-11-12T11:00:00+00:00",
+    "deliveredHorseCount": 1,
+    "offloadedHorseCount": 0
+  }
+}
+```
 
 Lỗi thường gặp:
 
@@ -3351,7 +3619,13 @@ Vòng đời của chuyến khi chạy:
 Scheduled ──(xuất phát)──> InTransit ──(tới mốc Destination)──> ArrivedDestination
 
 Mỗi mốc:  Pending ──(tới)──> Arrived ──(thông quan, chỉ cửa khẩu)──> Cleared ──(rời)──> Departed
+
+Mỗi con ngựa (horses[].status):
+  Planned ──(xe rời điểm đón của con ngựa)──> InTransit ──(ký e-POD ở điểm trả)──> Delivered
+                                               └──(rớt lại giữa đường)──> Offloaded (quay về hàng chờ xếp chuyến)
 ```
+
+Trạng thái chuyến là trạng thái của **xe**. Mỗi con ngựa có trạng thái riêng: ngựa của đơn không có mốc `PickUp` lên xe lúc xuất phát; ngựa của đơn có mốc `PickUp` lên xe khi đoàn xe rời mốc đó.
 
 Thứ tự gọi thông thường của đoàn xe:
 
@@ -3366,7 +3640,7 @@ Các API xuất phát và check-in trả về **chi tiết chuyến** mới nh�
 
 ### POST /api/trips/{id}/start — Xuất phát
 
-Bắt đầu chuyến: chuyến thành `InTransit`, mốc `Origin` được ghi là đã rời, khách và điều phối viên nhận thông báo. Bị chặn nếu còn con ngựa nào có hồ sơ chưa `Cleared`.
+Bắt đầu chuyến: chuyến thành `InTransit`, mốc `Origin` được ghi là đã rời, ngựa của các đơn lên xe ở điểm xuất phát chuyển `InTransit`, khách và điều phối viên nhận thông báo. Bị chặn nếu còn con ngựa nào có hồ sơ chưa `Cleared`.
 
 - **Ai gọi được:** Đoàn xe của chuyến, Admin
 - **Dữ liệu gửi lên:** không có (không cần body)
@@ -3438,6 +3712,9 @@ Lỗi thường gặp:
 
 Ghi nhận đoàn xe rời mốc. Không rời được khi chưa nghỉ đủ `mandatoryRestMinutes` tính từ lúc tới, và cửa khẩu phải `Cleared` trước.
 
+- Rời mốc `PickUp`: ngựa của đơn được đón ở đó chuyển `InTransit`.
+- Rời mốc `DropOff`: phải ký biên bản bàn giao (mục 12) cho đơn được trả ở đó trước.
+
 - **Ai gọi được:** Đoàn xe của chuyến, Admin
 - **Dữ liệu gửi lên:** không có (không cần body)
 
@@ -3456,6 +3733,46 @@ Lỗi thường gặp:
 | 400 | `'Cửa khẩu Hữu Nghị' must be cleared before departure.` | Cửa khẩu chưa thông quan |
 | 400 | `The horses must rest 120 minutes at 'A'; 35 minute(s) remaining.` | Chưa nghỉ đủ; `message` cho biết còn bao nhiêu phút |
 | 400 | `The destination is the last checkpoint; there is no departure from it.` | Mốc là điểm giao |
+| 400 | `Record the handover (e-POD) of the horses dropped off at 'X' before leaving.` | Mốc `DropOff` mà đơn được trả ở đó chưa ký biên bản |
+
+Khi xe tới mốc `PickUp` / `DropOff`, chỉ khách của đơn đó nhận thông báo; tới mốc `DropOff` thì khách của đơn được trả ở đó nhận thêm email "ngựa đã tới".
+
+### POST /api/trips/{id}/horses/{tripHorseId}/offload — Ngựa rớt lại giữa đường
+
+Ghi nhận một con ngựa không thể đi tiếp (thú y, chấn thương, sự cố...) và phải rời chuyến giữa đường. Chuyến vẫn chạy tiếp với các con còn lại. Con ngựa chuyển `Offloaded` và **quay về hàng chờ xếp chuyến** (`GET /api/trips/unplanned-horses`) để điều phối viên xếp chuyến khác; đơn của nó chưa hoàn tất cho tới khi con ngựa được giao. Khách (thông báo + email), quản lý và người lập chuyến được báo.
+
+- **Ai gọi được:** Đoàn xe của chuyến, FleetCoordinator, LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã chuyến |
+| `tripHorseId` | Mã "ngựa trên chuyến" (`horses[].tripHorseId` của chuyến) |
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `reason` | chuỗi | Có | Lý do, tối đa 300 ký tự |
+
+Ví dụ request:
+
+```json
+{
+  "reason": "Lameness, vet stop"
+}
+```
+
+Response `200`: chi tiết chuyến; con ngựa có `status` là `Offloaded`, kèm `offloadedAt` và `offloadReason`.
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `A horse can only be offloaded while the trip is under way (current status: Scheduled).` | Chuyến chưa xuất phát hoặc đã đóng |
+| 400 | `Sakura Wind cannot be offloaded (status: Delivered).` | Con ngựa đã giao hoặc đã rớt lại |
+| 403 | `Only the trip crew, a coordinator or a manager can offload a horse.` | Người gọi không có quyền |
+| 404 | `Trip horse with ID 99 is not on trip TRP-2026-0005.` | Con ngựa không thuộc chuyến |
 
 ### POST /api/trips/{id}/welfare-logs — Ghi nhật ký thể trạng ngựa
 
@@ -3730,6 +4047,64 @@ Response `200` — phần `data`:
 | `trips[].handoverCompleted` | Đơn này đã được bàn giao trên chuyến đó chưa |
 | `trips[].checkpoints[]` | Dòng thời gian. `actualArrivalTime` là `null` nghĩa là chưa tới; `delayMinutes` của mốc là `null` khi chưa tới |
 | `trips[].horses[]` | Chỉ gồm ngựa **của đơn này**, kể cả khi chuyến chở chung ngựa của khách khác |
+| `trips[].pickupCheckpointId`, `dropoffCheckpointId` | Mốc đón / mốc trả của đơn này trên chuyến |
+| `trips[].estimatedDeliveryAt` | Giờ dự kiến tới mốc trả của đơn này (không phải giờ kết thúc cả chuyến) |
+| `checkpoints[].isMyPickup`, `isMyDropoff` | Mốc đón / trả của đơn này, để tô nổi |
+| `checkpoints[].isOtherBookingStop` | `true` là điểm đón / trả của **khách khác** đi chung chuyến: `checkpointName` và `address` để trống, frontend hiện "Điểm dừng của đơn khác" |
+| `horses[].status`, `deliveredAt`, `offloadedAt`, `offloadReason` | Trạng thái của từng con ngựa trên chuyến (mục 3) |
+
+Ví dụ các trường mới của một chuyến ghép (khách đơn BKG-2026-0202; mốc thứ 2 là điểm trả của đơn khác nên bị ẩn tên):
+
+```json
+{
+  "pickupCheckpointId": 18,
+  "dropoffCheckpointId": 21,
+  "estimatedDeliveryAt": "2026-11-09T16:56:00+00:00",
+  "checkpoints": [
+    {
+      "checkpointId": 18,
+      "sequenceOrder": 1,
+      "checkpointName": "Hà Nội",
+      "checkpointType": "Origin",
+      "address": "Hà Nội",
+      "plannedTime": "2026-11-08T23:00:00+00:00",
+      "actualArrivalTime": "2026-10-18T12:59:25.307849+00:00",
+      "actualDepartureTime": "2026-10-18T12:59:25.307849+00:00",
+      "status": "Departed",
+      "delayMinutes": 0,
+      "isOtherBookingStop": false,
+      "isMyPickup": true,
+      "isMyDropoff": false
+    },
+    {
+      "checkpointId": 19,
+      "sequenceOrder": 2,
+      "checkpointName": "",
+      "checkpointType": "DropOff",
+      "address": "",
+      "plannedTime": "2026-11-09T02:42:00+00:00",
+      "actualArrivalTime": "2026-10-18T12:59:46.397787+00:00",
+      "actualDepartureTime": null,
+      "status": "Arrived",
+      "delayMinutes": 0,
+      "isOtherBookingStop": true,
+      "isMyPickup": false,
+      "isMyDropoff": false
+    }
+  ],
+  "horse": {
+    "tripHorseId": 14,
+    "horseId": 6,
+    "horseName": "Sakura Wind",
+    "stallSlotNumber": 3,
+    "status": "Offloaded",
+    "pickedUpAt": "2026-10-18T12:59:25.307849+00:00",
+    "deliveredAt": null,
+    "offloadedAt": "2026-10-18T13:00:48.509219+00:00",
+    "offloadReason": "Lameness, vet stop"
+  }
+}
+```
 | `horses[].latestLog` | Lần ghi nhật ký mới nhất; `null` nếu chưa có |
 | `horses[].logs[]` | Toàn bộ nhật ký của con ngựa, mới nhất trước |
 | `horsesAwaitingPlanning` | Tên các con ngựa của đơn chưa được xếp chuyến |
@@ -4094,20 +4469,22 @@ Lỗi thường gặp:
 
 ## 12. Flow 6 – Bàn giao, đóng chuyến và báo cáo
 
-Khi chuyến đã tới điểm giao (`ArrivedDestination`), đoàn xe **bàn giao** ngựa cho người nhận và lập **biên bản bàn giao điện tử** (e-POD): quét mã vi mạch từng con ngựa, ghi tình trạng, và lấy chữ ký vẽ tay của người nhận trên màn hình điện thoại. Một chuyến chở ngựa của nhiều đơn thì **mỗi đơn một biên bản**. Khi mọi đơn trên chuyến đã ký, quản lý **đóng chuyến**: hệ thống chốt số phút trễ, điểm KPI và chi phí thực tế.
+Khi xe tới **điểm trả của một đơn**, đoàn xe **bàn giao** ngựa của đơn đó cho người nhận và lập **biên bản bàn giao điện tử** (e-POD): quét mã vi mạch từng con ngựa, ghi tình trạng, và lấy chữ ký vẽ tay của người nhận trên màn hình điện thoại. Một chuyến chở ngựa của nhiều đơn thì **mỗi đơn một biên bản**, ký ở điểm trả của đơn đó: mốc `DropOff` của đơn nếu có (giữa đường), không thì ở mốc `Destination`. Ký xong, ngựa của đơn thành `Delivered`; đơn giao hết ngựa thì **hoàn tất ngay** (`Completed`), không chờ đóng chuyến. Khi xe tới mốc cuối và mọi đơn đã ký, quản lý **đóng chuyến**: hệ thống chốt số phút trễ, điểm KPI, chi phí thực tế và chia chi phí phát sinh.
 
 Vòng đời:
 
 ```
-ArrivedDestination ──(đoàn xe lập biên bản cho từng đơn)──> đủ biên bản ──(quản lý đóng chuyến)──> Completed
+InTransit ──(tới DropOff của đơn A)──> ký e-POD đơn A ──> đơn A Completed ──(đi tiếp)──> ...
+ArrivedDestination ──(ký e-POD các đơn còn lại)──> đủ biên bản ──(quản lý đóng chuyến)──> Completed
 
-Khi chuyến Completed: xe được giải phóng; đơn nào đã giao hết ngựa thì chuyển sang Completed.
+Khi chuyến Completed: xe được giải phóng; chi phí phát sinh của sự cố được chia cho các đơn
+còn ngựa trên xe lúc xảy ra sự cố. Đơn đã Completed mà có phát sinh thì chuyển AwaitingFinalPayment.
 ```
 
 Thứ tự gọi thông thường:
 
-1. Tài xế: `GET /api/trips/{id}` để xem `bookings[]` (các đơn phải giao) và `horses[]` (mã vi mạch từng con).
-2. Tài xế: với mỗi đơn, `POST /api/trips/{tripId}/handover`.
+1. Tài xế: `GET /api/trips/{id}` để xem `bookings[]` (các đơn phải giao, `dropoffCheckpointId` là mốc trả của từng đơn) và `horses[]` (mã vi mạch, trạng thái từng con).
+2. Tài xế: tới mốc trả của một đơn (`POST /api/checkpoints/{id}/arrive`), rồi `POST /api/trips/{tripId}/handover` cho đơn đó.
 3. Quản lý: khi mọi `bookings[].handoverCompleted` là `true`, gọi `POST /api/trips/{tripId}/close`.
 4. Quản lý: `GET /api/reports/summary` để xem báo cáo.
 
@@ -4159,11 +4536,12 @@ Một biên bản bàn giao (`handover`) có dạng:
 | `overallCondition` | Tình trạng ngựa khi giao: `Excellent` tốt · `NormalFatigue` mệt bình thường sau chuyến đi · `Injured` bị thương |
 | `remarks` | Ghi chú |
 | `driverUserId`, `driverName` | Người lập biên bản |
+| `checkpointId` | Mốc nơi ký nhận (mốc `DropOff` của đơn hoặc `Destination`) |
 | `horses[]` | Các con ngựa của đơn được giao trong biên bản |
 
 ### POST /api/trips/{tripId}/handover — Lập biên bản bàn giao (e-POD)
 
-Lập biên bản bàn giao cho **một** đơn trên chuyến đã tới đích. Mã vi mạch quét được phải khớp đúng các con ngựa của đơn đó trên chuyến: thiếu một con hoặc thừa một mã lạ đều bị từ chối. Khách nhận thông báo; khi đây là biên bản cuối cùng của chuyến, quản lý được báo để đóng chuyến.
+Lập biên bản bàn giao cho **một** đơn khi xe đang dừng ở điểm trả của đơn đó (mốc `bookings[].dropoffCheckpointId` có `status` là `Arrived`). Mã vi mạch quét được phải khớp đúng các con ngựa **còn trên xe** của đơn (con đã rớt lại giữa đường không giao ở đây): thiếu một con hoặc thừa một mã lạ đều bị từ chối. Ký xong, các con ngựa thành `Delivered`; đơn giao hết ngựa thì thành `Completed` ngay. Khách nhận thông báo; khi đây là biên bản cuối cùng của chuyến đã tới đích, quản lý được báo để đóng chuyến.
 
 - **Ai gọi được:** Đoàn xe của chuyến, Admin
 - **Dữ liệu gửi lên:** `multipart/form-data` (xem mục 2.5)
@@ -4216,7 +4594,9 @@ Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
-| 400 | `Horses can only be handed over after the trip has arrived at the destination (current status: InTransit).` | Chuyến chưa tới mốc `Destination` |
+| 400 | `Booking BKG-2026-0202 is handed over at 'Nanning'; record the arrival there first (status: Pending).` | Xe chưa tới điểm trả của đơn này |
+| 400 | `Horses can only be handed over while the trip is under way or has arrived (current status: Scheduled).` | Chuyến chưa xuất phát hoặc đã đóng |
+| 400 | `Booking BKG-2026-0202 has no horses on board to hand over.` | Mọi con ngựa của đơn đã rớt lại giữa đường |
 | 400 | `Microchip check failed. Not scanned: Golden Pegasus (Kim Mã) (982000412345672).` | Thiếu mã vi mạch của một con ngựa; `message` nêu tên con còn thiếu |
 | 400 | `Microchip check failed. These microchips do not belong to booking BKG-2026-0002 on this trip: 999.` | Có mã vi mạch không thuộc đơn này |
 | 400 | `Booking BKG-2026-0002 has already been handed over on trip TRP-2026-0003.` | Đơn này đã có biên bản trên chuyến |
@@ -5615,6 +5995,7 @@ Các danh sách trong `data`:
 | `crewRoles` | Vai trò trong tổ lái |
 | `checkpointTypes` | Loại điểm dừng |
 | `checkpointStatuses` | Trạng thái điểm dừng |
+| `tripHorseStatuses` | Trạng thái của từng con ngựa trên chuyến |
 | `feedStatuses` | Tình trạng ăn uống của ngựa |
 | `stressLevels` | Mức căng thẳng của ngựa |
 | `incidentTypes` | Loại sự cố |
@@ -5722,8 +6103,10 @@ Response `200`:
     ],
     "checkpointTypes": [
       "Origin",
+      "PickUp",
       "RestStop",
       "BorderGate",
+      "DropOff",
       "Destination"
     ],
     "checkpointStatuses": [
@@ -5731,6 +6114,13 @@ Response `200`:
       "Arrived",
       "Cleared",
       "Departed",
+      "Cancelled"
+    ],
+    "tripHorseStatuses": [
+      "Planned",
+      "InTransit",
+      "Delivered",
+      "Offloaded",
       "Cancelled"
     ],
     "feedStatuses": [
@@ -6391,7 +6781,7 @@ Tiến độ từng phần xem ở [TASKS.md](TASKS.md).
 
 ## 21. Bảng tra nhanh mọi endpoint
 
-Tổng cộng 116 endpoint. Chi tiết từng cái xem ở mục tương ứng.
+Tổng cộng 118 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 
 **4. Đăng nhập và tài khoản của tôi**
 
@@ -6465,6 +6855,7 @@ Tổng cộng 116 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | Method | Đường dẫn | Việc | Ai gọi được |
 |---|---|---|---|
 | GET | `/api/trips/unplanned-horses` | Hàng chờ xếp chuyến | FleetCoordinator, LogisticsManager, Admin |
+| POST | `/api/trips/suggest-route` | Gợi ý lộ trình (ghép nhiều đơn) | FleetCoordinator, Admin |
 | GET | `/api/trips/available-vehicles` | Xe còn rảnh | FleetCoordinator, LogisticsManager, Admin |
 | GET | `/api/trips/available-crew` | Tài xế và áp tải còn rảnh | FleetCoordinator, LogisticsManager, Admin |
 | POST | `/api/trips` | Tạo bản nháp chuyến | FleetCoordinator, Admin |
@@ -6488,6 +6879,7 @@ Tổng cộng 116 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/checkpoints/{id}/arrive` | Đã tới mốc | Đoàn xe của chuyến, Admin |
 | POST | `/api/checkpoints/{id}/clear` | Đã thông quan tại cửa khẩu | Đoàn xe của chuyến, Admin |
 | POST | `/api/checkpoints/{id}/depart` | Rời mốc | Đoàn xe của chuyến, Admin |
+| POST | `/api/trips/{id}/horses/{tripHorseId}/offload` | Ngựa rớt lại giữa đường | Đoàn xe của chuyến, FleetCoordinator, LogisticsManager, Admin |
 | POST | `/api/trips/{id}/welfare-logs` | Ghi nhật ký thể trạng ngựa | Đoàn xe của chuyến, Admin |
 | GET | `/api/trips/{id}/welfare-logs` | Xem nhật ký của chuyến | Mọi nhân sự; tài xế / áp tải chỉ xem được chuyến của mình |
 | GET | `/api/tracking/trips` | Bảng theo dõi các chuyến | FleetCoordinator, LogisticsManager, Admin |
