@@ -80,6 +80,10 @@ namespace RacehorseTransport.Services.Mappers
             model.PickupCountryCode = entity.PickupCountryCode;
             model.DropoffAddress = entity.DropoffAddress;
             model.DropoffCountryCode = entity.DropoffCountryCode;
+            model.TransitCountryCodes = entity.TransitCountries
+                .OrderBy(t => t.SequenceOrder)
+                .Select(t => t.CountryCode)
+                .ToList();
             model.PickupWindowStart = entity.PickupWindowStart;
             model.PickupWindowEnd = entity.PickupWindowEnd;
             model.DeliveryDeadline = entity.DeliveryDeadline;

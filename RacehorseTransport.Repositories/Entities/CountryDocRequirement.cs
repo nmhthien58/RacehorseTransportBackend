@@ -8,6 +8,7 @@ namespace RacehorseTransport.Repositories.Entities
         public string Direction { get; set; } = string.Empty;
         public int DocTypeId { get; set; }
         public int? ValidityDays { get; set; }
+        public int? ProcessingDays { get; set; } // số ngày cần để có được giấy này (xin phép, xét nghiệm, cách ly...)
         public bool IsMandatory { get; set; } = true;
         public string? RegulationNote { get; set; }
 

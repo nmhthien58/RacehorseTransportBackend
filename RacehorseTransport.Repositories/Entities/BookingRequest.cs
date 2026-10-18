@@ -43,5 +43,6 @@ namespace RacehorseTransport.Repositories.Entities
         public virtual User? AssignedSpecialist { get; set; }
         public virtual User? AssignedCoordinator { get; set; }
         public virtual ICollection<BookingHorse> BookingHorses { get; set; } = new List<BookingHorse>();
+        public virtual ICollection<BookingTransitCountry> TransitCountries { get; set; } = new List<BookingTransitCountry>();
     }
 }

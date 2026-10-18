@@ -111,8 +111,9 @@ namespace RacehorseTransport.Repositories.Constants
     {
         public const string Export = "Export";
         public const string Import = "Import";
+        public const string Transit = "Transit"; // nước ngựa đi qua (thường là đường bộ)
 
-        public static readonly string[] All = { Export, Import };
+        public static readonly string[] All = { Export, Import, Transit };
     }
 
     public static class AssetTypes

@@ -27,6 +27,7 @@ namespace RacehorseTransport.API.Mappers
                 Direction = request.Direction.Trim(),
                 DocTypeId = request.DocTypeId,
                 ValidityDays = request.ValidityDays,
+                ProcessingDays = request.ProcessingDays,
                 IsMandatory = request.IsMandatory,
                 RegulationNote = request.RegulationNote?.Trim()
             };
@@ -43,6 +44,7 @@ namespace RacehorseTransport.API.Mappers
                 Direction = request.Direction.Trim(),
                 DocTypeId = request.DocTypeId,
                 ValidityDays = request.ValidityDays,
+                ProcessingDays = request.ProcessingDays,
                 IsMandatory = request.IsMandatory,
                 RegulationNote = request.RegulationNote?.Trim()
             };
@@ -59,6 +61,7 @@ namespace RacehorseTransport.API.Mappers
                 DocTypeCode = model.DocTypeCode,
                 DocTypeName = model.DocTypeName,
                 ValidityDays = model.ValidityDays,
+                ProcessingDays = model.ProcessingDays,
                 IsMandatory = model.IsMandatory,
                 RegulationNote = model.RegulationNote
             };

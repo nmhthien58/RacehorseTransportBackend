@@ -27,6 +27,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IRepository<User> _userRepo;
         private readonly IRepository<DigitalDossier> _dossierRepo;
         private readonly IPricingService _pricingService;
+        private readonly IClearanceScheduleService _clearanceSchedule;
         private readonly INotificationService _notificationService;
         private readonly ICodeGenerator _codeGenerator;
         private readonly IUnitOfWork _unitOfWork;
@@ -39,6 +40,7 @@ namespace RacehorseTransport.Services.Implementations
             IRepository<User> userRepo,
             IRepository<DigitalDossier> dossierRepo,
             IPricingService pricingService,
+            IClearanceScheduleService clearanceSchedule,
             INotificationService notificationService,
             ICodeGenerator codeGenerator,
             IUnitOfWork unitOfWork,
@@ -50,6 +52,7 @@ namespace RacehorseTransport.Services.Implementations
             _userRepo = userRepo;
             _dossierRepo = dossierRepo;
             _pricingService = pricingService;
+            _clearanceSchedule = clearanceSchedule;
             _notificationService = notificationService;
             _codeGenerator = codeGenerator;
             _unitOfWork = unitOfWork;
@@ -61,6 +64,7 @@ namespace RacehorseTransport.Services.Implementations
             var query = ApplyVisibility(_bookingRepo.GetQueryable().AsNoTracking(), currentUser)
                 .Include(b => b.Customer)
                 .Include(b => b.AssignedSpecialist)
+                .Include(b => b.TransitCountries)
                 .AsQueryable();
 
             // Filtering
@@ -116,6 +120,7 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(b => b.Customer)
                 .Include(b => b.AssignedSpecialist)
                 .Include(b => b.ReviewedBy)
+                .Include(b => b.TransitCountries)
                 .Include(b => b.BookingHorses).ThenInclude(bh => bh.Horse)
                 .Include(b => b.BookingHorses).ThenInclude(bh => bh.Dossier)
                 .Include(b => b.BookingHorses).ThenInclude(bh => bh.TripHorses).ThenInclude(th => th.Trip)
@@ -175,6 +180,7 @@ namespace RacehorseTransport.Services.Implementations
                 PickupWindowStart = model.PickupWindowStart,
                 PickupWindowEnd = model.PickupWindowEnd,
                 DeliveryDeadline = model.DeliveryDeadline,
+                TransitCountryCodes = model.TransitCountryCodes,
                 StallClasses = model.Horses.Select(h => h.StallClass).ToList()
             });
 
@@ -223,6 +229,7 @@ namespace RacehorseTransport.Services.Implementations
                     CurrencyCode = quote.CurrencyCode,
                     QuoteBreakdown = _pricingService.SerializeLines(quote.Lines),
                     Status = BookingStatuses.Submitted,
+                    TransitCountries = ToTransitRows(quote.TransitCountryCodes),
                     BookingHorses = model.Horses.Select(h => new BookingHorse
                     {
                         HorseId = h.HorseId,
@@ -253,13 +260,16 @@ namespace RacehorseTransport.Services.Implementations
             var booking = await GetTrackedBookingAsync(id);
             EnsureStatus(booking, BookingStatuses.Submitted, "approved");
 
-            // Duyệt chậm thì khoảng pickup có thể không còn đủ thời gian cho đặt cọc, hồ sơ và xếp chuyến
+            // Duyệt chậm thì khoảng pickup có thể không còn đủ thời gian cho đặt cọc, hồ sơ (theo tuyến) và xếp chuyến
+            int clearanceDays = await _clearanceSchedule.GetClearanceDaysAsync(
+                booking.PickupCountryCode, TransitCodes(booking), booking.DropoffCountryCode);
+            int approvalLeadDays = _options.ApprovalLeadDaysFor(clearanceDays);
             var latestPickupDay = DateOnly.FromDateTime(booking.PickupWindowEnd.UtcDateTime);
-            var neededDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(_options.ApprovalLeadDays);
+            var neededDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(approvalLeadDays);
             if (latestPickupDay < neededDay)
             {
                 throw new BusinessException(
-                    $"This booking can no longer be approved: its pickup window ends on {latestPickupDay:yyyy-MM-dd}, but deposit, quarantine clearance and trip planning need about {_options.ApprovalLeadDays} days (until {neededDay:yyyy-MM-dd}). Reject it and ask the customer to book a later pickup window.");
+                    $"This booking can no longer be approved: its pickup window ends on {latestPickupDay:yyyy-MM-dd}, but deposit, quarantine clearance and trip planning on this route need about {approvalLeadDays} days (until {neededDay:yyyy-MM-dd}). Reject it and ask the customer to book a later pickup window.");
             }
 
             var specialist = await GetActiveSpecialistAsync(specialistUserId);
@@ -305,6 +315,77 @@ namespace RacehorseTransport.Services.Implementations
                     specialist.UserId,
                     $"Booking {booking.BookingCode} assigned to you",
                     $"You are responsible for the clearance dossiers of {dossiers.Count} horse(s) in this booking.",
+                    NotificationReferenceTypes.Booking,
+                    booking.BookingId);
+            });
+
+            return await GetBookingByIdAsync(id, currentUser);
+        }
+
+        // R-03: Manager xác nhận / sửa các nước quá cảnh khi xét duyệt (khách có thể đã gợi ý lúc đặt).
+        // Đổi nước quá cảnh làm đổi giá (phí quá cảnh, thời gian qua cửa khẩu) nên tính lại báo giá,
+        // lấy mốc "hôm nay" là ngày tạo đơn để không bắt khách đổi lịch chỉ vì đơn đã chờ duyệt vài ngày.
+        public async Task<BookingDetailModel> UpdateTransitCountriesAsync(int id, List<string> transitCountryCodes, CurrentUser currentUser)
+        {
+            var booking = await GetTrackedBookingAsync(id);
+            if (booking.Status != BookingStatuses.Submitted)
+            {
+                throw new BusinessException($"Transit countries can only be changed before the booking is reviewed (current status: {booking.Status}).");
+            }
+
+            var activeHorses = booking.BookingHorses.Where(bh => bh.Status != BookingHorseStatuses.Cancelled).ToList();
+            var quote = await _pricingService.CalculateQuoteAsync(new QuoteInputModel
+            {
+                TransportMode = booking.TransportMode,
+                PickupCountryCode = booking.PickupCountryCode,
+                PickupAddress = booking.PickupAddress,
+                DropoffCountryCode = booking.DropoffCountryCode,
+                DropoffAddress = booking.DropoffAddress,
+                DistanceKm = booking.DistanceKm,
+                RequiresClimateControl = booking.RequiresClimateControl,
+                DeclaredValue = booking.DeclaredValue,
+                PickupWindowStart = booking.PickupWindowStart,
+                PickupWindowEnd = booking.PickupWindowEnd,
+                DeliveryDeadline = booking.DeliveryDeadline,
+                TransitCountryCodes = transitCountryCodes,
+                QuotedAt = booking.CreatedAt,
+                StallClasses = activeHorses.Select(bh => bh.StallClass).ToList()
+            });
+
+            decimal previousCost = booking.EstimatedCost;
+            var oldRows = booking.TransitCountries.ToList();
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                // Xóa trước rồi thêm lại để không vướng khóa (booking_id, sequence_order)
+                foreach (var row in oldRows)
+                {
+                    booking.TransitCountries.Remove(row);
+                }
+                await _bookingRepo.SaveChangesAsync();
+
+                foreach (var row in ToTransitRows(quote.TransitCountryCodes))
+                {
+                    booking.TransitCountries.Add(row);
+                }
+
+                booking.EstimatedCost = quote.Total;
+                booking.CurrencyCode = quote.CurrencyCode;
+                booking.QuoteBreakdown = _pricingService.SerializeLines(quote.Lines);
+                booking.IsExpress = quote.IsExpress;
+                booking.EstimatedTransitHours = quote.EstimatedHours;
+                await _bookingRepo.UpdateAsync(booking);
+
+                string route = quote.TransitCountryCodes.Count > 0
+                    ? $"{booking.PickupCountryCode} → {string.Join(" → ", quote.TransitCountryCodes)} → {booking.DropoffCountryCode}"
+                    : $"{booking.PickupCountryCode} → {booking.DropoffCountryCode} (no transit country)";
+
+                await _notificationService.SendAsync(
+                    booking.CustomerUserId,
+                    $"Route of booking {booking.BookingCode} updated",
+                    previousCost == quote.Total
+                        ? $"The route was confirmed as {route}."
+                        : $"The route was confirmed as {route}. The estimated cost changed from {previousCost:N2} to {quote.Total:N2} {quote.CurrencyCode}.",
                     NotificationReferenceTypes.Booking,
                     booking.BookingId);
             });
@@ -456,10 +537,25 @@ namespace RacehorseTransport.Services.Implementations
             return overdue.Count;
         }
 
+        private static List<string> TransitCodes(BookingRequest booking)
+        {
+            return booking.TransitCountries.OrderBy(t => t.SequenceOrder).Select(t => t.CountryCode).ToList();
+        }
+
+        private static List<BookingTransitCountry> ToTransitRows(IEnumerable<string> codes)
+        {
+            return codes.Select((code, index) => new BookingTransitCountry
+            {
+                SequenceOrder = index + 1,
+                CountryCode = code
+            }).ToList();
+        }
+
         private async Task<BookingRequest> GetTrackedBookingAsync(int id)
         {
             var booking = await _bookingRepo.GetQueryable()
                 .Include(b => b.BookingHorses)
+                .Include(b => b.TransitCountries)
                 .FirstOrDefaultAsync(b => b.BookingId == id);
 
             if (booking == null)

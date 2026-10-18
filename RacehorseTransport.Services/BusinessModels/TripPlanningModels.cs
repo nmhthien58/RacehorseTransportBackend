@@ -12,6 +12,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public string PickupCountryCode { get; set; } = string.Empty;
         public string DropoffAddress { get; set; } = string.Empty;
         public string DropoffCountryCode { get; set; } = string.Empty;
+        public List<string> TransitCountryCodes { get; set; } = new(); // nước quá cảnh: mỗi nước cần mốc cửa khẩu
         public DateTimeOffset PickupWindowStart { get; set; }
         public DateTimeOffset PickupWindowEnd { get; set; }
         public DateTimeOffset DeliveryDeadline { get; set; }

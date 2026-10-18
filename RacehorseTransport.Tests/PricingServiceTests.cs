@@ -187,7 +187,72 @@ public class PricingServiceTests
         return new DateTimeOffset(DateTime.UtcNow.Date.AddDays(Options.LeadTimeDays), TimeSpan.Zero);
     }
 
-    private static PricingService CreateService()
+    [Fact]
+    public async Task CalculateQuote_ChargesTransitFeePerCountryAndHorse()
+    {
+        var service = CreateService();
+        var input = CreateInput(new[] { StallClasses.Shared, StallClasses.Shared });
+        input.TransitCountryCodes = new List<string> { "my", "SG" };
+
+        var quote = await service.CalculateQuoteAsync(input);
+
+        var fee = Assert.Single(quote.Lines, x => x.Code == "FEE_TRANSIT");
+        Assert.Equal(4m, fee.Quantity);      // 2 nước x 2 ngựa
+        Assert.Equal(600m, fee.Amount);      // 150 / ngựa / nước
+        Assert.Equal(new[] { "MY", "SG" }, quote.TransitCountryCodes);
+    }
+
+    [Fact]
+    public async Task CalculateQuote_WithoutTransit_HasNoTransitFee()
+    {
+        var service = CreateService();
+        var quote = await service.CalculateQuoteAsync(CreateInput(new[] { StallClasses.Shared }));
+
+        Assert.DoesNotContain(quote.Lines, x => x.Code == "FEE_TRANSIT");
+    }
+
+    [Fact]
+    public async Task CalculateQuote_RejectsTransitEqualToDestination()
+    {
+        var service = CreateService();
+        var input = CreateInput(new[] { StallClasses.Shared });
+        input.TransitCountryCodes = new List<string> { "TH" };
+
+        await Assert.ThrowsAsync<BusinessException>(() => service.CalculateQuoteAsync(input));
+    }
+
+    [Fact]
+    public async Task CalculateQuote_LeadTimeFollowsRouteClearanceDays()
+    {
+        var service = CreateService(clearanceDays: 30);
+        var input = CreateInput(new[] { StallClasses.Shared });
+        input.PickupWindowStart = null;
+        input.PickupWindowEnd = null;
+        input.DeliveryDeadline = null;
+
+        var quote = await service.CalculateQuoteAsync(input);
+
+        Assert.Equal(30, quote.ClearanceDays);
+        Assert.Equal(Options.LeadTimeDaysFor(30), quote.LeadTimeDays);
+        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow).AddDays(Options.LeadTimeDaysFor(30)), quote.EarliestPickupDate);
+    }
+
+    [Fact]
+    public async Task CalculateQuote_UsesQuotedAtAsReferenceDate()
+    {
+        var service = CreateService();
+        // Đơn tạo 5 ngày trước với ngày pickup sớm nhất lúc đó: tính lại giá hôm nay vẫn hợp lệ
+        var createdAt = DateTimeOffset.UtcNow.AddDays(-5);
+        var input = CreateInput(new[] { StallClasses.Shared },
+            new DateTimeOffset(createdAt.UtcDateTime.Date.AddDays(Options.LeadTimeDays), TimeSpan.Zero));
+        input.QuotedAt = createdAt;
+
+        var quote = await service.CalculateQuoteAsync(input);
+
+        Assert.True(quote.Total > 0);
+    }
+
+    private static PricingService CreateService(int? clearanceDays = null)
     {
         var prices = new List<PriceItem>
         {
@@ -203,6 +268,7 @@ public class PricingServiceTests
             Price("SUR_CLIMATE", PriceCategories.Surcharge, PriceCalcTypes.Percent, 10m),
             Price("FEE_DOCS", PriceCategories.Clearance, PriceCalcTypes.PerHorse, 100m),
             Price("FEE_CLEARANCE", PriceCategories.Clearance, PriceCalcTypes.PerHorse, 200m, TransportModes.Air),
+            Price("FEE_TRANSIT", PriceCategories.Clearance, PriceCalcTypes.PerHorse, 150m),
             Price("ESCORT", PriceCategories.Escort, PriceCalcTypes.PerGroom, 300m, TransportModes.Air),
             Price("INS_TRANSIT", PriceCategories.Insurance, PriceCalcTypes.Percent, 1m)
         };
@@ -214,7 +280,22 @@ public class PricingServiceTests
             new SeededPriceCache(prices),
             new UnusedDistanceService(),
             new TransitTimeEstimator(Microsoft.Extensions.Options.Options.Create(new TransitOptions())),
+            new FixedClearanceSchedule(clearanceDays ?? Options.DefaultClearanceDays),
             Microsoft.Extensions.Options.Options.Create(Options));
+    }
+
+    // Thời gian làm hồ sơ của tuyến cố định cho kiểm thử (bản thật đọc country_doc_requirements.processing_days)
+    private sealed class FixedClearanceSchedule : IClearanceScheduleService
+    {
+        private readonly int _days;
+
+        public FixedClearanceSchedule(int days)
+        {
+            _days = days;
+        }
+
+        public Task<int> GetClearanceDaysAsync(string originCountry, IReadOnlyList<string> transitCountries, string destinationCountry)
+            => Task.FromResult(_days);
     }
 
     // Mặc định: pickup xa hơn mốc Express, hạn giao rộng rãi

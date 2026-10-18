@@ -429,7 +429,7 @@ Các trường dưới đây chỉ nhận đúng những giá trị liệt kê, 
 | `onTimeStatus` (kết quả đúng giờ của chuyến) | `OnTime` đúng giờ · `Delayed_AcceptableForceMajeure` trễ do bất khả kháng · `Delayed_OperationalFault` trễ do lỗi vận hành |
 | Loại phương tiện (`assetType`) | `HorseTruck_AirSuspension` xe tải giảm xóc khí · `HorseVan` xe van · `AirStall` chuồng hàng không |
 | Tình trạng phương tiện (`status`, mục 15) | `Available` sẵn sàng · `InTransit` đang chạy chuyến · `Maintenance` đang bảo dưỡng |
-| `direction` (quy định giấy tờ, mục 16) | `Export` khi rời nước · `Import` khi vào nước |
+| `direction` (quy định giấy tờ, mục 16) | `Export` khi rời nước · `Import` khi vào nước · `Transit` khi chỉ đi qua nước đó |
 | `category` (nhóm giá, mục 17) | `Freight` cước · `StallClass` hệ số hạng chuồng · `Surcharge` phụ phí · `Discount` chiết khấu · `Clearance` phí thủ tục · `Escort` người chăm ngựa · `Insurance` bảo hiểm |
 | `calcType` (cách tính giá, mục 17) | `PerHorse` · `PerKmPerHorse` · `Multiplier` · `Percent` · `PerBooking` · `PerGroom` · `PerGroomDay` |
 | `referenceType` (thông báo, mục 14) | `Booking` · `Dossier` · `Trip` · `Incident` |
@@ -1513,7 +1513,8 @@ Tính giá cho một đơn dự kiến. Không lưu gì vào hệ thống, gọi
 
 **Khách không chọn ngày khởi hành.** Khách chỉ cho biết ngựa sẵn sàng được đón trong khoảng ngày nào (`pickupWindowStart` → `pickupWindowEnd`) và hạn giao trễ nhất (`deliveryDeadline`). Ngày chạy thật do điều phối viên chốt khi lập chuyến.
 
-- **Ngày pickup sớm nhất:** hôm nay + khoảng `leadTimeDays` ngày (mặc định 21 ngày = 2 ngày duyệt + 2 ngày đặt cọc + 14 ngày làm hồ sơ kiểm dịch + 3 ngày xếp chuyến). Server trả về `earliestPickupDate`; form nên khóa các ngày sớm hơn.
+- **Ngày pickup sớm nhất:** hôm nay + `leadTimeDays` ngày = 2 ngày duyệt + 2 ngày đặt cọc + **số ngày làm hồ sơ của tuyến** (`clearanceDays`) + 3 ngày xếp chuyến. `clearanceDays` = giấy lâu nhất trong các quy định của nước đi (Export), các nước quá cảnh (Transit) và nước đến (Import), ví dụ VN → Campuchia 7 ngày, VN → Trung Quốc 21 ngày; tuyến chưa có số liệu thì 14 ngày. Server trả về `earliestPickupDate`; form nên khóa các ngày sớm hơn.
+- **Nước quá cảnh** (`transitCountryCodes`): đi đường bộ qua nước khác (ví dụ VN → Trung Quốc → Nga) thì liệt kê các nước đi qua theo thứ tự. Mỗi nước thêm một dòng phí `FEE_TRANSIT`, thêm một lần qua cửa khẩu trong thời gian vận chuyển, và có thể làm `clearanceDays` dài hơn. Đi thẳng thì bỏ trống.
 - **Thời gian vận chuyển** do server ước tính từ quãng đường và phương thức (`transit`), không lấy từ ngày khách nhập. Hạn giao phải từ `earliestDeliveryDeadline` trở đi (= đầu khoảng pickup + thời gian vận chuyển chậm nhất).
 - **Phụ phí gấp (Express):** khi đầu khoảng pickup trước `expressUntilDate` (sát ngày sớm nhất, phải làm hồ sơ gấp) hoặc hạn giao dư ít hơn 24 giờ so với `earliestDeliveryDeadline`.
 - Chưa chọn ngày thì cứ bỏ trống 3 trường ngày: server vẫn trả về `earliestPickupDate`, `expressUntilDate` và thời gian vận chuyển để form hiển thị gợi ý.
@@ -1537,6 +1538,7 @@ Các trường gửi lên:
 | `pickupWindowStart` | ngày giờ | Không | Ngày đầu của khoảng ngựa sẵn sàng được đón; không sớm hơn `earliestPickupDate` |
 | `pickupWindowEnd` | ngày giờ | Không | Ngày cuối của khoảng đón; không trước `pickupWindowStart`, khoảng dài tối đa 30 ngày. Bỏ trống thì bằng `pickupWindowStart` |
 | `deliveryDeadline` | ngày giờ | Không | Hạn giao trễ nhất; không sớm hơn `earliestDeliveryDeadline` |
+| `transitCountryCodes` | mảng chuỗi | Không | Nước đi qua theo thứ tự, mã 2 chữ cái, ví dụ `["CN"]`; tối đa 5 nước, không trùng nhau, không trùng nước đi / nước đến |
 | `horses` | mảng | Có | Mỗi phần tử là một con ngựa, chỉ cần `stallClass`: `Shared`, `Comfort` hoặc `Private` |
 
 Gửi `pickupWindowEnd` hoặc `deliveryDeadline` thì phải gửi kèm `pickupWindowStart`.
@@ -1550,9 +1552,9 @@ Ví dụ request:
   "distanceKm": 900,
   "requiresClimateControl": true,
   "declaredValue": 50000,
-  "pickupWindowStart": "2026-11-20T00:00:00+07:00",
-  "pickupWindowEnd": "2026-11-25T00:00:00+07:00",
-  "deliveryDeadline": "2026-12-01T00:00:00+07:00",
+  "pickupWindowStart": "2026-11-25T00:00:00+07:00",
+  "pickupWindowEnd": "2026-11-30T00:00:00+07:00",
+  "deliveryDeadline": "2026-12-06T00:00:00+07:00",
   "horses": [
     {
       "stallClass": "Shared"
@@ -1607,10 +1609,12 @@ Response `200` — phần `data`:
   "distanceKm": 900,
   "estimatedHours": 35.9,
   "routeSummary": null,
-  "leadTimeDays": 21,
-  "earliestPickupDate": "2026-11-08",
-  "expressUntilDate": "2026-11-15",
-  "earliestDeliveryDeadline": "2026-11-20T10:18:00+00:00",
+  "leadTimeDays": 28,
+  "clearanceDays": 21,
+  "transitCountryCodes": [],
+  "earliestPickupDate": "2026-11-15",
+  "expressUntilDate": "2026-11-22",
+  "earliestDeliveryDeadline": "2026-11-26T10:18:00+00:00",
   "transit": {
     "drivingHours": 16.4,
     "restHours": 11.5,
@@ -1637,7 +1641,7 @@ Response `200` — phần `data`:
 | `isExpress` | `true` nếu có phụ phí gấp (xem đầu mục). Server tự xác định |
 | `distanceKm`, `routeSummary` | Quãng đường đường bộ và mô tả tuyến khi server tự tính |
 | `estimatedHours` | Tổng thời gian vận chuyển dự kiến (giờ), bằng `transit.totalHours` |
-| `leadTimeDays` | Số ngày cần từ hôm nay tới ngày pickup sớm nhất |
+| `leadTimeDays` | Số ngày cần từ hôm nay tới ngày pickup sớm nhất của tuyến này |
 | `earliestPickupDate` | Ngày pickup sớm nhất được chọn (dạng `yyyy-MM-dd`) |
 | `expressUntilDate` | Pickup trước ngày này thì có phụ phí gấp |
 | `earliestDeliveryDeadline` | Hạn giao sớm nhất được chọn, tính từ `pickupWindowStart` (hoặc từ `earliestPickupDate` khi chưa chọn ngày) |
@@ -1654,7 +1658,7 @@ Lỗi thường gặp:
 |---|---|---|
 | 400 | `No freight rate is configured ...` | Tuyến này chưa có trong bảng giá |
 | 400 | `Validation failed` | Thiếu trường, mã nước không phải 2 chữ cái, không có con ngựa nào |
-| 400 | `PickupWindowStart must be on or after 2026-11-08: a booking needs about 21 days ...` | Chọn ngày pickup quá gần |
+| 400 | `PickupWindowStart must be on or after 2026-11-15: a booking on this route needs about 28 days ...` | Chọn ngày pickup quá gần |
 | 400 | `PickupWindowEnd must be on or after PickupWindowStart.` | Ngày cuối khoảng trước ngày đầu |
 | 400 | `The pickup window cannot be longer than 30 days.` | Khoảng pickup quá dài |
 | 400 | `DeliveryDeadline must be on or after ...: this route is estimated to take up to 41.3 hours ...` | Hạn giao không đủ thời gian vận chuyển |
@@ -1685,6 +1689,7 @@ Các trường gửi lên:
 | `pickupWindowEnd` | ngày giờ | Có | Ngày cuối của khoảng đón; từ `pickupWindowStart` trở đi, khoảng dài tối đa 30 ngày |
 | `deliveryDeadline` | ngày giờ | Có | Hạn giao trễ nhất; không sớm hơn `earliestDeliveryDeadline` của xem giá |
 | `specialInstructions` | chuỗi | Không | Ghi chú cho công ty, tối đa 2000 ký tự |
+| `transitCountryCodes` | mảng chuỗi | Không | Nước đi qua theo thứ tự (khách gợi ý, Manager xác nhận khi duyệt bằng `PUT /api/bookings/{id}/transit-countries`). Quy tắc như ở xem giá |
 | `horses` | mảng | Có | Ít nhất 1 phần tử, xem bảng dưới |
 
 Mỗi phần tử của `horses`:
@@ -1703,9 +1708,10 @@ Ví dụ request:
   "pickupCountryCode": "VN",
   "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
   "dropoffCountryCode": "CN",
-  "pickupWindowStart": "2026-11-20T00:00:00+07:00",
-  "pickupWindowEnd": "2026-11-25T00:00:00+07:00",
-  "deliveryDeadline": "2026-12-01T00:00:00+07:00",
+  "transitCountryCodes": [],
+  "pickupWindowStart": "2026-11-25T00:00:00+07:00",
+  "pickupWindowEnd": "2026-11-30T00:00:00+07:00",
+  "deliveryDeadline": "2026-12-06T00:00:00+07:00",
   "transportMode": "Ground",
   "distanceKm": 900,
   "requiresClimateControl": true,
@@ -1737,9 +1743,10 @@ Response `201` — phần `data`:
   "pickupCountryCode": "VN",
   "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
   "dropoffCountryCode": "CN",
-  "pickupWindowStart": "2026-11-19T17:00:00+00:00",
-  "pickupWindowEnd": "2026-11-24T17:00:00+00:00",
-  "deliveryDeadline": "2026-11-30T17:00:00+00:00",
+  "transitCountryCodes": [],
+  "pickupWindowStart": "2026-11-24T17:00:00+00:00",
+  "pickupWindowEnd": "2026-11-29T17:00:00+00:00",
+  "deliveryDeadline": "2026-12-05T17:00:00+00:00",
   "transportMode": "Ground",
   "totalHorses": 2,
   "estimatedCost": 6788.48,
@@ -1835,9 +1842,10 @@ Response `200` — phần `data`:
     "pickupCountryCode": "VN",
     "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
     "dropoffCountryCode": "CN",
-    "pickupWindowStart": "2026-11-19T17:00:00+00:00",
-    "pickupWindowEnd": "2026-11-24T17:00:00+00:00",
-    "deliveryDeadline": "2026-11-30T17:00:00+00:00",
+    "transitCountryCodes": [],
+    "pickupWindowStart": "2026-11-24T17:00:00+00:00",
+    "pickupWindowEnd": "2026-11-29T17:00:00+00:00",
+    "deliveryDeadline": "2026-12-05T17:00:00+00:00",
     "transportMode": "Ground",
     "totalHorses": 2,
     "estimatedCost": 6788.48,
@@ -1855,6 +1863,7 @@ Response `200` — phần `data`:
 | `bookingId`, `bookingCode` | Mã đơn (số) và mã hiển thị (`BKG-2026-0002`) |
 | `customerUserId`, `customerName` | Khách đặt đơn |
 | `pickupAddress`, `dropoffAddress` | Điểm nhận và điểm giao |
+| `transitCountryCodes` | Nước quá cảnh theo thứ tự đi qua; mảng rỗng là đi thẳng |
 | `pickupWindowStart`, `pickupWindowEnd` | Khoảng ngày ngựa sẵn sàng được đón (giờ UTC). Ngày chạy thật xem ở `horses[].trips[].plannedStartDate` của chi tiết đơn |
 | `deliveryDeadline` | Hạn giao trễ nhất (giờ UTC) |
 | `totalHorses` | Số ngựa trong đơn |
@@ -1886,9 +1895,10 @@ Response `200` — phần `data`:
   "pickupCountryCode": "VN",
   "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
   "dropoffCountryCode": "CN",
-  "pickupWindowStart": "2026-11-19T17:00:00+00:00",
-  "pickupWindowEnd": "2026-11-24T17:00:00+00:00",
-  "deliveryDeadline": "2026-11-30T17:00:00+00:00",
+  "transitCountryCodes": [],
+  "pickupWindowStart": "2026-11-24T17:00:00+00:00",
+  "pickupWindowEnd": "2026-11-29T17:00:00+00:00",
+  "deliveryDeadline": "2026-12-05T17:00:00+00:00",
   "transportMode": "Ground",
   "totalHorses": 2,
   "estimatedCost": 6788.48,
@@ -2026,6 +2036,58 @@ Lỗi thường gặp:
 |---|---|---|
 | 400 | `Only a Submitted booking can be approved (current status: ...).` | Đơn không còn ở trạng thái chờ duyệt |
 | 400 | `User with ID 9 is not an active transport specialist.` | Người được chọn không phải chuyên viên, hoặc đã bị khóa |
+| 400 | `This booking can no longer be approved: its pickup window ends on ... on this route need about 26 days ...` | Duyệt quá muộn: khoảng pickup không còn đủ thời gian đặt cọc + làm hồ sơ của tuyến + xếp chuyến. Từ chối và nhờ khách đặt lại khoảng ngày muộn hơn |
+
+### PUT /api/bookings/{id}/transit-countries — Xác nhận / sửa nước quá cảnh
+
+Khi xét duyệt đơn, Manager xác nhận các nước ngựa sẽ đi qua (khách có thể đã gợi ý lúc gửi đơn). Ví dụ VN → Nga đường bộ thì phải đi qua Trung Quốc: gửi `["CN"]`. Danh sách mới **thay toàn bộ** danh sách cũ; gửi mảng rỗng nghĩa là đi thẳng.
+
+Sau khi đổi, server **tính lại báo giá** (phí quá cảnh, thời gian qua cửa khẩu, thời gian làm hồ sơ) và báo cho khách. Ngày "hôm nay" khi tính lại là ngày khách tạo đơn, nên khách không bị bắt đổi lịch chỉ vì đơn chờ duyệt vài ngày; nhưng nếu tuyến mới cần làm hồ sơ lâu hơn khiến khoảng pickup không còn hợp lệ thì server báo lỗi, khi đó Manager nên từ chối đơn.
+
+Hồ sơ kiểm dịch của đơn sẽ có thêm các giấy tờ hướng `Transit` của từng nước này (xem `GET /api/dossiers/{id}`).
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Khi nào gọi được:** đơn còn ở trạng thái `Submitted` (trước khi duyệt / từ chối)
+- **Dữ liệu gửi lên:** JSON
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã đơn |
+
+Các trường gửi lên:
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `transitCountryCodes` | mảng chuỗi | Có | Nước đi qua theo thứ tự, mã 2 chữ cái; tối đa 5 nước, không trùng nhau, không trùng nước đi / nước đến. `[]` = đi thẳng |
+
+Ví dụ request:
+
+```json
+{
+  "transitCountryCodes": ["CN"]
+}
+```
+
+Response `200`: `data` là chi tiết đơn (như `GET /api/bookings/{id}`) với `transitCountryCodes`, `estimatedCost`, `quoteLines`, `isExpress`, `estimatedTransitHours` đã cập nhật.
+
+Ví dụ JavaScript:
+
+```js
+await api.put(`/bookings/${bookingId}/transit-countries`, { transitCountryCodes: ['CN'] });
+```
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Transit countries can only be changed before the booking is reviewed (current status: Approved).` | Đơn đã được duyệt / từ chối |
+| 400 | `Transit countries cannot include the origin or the destination country.` | Có nước trùng nước đi / nước đến |
+| 400 | `The same transit country is listed more than once.` | Trùng nước |
+| 400 | `PickupWindowStart must be on or after ...` | Tuyến mới cần làm hồ sơ lâu hơn, khoảng pickup của khách không còn đủ |
+| 403 | `You do not have permission to perform this action.` | Người gọi không phải Manager / Admin |
+| 404 | `Booking with ID 99 was not found.` | Không có đơn |
 
 ### POST /api/bookings/{id}/reject — Từ chối đơn
 
@@ -2161,8 +2223,9 @@ Response `200` — phần `data`:
     "microchipNumber": "982000412345672",
     "pickupCountryCode": "VN",
     "dropoffCountryCode": "CN",
-    "pickupWindowStart": "2026-11-19T17:00:00+00:00",
-  "pickupWindowEnd": "2026-11-24T17:00:00+00:00",
+    "transitCountryCodes": [],
+    "pickupWindowStart": "2026-11-24T17:00:00+00:00",
+  "pickupWindowEnd": "2026-11-29T17:00:00+00:00",
     "specialistUserId": 2,
     "specialistName": "Nguyễn Thị Mai",
     "clearanceNumber": null,
@@ -2200,8 +2263,9 @@ Response `200` — phần `data`:
   "microchipNumber": "982000412345672",
   "pickupCountryCode": "VN",
   "dropoffCountryCode": "CN",
-  "pickupWindowStart": "2026-11-19T17:00:00+00:00",
-  "pickupWindowEnd": "2026-11-24T17:00:00+00:00",
+  "transitCountryCodes": [],
+  "pickupWindowStart": "2026-11-24T17:00:00+00:00",
+  "pickupWindowEnd": "2026-11-29T17:00:00+00:00",
   "specialistUserId": 2,
   "specialistName": "Nguyễn Thị Mai",
   "clearanceNumber": null,
@@ -2292,7 +2356,8 @@ Response `200` — phần `data`:
 | `checklist[].isMandatory` | Giấy bắt buộc hay không |
 | `checklist[].validityDays` | Giấy phải còn hiệu lực trong bao nhiêu ngày; `null` là không quy định |
 | `checklist[].regulationNote` | Ghi chú quy định, nên hiện cho khách đọc |
-| `checklist[].requiredBy` | Nước nào yêu cầu, ví dụ `CN Import` |
+| `checklist[].requiredBy` | Nước nào yêu cầu, theo thứ tự đường đi: `VN Export` (nước đi), `CN Transit` (nước quá cảnh), `RU Import` (nước đến) |
+| `transitCountryCodes` | Nước quá cảnh của đơn; mỗi nước có thể thêm giấy tờ hướng `Transit` vào checklist (ví dụ Giấy phép quá cảnh) |
 | `checklist[].state` | `Missing` (chưa nộp), `Pending` (chờ duyệt), `Approved`, `Rejected` |
 | `checklist[].latestDocument` | Giấy đã nộp cho dòng này; `null` nếu chưa nộp |
 | `latestDocument.documentId` | Mã giấy, dùng khi duyệt / từ chối |
@@ -2408,7 +2473,7 @@ Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
-| 400 | `'...' expires on 2026-11-01, before the end of the pickup window 2026-11-25. Reject it and ask for a valid document.` | Giấy hết hạn trước ngày cuối của khoảng pickup |
+| 400 | `'...' expires on 2026-11-01, before the end of the pickup window 2026-11-30. Reject it and ask for a valid document.` | Giấy hết hạn trước ngày cuối của khoảng pickup |
 | 400 | `Only a pending document can be reviewed (current status: Approved).` | Giấy đã được xử lý rồi |
 
 ### POST /api/documents/{id}/reject — Từ chối một giấy tờ
@@ -2585,9 +2650,10 @@ Response `200` — phần `data`:
     "pickupCountryCode": "VN",
     "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
     "dropoffCountryCode": "CN",
-    "pickupWindowStart": "2026-11-19T17:00:00+00:00",
-    "pickupWindowEnd": "2026-11-24T17:00:00+00:00",
-    "deliveryDeadline": "2026-11-30T17:00:00+00:00",
+    "transitCountryCodes": [],
+    "pickupWindowStart": "2026-11-24T17:00:00+00:00",
+    "pickupWindowEnd": "2026-11-29T17:00:00+00:00",
+    "deliveryDeadline": "2026-12-05T17:00:00+00:00",
     "requiresClimateControl": true,
     "horseId": 1,
     "horseName": "Red Flash (Tia Chớp Đỏ)",
@@ -2599,7 +2665,7 @@ Response `200` — phần `data`:
 ]
 ```
 
-`bookingHorseId` là giá trị cần gửi khi xếp ngựa vào chuyến. `dossierStatus` cho biết hồ sơ của con ngựa đã xong chưa: vẫn xếp chuyến được khi hồ sơ chưa `Cleared`, nhưng chuyến sẽ không xuất phát được cho tới khi mọi hồ sơ `Cleared`.
+`bookingHorseId` là giá trị cần gửi khi xếp ngựa vào chuyến. `pickupWindowStart` → `pickupWindowEnd` và `deliveryDeadline` là lịch của đơn: chuyến phải khởi hành trong khoảng pickup và kết thúc trước hạn giao của mọi đơn trên chuyến. `transitCountryCodes` là các nước ngựa đi qua: mỗi nước nên có mốc cửa khẩu (`BorderGate`) trên lộ trình. `dossierStatus` cho biết hồ sơ của con ngựa đã xong chưa: vẫn xếp chuyến được khi hồ sơ chưa `Cleared`, nhưng chuyến sẽ không xuất phát được cho tới khi mọi hồ sơ `Cleared`.
 
 ### GET /api/trips/available-vehicles — Xe còn rảnh
 
@@ -3551,9 +3617,9 @@ Response `200` — phần `data`:
   "status": "Approved",
   "pickupAddress": "Trang trại Yên Bài, Ba Vì, Hà Nội",
   "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
-  "pickupWindowStart": "2026-11-19T17:00:00+00:00",
-  "pickupWindowEnd": "2026-11-24T17:00:00+00:00",
-  "deliveryDeadline": "2026-11-30T17:00:00+00:00",
+  "pickupWindowStart": "2026-11-24T17:00:00+00:00",
+  "pickupWindowEnd": "2026-11-29T17:00:00+00:00",
+  "deliveryDeadline": "2026-12-05T17:00:00+00:00",
   "trips": [
     {
       "tripId": 3,
@@ -4952,9 +5018,11 @@ Lỗi thường gặp:
 
 ## 16. Quy định giấy tờ theo quốc gia
 
-Bảng quy định "nước nào, chiều nào, cần những giấy gì". Backend dựa vào bảng này để lập **checklist giấy tờ** của hồ sơ kiểm dịch (mục 8): lấy các giấy **xuất khẩu** (`Export`) của nước đi cộng các giấy **nhập khẩu** (`Import`) của nước đến. Loại giấy mà cả hai nước cùng yêu cầu chỉ hiện một dòng, lấy thời hạn ngắn hơn.
+Bảng quy định "nước nào, chiều nào, cần những giấy gì". Backend dựa vào bảng này để lập **checklist giấy tờ** của hồ sơ kiểm dịch (mục 8): lấy các giấy **xuất khẩu** (`Export`) của nước đi, cộng các giấy **quá cảnh** (`Transit`) của từng nước ngựa đi qua (`transitCountryCodes` của đơn), cộng các giấy **nhập khẩu** (`Import`) của nước đến. Loại giấy mà nhiều nước cùng yêu cầu chỉ hiện một dòng, lấy thời hạn ngắn hơn.
 
-Ví dụ: đơn đi từ Việt Nam sang Thái Lan sẽ cần các giấy `VN` + `Export` và các giấy `TH` + `Import`.
+Ví dụ: đơn đi từ Việt Nam sang Thái Lan sẽ cần các giấy `VN` + `Export` và các giấy `TH` + `Import`. Đơn đường bộ Việt Nam → Nga đi qua Trung Quốc cần thêm các giấy `CN` + `Transit` (giấy phép quá cảnh, chứng nhận sức khỏe còn hạn khi vào cửa khẩu).
+
+Bảng này còn quyết định **ngày pickup sớm nhất** của đơn: `processingDays` là số ngày cần để có giấy đó (xin giấy phép, xét nghiệm, cách ly trước xuất). Thời gian làm hồ sơ của một tuyến = `processingDays` **lớn nhất** trong các quy định Export + Transit + Import của tuyến (các giấy làm song song nên không cộng dồn); tuyến chưa có số liệu thì dùng 14 ngày.
 
 > Checklist được tính lại **mỗi lần xem hồ sơ**, nên sửa bảng này là checklist của mọi hồ sơ (kể cả hồ sơ đang làm) đổi theo ngay. Nếu cặp nước của đơn chưa có quy định nào, checklist dùng các loại giấy có `isMandatory: true` trong danh mục loại giấy tờ (mục 13).
 
@@ -4972,6 +5040,7 @@ Một quy định có dạng:
   "docTypeCode": "COGGINS_EIA",
   "docTypeName": "Xét nghiệm thiếu máu truyền nhiễm (EIA/Coggins)",
   "validityDays": 30,
+  "processingDays": 7,
   "isMandatory": true,
   "regulationNote": "Xét nghiệm EIA âm tính trong 30 ngày"
 }
@@ -4981,9 +5050,10 @@ Một quy định có dạng:
 |---|---|
 | `requirementId` | Mã quy định |
 | `countryCode` | Mã nước 2 chữ cái in hoa theo chuẩn ISO (`VN`, `TH`, `JP`...) |
-| `direction` | `Export` giấy cần khi **rời** nước này · `Import` giấy cần khi **vào** nước này |
+| `direction` | `Export` giấy cần khi **rời** nước này · `Import` giấy cần khi **vào** nước này · `Transit` giấy cần khi chỉ **đi qua** nước này |
 | `docTypeId`, `docTypeCode`, `docTypeName` | Loại giấy tờ (lấy từ danh mục ở mục 13) |
 | `validityDays` | Giấy chỉ có giá trị trong bao nhiêu ngày; `null` là không giới hạn |
+| `processingDays` | Số ngày cần để có giấy (xin phép, xét nghiệm, cách ly); dùng tính ngày pickup sớm nhất của tuyến. `null` là không tính |
 | `isMandatory` | `true` bắt buộc, `false` khuyến nghị |
 | `regulationNote` | Ghi chú quy định, hiện cho khách đọc; có thể `null` |
 
@@ -4998,7 +5068,7 @@ Tham số query (gắn sau dấu `?`):
 | Tham số | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
 | `countryCode` | chuỗi | Không | Lọc theo nước, đúng 2 chữ cái (gõ thường cũng được) |
-| `direction` | chuỗi | Không | `Export` hoặc `Import` |
+| `direction` | chuỗi | Không | `Export`, `Import` hoặc `Transit` |
 | `page` | số | Không | Trang, bắt đầu từ 1 (mặc định 1) |
 | `size` | số | Không | Số dòng mỗi trang, 1–100 (mặc định 10) |
 
@@ -5051,7 +5121,7 @@ Lỗi thường gặp:
 | HTTP | `message` / `errors` | Khi nào |
 |---|---|---|
 | 400 | `CountryCode must contain exactly two letters.` | `countryCode` không phải đúng 2 chữ cái (ví dụ `VNM`) |
-| 400 | `Direction 'Inbound' is invalid. Allowed values: Export, Import.` | `direction` sai giá trị |
+| 400 | `Direction 'Inbound' is invalid. Allowed values: Export, Import, Transit.` | `direction` sai giá trị |
 
 Ví dụ hiện cho khách "sang Thái Lan cần chuẩn bị gì":
 
@@ -5090,9 +5160,10 @@ Các trường gửi lên:
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
 | `countryCode` | chuỗi | Có | Đúng 2 chữ cái; server tự đổi sang in hoa |
-| `direction` | chuỗi | Có | `Export` hoặc `Import` |
+| `direction` | chuỗi | Có | `Export`, `Import` hoặc `Transit` |
 | `docTypeId` | số | Có | Mã loại giấy, lấy từ `GET /api/document-types/lookup` |
 | `validityDays` | số | Không | Số ngày giấy còn hiệu lực, lớn hơn 0; bỏ trống là không giới hạn |
+| `processingDays` | số | Không | Số ngày cần để có giấy, 0–365; bỏ trống là không tính vào thời gian làm hồ sơ |
 | `isMandatory` | true / false | Không | Mặc định `true` |
 | `regulationNote` | chuỗi | Không | Ghi chú, tối đa 255 ký tự |
 
@@ -5136,7 +5207,7 @@ Lỗi thường gặp:
 |---|---|---|
 | 400 | `A document requirement for SG, Import, document type ID 2 already exists.` | Nước + chiều + loại giấy này đã có quy định; hãy sửa dòng cũ |
 | 400 | `Document type with ID 999 does not exist.` | `docTypeId` không có trong danh mục |
-| 400 | `Direction 'Inbound' is invalid. Allowed values: Export, Import.` | `direction` sai giá trị |
+| 400 | `Direction 'Inbound' is invalid. Allowed values: Export, Import, Transit.` | `direction` sai giá trị |
 | 400 | `CountryCode must contain exactly two letters.` | Mã nước sai |
 | 403 | `You do not have permission to perform this action.` | Người gọi không phải TransportSpecialist / Admin |
 

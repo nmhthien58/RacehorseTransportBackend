@@ -22,6 +22,13 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? DropoffCity { get; set; }
         public string? DropoffAddress { get; set; }
 
+        // Nước quá cảnh theo thứ tự (R-03); để trống với đường bay thẳng
+        public List<string> TransitCountryCodes { get; set; } = new();
+
+        // Mốc tính "hôm nay" cho thời gian đặt trước tối thiểu. Để trống = bây giờ.
+        // Tính lại giá cho đơn đã gửi thì truyền ngày tạo đơn, để không bắt khách đổi lịch vì Manager xử lý chậm.
+        public DateTimeOffset? QuotedAt { get; set; }
+
         // Hạng chuồng của từng con ngựa trong đơn (mỗi phần tử một con)
         public List<string> StallClasses { get; set; } = new();
     }
@@ -53,6 +60,8 @@ namespace RacehorseTransport.Services.BusinessModels
         // Lịch: ngày pickup sớm nhất được chọn, pickup trước ngày ExpressUntilDate thì tính phụ phí Express,
         // hạn giao sớm nhất khả thi tính từ ngày pickup đầu khoảng (hoặc từ ngày sớm nhất khi chưa chọn ngày)
         public int LeadTimeDays { get; set; }
+        public int ClearanceDays { get; set; } // phần làm hồ sơ của tuyến trong LeadTimeDays
+        public List<string> TransitCountryCodes { get; set; } = new(); // đã chuẩn hóa
         public DateOnly EarliestPickupDate { get; set; }
         public DateOnly ExpressUntilDate { get; set; }
         public DateTimeOffset EarliestDeliveryDeadline { get; set; }

@@ -27,6 +27,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public bool RequiresClimateControl { get; set; }
         public decimal? DeclaredValue { get; set; }
         public string? SpecialInstructions { get; set; }
+
+        // Nước quá cảnh khách gợi ý (Manager xác nhận / sửa khi duyệt)
+        public List<string> TransitCountryCodes { get; set; } = new();
         public List<CreateBookingHorseModel> Horses { get; set; } = new();
     }
 
@@ -48,6 +51,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public string PickupCountryCode { get; set; } = string.Empty;
         public string DropoffAddress { get; set; } = string.Empty;
         public string DropoffCountryCode { get; set; } = string.Empty;
+        public List<string> TransitCountryCodes { get; set; } = new(); // theo thứ tự đi qua
         public DateTimeOffset PickupWindowStart { get; set; }
         public DateTimeOffset PickupWindowEnd { get; set; }
         public DateTimeOffset DeliveryDeadline { get; set; }

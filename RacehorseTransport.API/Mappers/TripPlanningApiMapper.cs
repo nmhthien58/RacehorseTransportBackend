@@ -57,6 +57,7 @@ namespace RacehorseTransport.API.Mappers
                 PickupCountryCode = model.PickupCountryCode,
                 DropoffAddress = model.DropoffAddress,
                 DropoffCountryCode = model.DropoffCountryCode,
+                TransitCountryCodes = model.TransitCountryCodes,
                 PickupWindowStart = model.PickupWindowStart,
                 PickupWindowEnd = model.PickupWindowEnd,
                 DeliveryDeadline = model.DeliveryDeadline,

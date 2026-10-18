@@ -11,6 +11,7 @@ namespace RacehorseTransport.API.ResponseModels
         public string PickupCountryCode { get; set; } = string.Empty;
         public string DropoffAddress { get; set; } = string.Empty;
         public string DropoffCountryCode { get; set; } = string.Empty;
+        public List<string> TransitCountryCodes { get; set; } = new();
         public DateTimeOffset PickupWindowStart { get; set; }
         public DateTimeOffset PickupWindowEnd { get; set; }
         public DateTimeOffset DeliveryDeadline { get; set; }

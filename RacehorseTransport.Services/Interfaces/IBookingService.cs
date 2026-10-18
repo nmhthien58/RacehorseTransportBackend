@@ -11,6 +11,7 @@ namespace RacehorseTransport.Services.Interfaces
         Task<BookingDetailModel> CreateBookingAsync(CreateBookingModel model, CurrentUser currentUser);
         Task<BookingDetailModel> ApproveBookingAsync(int id, int specialistUserId, CurrentUser currentUser);
         Task<BookingDetailModel> RejectBookingAsync(int id, string reason, CurrentUser currentUser);
+        Task<BookingDetailModel> UpdateTransitCountriesAsync(int id, List<string> transitCountryCodes, CurrentUser currentUser);
         Task<BookingDetailModel> ReassignSpecialistAsync(int id, int specialistUserId, CurrentUser currentUser);
         Task<BookingDetailModel> CancelBookingAsync(int id, CurrentUser currentUser);
 
