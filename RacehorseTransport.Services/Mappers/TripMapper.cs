@@ -46,7 +46,12 @@ namespace RacehorseTransport.Services.Mappers
                 CreatedAt = entity.CreatedAt,
                 Horses = entity.TripHorses
                     .OrderBy(th => th.StallSlotNumber)
-                    .Select(th => th.ToBusinessModel())
+                    .Select(th =>
+                    {
+                        var horse = th.ToBusinessModel();
+                        horse.EscortName = entity.Crew.FirstOrDefault(c => c.UserId == th.EscortUserId)?.User?.FullName;
+                        return horse;
+                    })
                     .ToList(),
                 // Mốc đang hiệu lực đứng trước mốc đã bị thay thế có cùng thứ tự
                 Checkpoints = entity.Checkpoints
@@ -118,6 +123,7 @@ namespace RacehorseTransport.Services.Mappers
                 PhotoUrl = horse?.PhotoUrl,
                 StallClass = bookingHorse?.StallClass ?? string.Empty,
                 DossierStatus = bookingHorse?.Dossier?.Status,
+                EscortUserId = entity.EscortUserId,
                 Status = entity.Status,
                 PickedUpAt = entity.PickedUpAt,
                 DeliveredAt = entity.DeliveredAt,
@@ -168,7 +174,10 @@ namespace RacehorseTransport.Services.Mappers
                     PhoneNumber = c.User?.PhoneNumber,
                     CrewRole = c.CrewRole,
                     IsLead = c.IsLead,
-                    Duty = c.Duty
+                    Duty = c.Duty,
+                    AssignedHorseCount = c.CrewRole == CrewRoles.Escort
+                        ? entity.TripHorses.Count(th => th.EscortUserId == c.UserId && TripHorseStatuses.Holding.Contains(th.Status))
+                        : null
                 })
                 .ToList();
         }

@@ -238,6 +238,11 @@ Không task nào của Tú chặn việc của Thiên. Chiều ngược lại:
 24. **e-POD giữa đường:** ký ở điểm trả của đơn (xe đang `Arrived` ở mốc đó); chưa ký thì xe không rời `DropOff`. Đơn giao hết ngựa thì `Completed` ngay. Chi phí phát sinh chốt khi đóng chuyến và chỉ chia cho đơn còn ngựa trên xe lúc báo sự cố; đơn đã `Completed` mà có phát sinh thì sang `AwaitingFinalPayment`.
 25. **Riêng tư khi đi chung chuyến:** khách chỉ thấy ngựa của mình; điểm đón / trả của khách khác bị ẩn tên và địa chỉ trên màn theo dõi.
 
+**Áp tải theo chuồng (R-06, Thiên, 19/10/2026)**
+
+26. **Mỗi con ngựa có một người áp tải phụ trách** (`trip_horses.escort_user_id`), phải là `Escort` trong đoàn của chính chuyến, mỗi người tối đa 3 con (`EscortAssignmentRules`). Điều phối chọn trên sơ đồ chuồng; con nào để trống thì tự phân theo ô chuồng (ô 1–3 cho người đầu tiên, trưởng nhóm áp tải trước). Chuyến lập trước R-06 được tự phân khi trình / duyệt.
+27. **Nhật ký thể trạng:** chỉ người áp tải phụ trách con ngựa, trưởng nhóm áp tải hoặc Admin ghi được; lái xe không phải áp tải thì không ghi. Màn của áp tải mặc định chỉ hiện ngựa mình phụ trách.
+
 ---
 
 ## Phụ lục: công thức nghiệp vụ (chuyển từ stored procedure của bản SQL Server)

@@ -301,6 +301,7 @@ CREATE TABLE fleet.trip_horses (
     booking_horse_id   integer NOT NULL REFERENCES booking.booking_horses (booking_horse_id),
     stall_slot_number  integer NOT NULL,
     notes              varchar(200),
+    escort_user_id     integer REFERENCES identity.users (user_id), -- Escort phụ trách con này (R-06), tối đa 3 con / escort
     -- Trạng thái riêng của từng con trên chuyến (R-05); trạng thái chuyến là trạng thái của xe
     status             varchar(20) NOT NULL DEFAULT 'Planned'
         CONSTRAINT ck_trip_horses_status CHECK (status IN ('Planned', 'InTransit', 'Delivered', 'Offloaded', 'Cancelled')),

@@ -65,6 +65,8 @@ namespace RacehorseTransport.API.Mappers
                     PhotoUrl = h.PhotoUrl,
                     StallClass = h.StallClass,
                     DossierStatus = h.DossierStatus,
+                    EscortUserId = h.EscortUserId,
+                    EscortName = h.EscortName,
                     Status = h.Status,
                     PickedUpAt = h.PickedUpAt,
                     DeliveredAt = h.DeliveredAt,
@@ -130,7 +132,8 @@ namespace RacehorseTransport.API.Mappers
                 PhoneNumber = c.PhoneNumber,
                 CrewRole = c.CrewRole,
                 IsLead = c.IsLead,
-                Duty = c.Duty
+                Duty = c.Duty,
+                AssignedHorseCount = c.AssignedHorseCount
             }).ToList();
         }
     }

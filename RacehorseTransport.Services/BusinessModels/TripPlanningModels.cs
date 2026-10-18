@@ -52,6 +52,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public int BookingHorseId { get; set; }
         public int StallSlotNumber { get; set; }
         public string? Notes { get; set; }
+
+        // Escort phụ trách (R-06): UserId của một Escort trong Crew; bỏ trống = tự phân theo ô chuồng
+        public int? EscortUserId { get; set; }
     }
 
     public class CheckpointInputModel
