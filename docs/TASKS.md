@@ -243,6 +243,10 @@ Không task nào của Tú chặn việc của Thiên. Chiều ngược lại:
 26. **Mỗi con ngựa có một người áp tải phụ trách** (`trip_horses.escort_user_id`), phải là `Escort` trong đoàn của chính chuyến, mỗi người tối đa 3 con (`EscortAssignmentRules`). Điều phối chọn trên sơ đồ chuồng; con nào để trống thì tự phân theo ô chuồng (ô 1–3 cho người đầu tiên, trưởng nhóm áp tải trước). Chuyến lập trước R-06 được tự phân khi trình / duyệt.
 27. **Nhật ký thể trạng:** chỉ người áp tải phụ trách con ngựa, trưởng nhóm áp tải hoặc Admin ghi được; lái xe không phải áp tải thì không ghi. Màn của áp tải mặc định chỉ hiện ngựa mình phụ trách.
 
+**Màn đơn hợp nhất cho khách (R-07, Thiên, 19/10/2026)**
+
+28. **Khách theo dõi theo đơn, không theo chuyến:** `customerStage` (suy ra, không lưu DB, `CustomerStageRules`) = `PendingReview → AwaitingDeposit → PreparingDossier → AwaitingTrip → Scheduled / AwaitingPayment → InTransit → AwaitingHandover → Completed`, nhánh `Closed`. `GET /api/bookings?stage=` lọc theo giai đoạn. Màn "Đơn vận chuyển" của khách có tab theo giai đoạn; chi tiết đơn có timeline dọc và tab "Hành trình" (lộ trình, sự cố, nhật ký chỉ ngựa của khách) thay cho menu "Theo dõi chuyến" riêng. Nhân sự vẫn dùng màn chuyến.
+
 ---
 
 ## Phụ lục: công thức nghiệp vụ (chuyển từ stored procedure của bản SQL Server)

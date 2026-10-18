@@ -126,8 +126,57 @@ namespace RacehorseTransport.Services.Implementations
             // Sorting: mặc định đơn mới nhất lên đầu
             query = query.ApplySort(string.IsNullOrWhiteSpace(options.Sort) ? "-createdAt" : options.Sort, nameof(BookingRequest.BookingId));
 
-            // Paging
-            return await query.ToPagedResultAsync(options, b => b.ToSummaryModel());
+            PagedBusinessResult<BookingSummaryModel> result;
+            if (string.IsNullOrWhiteSpace(options.Stage))
+            {
+                result = await query.ToPagedResultAsync(options, b => b.ToSummaryModel());
+                var stages = await ResolveStagesAsync(result.Items.Select(b => b.BookingId).ToList());
+                result.Items.ForEach(b => b.CustomerStage = stages[b.BookingId]);
+                return result;
+            }
+
+            // Giai đoạn không phải cột DB: tính cho mọi đơn khớp bộ lọc rồi mới lọc và cắt trang
+            if (!CustomerStages.All.Contains(options.Stage))
+            {
+                throw new BusinessException($"Stage '{options.Stage}' is invalid. Allowed values: {string.Join(", ", CustomerStages.All)}.");
+            }
+            var all = (await query.ToListAsync()).Select(b => b.ToSummaryModel()).ToList();
+            var allStages = await ResolveStagesAsync(all.Select(b => b.BookingId).ToList());
+            all.ForEach(b => b.CustomerStage = allStages[b.BookingId]);
+            var matched = all.Where(b => b.CustomerStage == options.Stage).ToList();
+
+            int page = options.Page > 0 ? options.Page : 1;
+            int size = options.Size > 0 ? Math.Min(options.Size, BusinessQueryOptions.MaxSize) : 10;
+            return new PagedBusinessResult<BookingSummaryModel>
+            {
+                Items = matched.Skip((page - 1) * size).Take(size).ToList(),
+                Page = page,
+                PageSize = size,
+                TotalItems = matched.Count
+            };
+        }
+
+        // Giai đoạn theo góc nhìn khách của các đơn (R-07), xem CustomerStageRules
+        private async Task<Dictionary<int, string>> ResolveStagesAsync(List<int> bookingIds)
+        {
+            if (bookingIds.Count == 0)
+            {
+                return new Dictionary<int, string>();
+            }
+
+            var bookings = await _bookingRepo.GetQueryable()
+                .AsNoTracking()
+                .AsSplitQuery()
+                .Include(b => b.BookingHorses).ThenInclude(bh => bh.Dossier)
+                .Include(b => b.BookingHorses).ThenInclude(bh => bh.TripHorses).ThenInclude(th => th.Trip!).ThenInclude(t => t.Checkpoints)
+                .Include(b => b.Payments)
+                .Where(b => bookingIds.Contains(b.BookingId))
+                .ToListAsync();
+
+            var settings = await _settingService.GetPaymentSettingsAsync();
+            return bookings.ToDictionary(
+                b => b.BookingId,
+                b => CustomerStageRules.Resolve(b, _paymentService.BuildSummary(b, settings)));
         }
 
         public async Task<BookingDetailModel> GetBookingByIdAsync(int id, CurrentUser currentUser)
@@ -141,7 +190,7 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(b => b.TransitCountries)
                 .Include(b => b.BookingHorses).ThenInclude(bh => bh.Horse)
                 .Include(b => b.BookingHorses).ThenInclude(bh => bh.Dossier)
-                .Include(b => b.BookingHorses).ThenInclude(bh => bh.TripHorses).ThenInclude(th => th.Trip)
+                .Include(b => b.BookingHorses).ThenInclude(bh => bh.TripHorses).ThenInclude(th => th.Trip!).ThenInclude(t => t.Checkpoints)
                 .Include(b => b.Payments).ThenInclude(p => p.CreatedBy)
                 .FirstOrDefaultAsync(b => b.BookingId == id);
 
@@ -157,6 +206,7 @@ namespace RacehorseTransport.Services.Implementations
 
             var model = booking.ToDetailModel(_pricingService.ParseLines(booking.QuoteBreakdown));
             model.Payment = _paymentService.BuildSummary(booking, await _settingService.GetPaymentSettingsAsync());
+            model.CustomerStage = CustomerStageRules.Resolve(booking, model.Payment);
             return model;
         }
 

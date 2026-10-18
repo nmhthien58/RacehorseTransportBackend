@@ -8,6 +8,11 @@ namespace RacehorseTransport.API.RequestModels
         [FromQuery(Name = "status")]
         public string? Status { get; set; }
 
+        // Giai đoạn theo góc nhìn khách (R-07): PendingReview, AwaitingDeposit, PreparingDossier, AwaitingTrip,
+        // Scheduled, AwaitingPayment, InTransit, AwaitingHandover, Completed, Closed
+        [FromQuery(Name = "stage")]
+        public string? Stage { get; set; }
+
         // Chỉ có tác dụng với nhân sự
         [FromQuery(Name = "customerUserId")]
         public int? CustomerUserId { get; set; }

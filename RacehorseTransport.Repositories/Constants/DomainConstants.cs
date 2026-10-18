@@ -82,6 +82,26 @@ namespace RacehorseTransport.Repositories.Constants
         public static readonly string[] All = { VnPay, Mock, Manual };
     }
 
+    // Giai đoạn của đơn theo góc nhìn khách (R-07), suy ra từ đơn + thanh toán + hồ sơ + ngựa trên chuyến, không lưu DB
+    public static class CustomerStages
+    {
+        public const string PendingReview = "PendingReview";       // chờ duyệt
+        public const string AwaitingDeposit = "AwaitingDeposit";   // chờ đặt cọc
+        public const string PreparingDossier = "PreparingDossier"; // đang làm hồ sơ kiểm dịch
+        public const string AwaitingTrip = "AwaitingTrip";         // hồ sơ xong, chờ xếp chuyến
+        public const string Scheduled = "Scheduled";               // đã xếp chuyến (đã duyệt), chờ ngày chạy
+        public const string AwaitingPayment = "AwaitingPayment";   // chờ trả phần còn lại trước khi chạy / chi phí phát sinh
+        public const string InTransit = "InTransit";               // ngựa đang trên xe
+        public const string AwaitingHandover = "AwaitingHandover"; // xe đã tới điểm trả, chờ ký nhận
+        public const string Completed = "Completed";
+        public const string Closed = "Closed";                     // bị từ chối / hủy / quá hạn
+
+        public static readonly string[] All =
+        {
+            PendingReview, AwaitingDeposit, PreparingDossier, AwaitingTrip, Scheduled, AwaitingPayment, InTransit, AwaitingHandover, Completed, Closed
+        };
+    }
+
     public static class BookingHorseStatuses
     {
         public const string Pending = "Pending";
