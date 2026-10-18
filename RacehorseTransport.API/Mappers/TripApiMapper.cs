@@ -32,6 +32,7 @@ namespace RacehorseTransport.API.Mappers
             var response = new TripDetailResponse
             {
                 VehicleCapacity = model.VehicleCapacity,
+                LiveDelayMinutes = model.LiveDelayMinutes,
                 PlannedCost = model.PlannedCost,
                 ActualCost = model.ActualCost,
                 PlannedByUserId = model.PlannedByUserId,
@@ -87,7 +88,8 @@ namespace RacehorseTransport.API.Mappers
                     Status = c.Status,
                     IsActive = c.IsActive,
                     BookingId = c.BookingId,
-                    BookingCode = c.BookingCode
+                    BookingCode = c.BookingCode,
+                    EstimatedArrivalTime = c.EstimatedArrivalTime
                 }).ToList(),
                 Bookings = model.Bookings.Select(b => new TripBookingResponse
                 {
@@ -102,6 +104,7 @@ namespace RacehorseTransport.API.Mappers
                     PickupCheckpointId = b.PickupCheckpointId,
                     DropoffCheckpointId = b.DropoffCheckpointId,
                     EstimatedDeliveryAt = b.EstimatedDeliveryAt,
+                    LiveEstimatedDeliveryAt = b.LiveEstimatedDeliveryAt,
                     DeliveryDeadline = b.DeliveryDeadline,
                     DeliveredHorseCount = b.DeliveredHorseCount,
                     OffloadedHorseCount = b.OffloadedHorseCount

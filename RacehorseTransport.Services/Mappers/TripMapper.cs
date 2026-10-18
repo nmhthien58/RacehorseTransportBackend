@@ -1,6 +1,7 @@
 using RacehorseTransport.Repositories.Constants;
 using RacehorseTransport.Repositories.Entities;
 using RacehorseTransport.Services.BusinessModels;
+using RacehorseTransport.Services.Implementations;
 
 namespace RacehorseTransport.Services.Mappers
 {
@@ -19,6 +20,7 @@ namespace RacehorseTransport.Services.Mappers
         public static TripDetailModel ToDetailModel(this Trip entity)
         {
             var activeRoute = entity.Checkpoints.Where(c => c.IsActive).OrderBy(c => c.SequenceOrder).ToList();
+            var eta = LiveEtaCalculator.Calculate(activeRoute, entity.OverallStatus, DateTimeOffset.UtcNow);
             var bookingCodes = entity.TripHorses
                 .Where(th => th.BookingHorse?.Booking != null)
                 .Select(th => th.BookingHorse!.Booking!)
@@ -28,6 +30,7 @@ namespace RacehorseTransport.Services.Mappers
             var model = new TripDetailModel
             {
                 VehicleCapacity = entity.Vehicle?.CapacityHorses,
+                LiveDelayMinutes = eta.DelayMinutes,
                 PlannedCost = entity.PlannedCost,
                 ActualCost = entity.ActualCost,
                 PlannedByUserId = entity.PlannedByUserId,
@@ -62,6 +65,7 @@ namespace RacehorseTransport.Services.Mappers
                     {
                         var checkpoint = c.ToBusinessModel();
                         checkpoint.BookingCode = c.BookingId.HasValue && bookingCodes.TryGetValue(c.BookingId.Value, out var code) ? code : null;
+                        checkpoint.EstimatedArrivalTime = eta.EstimatedArrivals.TryGetValue(c.CheckpointId, out var at) ? at : null;
                         return checkpoint;
                     })
                     .ToList(),
@@ -80,6 +84,7 @@ namespace RacehorseTransport.Services.Mappers
                             PickupCheckpointId = pickup?.CheckpointId,
                             DropoffCheckpointId = dropoff?.CheckpointId,
                             EstimatedDeliveryAt = dropoff?.PlannedTime,
+                            LiveEstimatedDeliveryAt = dropoff == null ? null : eta.EstimatedArrivals[dropoff.CheckpointId],
                             DeliveryDeadline = booking.DeliveryDeadline,
                             DeliveredHorseCount = g.Count(th => th.Status == TripHorseStatuses.Delivered),
                             OffloadedHorseCount = g.Count(th => th.Status == TripHorseStatuses.Offloaded),

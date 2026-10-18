@@ -19,6 +19,7 @@ namespace RacehorseTransport.API.ResponseModels
     public class TripDetailResponse : TripSummaryResponse
     {
         public int? VehicleCapacity { get; set; }
+        public int LiveDelayMinutes { get; set; }
         public decimal PlannedCost { get; set; }
         public decimal ActualCost { get; set; }
         public int? PlannedByUserId { get; set; }
@@ -92,6 +93,7 @@ namespace RacehorseTransport.API.ResponseModels
         public bool IsActive { get; set; }
         public int? BookingId { get; set; }
         public string? BookingCode { get; set; }
+        public DateTimeOffset? EstimatedArrivalTime { get; set; }
     }
 
     public class TripBookingResponse
@@ -107,6 +109,7 @@ namespace RacehorseTransport.API.ResponseModels
         public int? PickupCheckpointId { get; set; }
         public int? DropoffCheckpointId { get; set; }
         public DateTimeOffset? EstimatedDeliveryAt { get; set; }
+        public DateTimeOffset? LiveEstimatedDeliveryAt { get; set; }
         public DateTimeOffset DeliveryDeadline { get; set; }
         public int DeliveredHorseCount { get; set; }
         public int OffloadedHorseCount { get; set; }

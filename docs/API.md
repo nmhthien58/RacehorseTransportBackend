@@ -3569,6 +3569,9 @@ Response `200` — phần `data`:
 | `horses[].pickedUpAt`, `deliveredAt` | Lúc xe rời điểm đón của con ngựa, lúc ký bàn giao |
 | `horses[].offloadedAt`, `offloadReason` | Lúc và lý do con ngựa rớt lại giữa đường |
 | `checkpoints[].bookingId`, `bookingCode` | Với mốc `PickUp` / `DropOff`: đơn được đón / trả ở đây; `null` với mốc khác |
+| `checkpoints[].estimatedArrivalTime` | Mốc đã tới: giờ tới thực tế. Mốc chưa tới: giờ kế hoạch cộng độ trễ hiện tại (cách tính xem "Giờ dự kiến theo check-in" ở `GET /api/tracking/trips`). `null` với mốc đã bị bỏ khi nắn tuyến |
+| `liveDelayMinutes` | Số phút chuyến đang trễ theo check-in thực tế (0 là đúng giờ). Khác `delayMinutes` là kết quả chốt khi đóng chuyến |
+| `bookings[].liveEstimatedDeliveryAt` | Giờ dự kiến tới mốc trả của đơn, cập nhật theo check-in thực tế |
 | `checkpoints[]` | Các mốc, đã sắp theo thứ tự đi |
 | `checkpoints[].sequenceOrder` | Thứ tự |
 | `checkpoints[].plannedTime`, `actualArrivalTime`, `actualDepartureTime` | Giờ dự kiến và giờ thực tế |
