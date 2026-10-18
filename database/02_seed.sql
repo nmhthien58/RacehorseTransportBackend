@@ -315,9 +315,10 @@ INSERT INTO fleet.trip_crew (trip_id, user_id, crew_role, is_lead) VALUES
 (1, 4, 'Driver', true),
 (1, 4, 'Escort', true);
 
-INSERT INTO fleet.trip_horses (trip_horse_id, trip_id, booking_horse_id, stall_slot_number, notes, status, picked_up_at) VALUES
-(1, 1, 1, 1, 'Red Flash - Chuồng số 1',      'InTransit', '2026-10-01 06:30:00+07'),
-(2, 1, 2, 2, 'Golden Pegasus - Chuồng số 2', 'InTransit', '2026-10-01 06:30:00+07');
+-- Phạm Văn Đức vừa lái chính vừa là escort phụ trách cả 2 con (R-06)
+INSERT INTO fleet.trip_horses (trip_horse_id, trip_id, booking_horse_id, stall_slot_number, notes, escort_user_id, status, picked_up_at) VALUES
+(1, 1, 1, 1, 'Red Flash - Chuồng số 1',      4, 'InTransit', '2026-10-01 06:30:00+07'),
+(2, 1, 2, 2, 'Golden Pegasus - Chuồng số 2', 4, 'InTransit', '2026-10-01 06:30:00+07');
 
 -- Luồng 4 + 5: mốc Hữu Nghị (2) bị hủy do tắc biên, thay bằng mốc Tân Thanh (5)
 INSERT INTO fleet.route_checkpoints (checkpoint_id, trip_id, sequence_order, checkpoint_name, checkpoint_type, address, planned_time, mandatory_rest_minutes,

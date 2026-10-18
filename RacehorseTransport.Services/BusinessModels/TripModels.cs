@@ -61,6 +61,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public string CrewRole { get; set; } = string.Empty; // Driver / Escort
         public bool IsLead { get; set; }
         public string? Duty { get; set; }
+
+        // Escort: số ngựa đang phụ trách trên chuyến (R-06, tối đa 3); Driver: null
+        public int? AssignedHorseCount { get; set; }
     }
 
     public class TripHorseModel
@@ -80,6 +83,10 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? PhotoUrl { get; set; }
         public string StallClass { get; set; } = string.Empty;
         public string? DossierStatus { get; set; } // chuyến chỉ xuất phát được khi mọi con đều Cleared
+
+        // Escort phụ trách con ngựa (R-06)
+        public int? EscortUserId { get; set; }
+        public string? EscortName { get; set; }
 
         // Trạng thái riêng của con ngựa trên chuyến (R-05)
         public string Status { get; set; } = string.Empty;

@@ -181,11 +181,13 @@ namespace RacehorseTransport.Services.Implementations
             var trip = await GetDraftForEditAsync(tripId, currentUser);
 
             // Kiểm tra lại toàn bộ: từ lúc lập nháp tới giờ xe, người hoặc đơn có thể đã thay đổi
-            var bookings = await ValidatePlanAsync(ToPlan(trip), excludeTripId: tripId);
+            var plan = ToPlan(trip);
+            var bookings = await ValidatePlanAsync(plan, excludeTripId: tripId);
             ValidateRoute(trip, bookings);
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
+                CopyEscortAssignments(plan, trip);
                 trip.OverallStatus = TripStatuses.PendingApproval;
                 await _tripRepo.UpdateAsync(trip);
 
@@ -204,7 +206,8 @@ namespace RacehorseTransport.Services.Implementations
         {
             var trip = await GetTrackedTripAsync(tripId);
             EnsureStatus(trip, TripStatuses.PendingApproval, "approved");
-            var bookings = await ValidatePlanAsync(ToPlan(trip), excludeTripId: tripId);
+            var plan = ToPlan(trip);
+            var bookings = await ValidatePlanAsync(plan, excludeTripId: tripId);
             ValidateRoute(trip, bookings);
 
             var customerIds = await _tripHorseRepo.GetQueryable()
@@ -219,6 +222,7 @@ namespace RacehorseTransport.Services.Implementations
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
+                CopyEscortAssignments(plan, trip);
                 trip.OverallStatus = TripStatuses.Scheduled;
                 trip.ApprovedByUserId = currentUser.UserId;
                 trip.ApprovedAt = DateTimeOffset.UtcNow;
@@ -499,6 +503,9 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"{plan.Horses.Count} horse(s) need at least {requiredEscorts} escort(s) (one per {PricingService.HorsesPerGroom} horses); this plan has {escortCount}.");
             }
 
+            // R-06: mỗi con một escort của chuyến, mỗi escort tối đa 3 con; con chưa chọn escort được tự phân
+            EscortAssignmentRules.Apply(plan.Horses, plan.Crew);
+
             var crewUserIds = plan.Crew.Select(c => c.UserId).Distinct().ToList();
             var crewUsers = await _userRepo.GetQueryable()
                 .AsNoTracking()
@@ -675,8 +682,18 @@ namespace RacehorseTransport.Services.Implementations
             {
                 BookingHorseId = h.BookingHorseId,
                 StallSlotNumber = h.StallSlotNumber,
-                Notes = h.Notes
+                Notes = h.Notes,
+                EscortUserId = h.EscortUserId
             }).ToList();
+        }
+
+        // Chuyến lập trước R-06 chưa có escort cho từng con: lưu lại phần tự phân lúc trình / duyệt
+        private static void CopyEscortAssignments(TripPlanModel plan, Trip trip)
+        {
+            foreach (var tripHorse in trip.TripHorses)
+            {
+                tripHorse.EscortUserId = plan.Horses.First(h => h.BookingHorseId == tripHorse.BookingHorseId).EscortUserId;
+            }
         }
 
         private static List<RouteCheckpoint> BuildCheckpoints(List<CheckpointInputModel> checkpoints)
@@ -709,7 +726,7 @@ namespace RacehorseTransport.Services.Implementations
                 PlannedEndDate = trip.PlannedEndDate,
                 PlannedCost = trip.PlannedCost,
                 Crew = trip.Crew.Select(c => new TripCrewInputModel { UserId = c.UserId, CrewRole = c.CrewRole, IsLead = c.IsLead, Duty = c.Duty }).ToList(),
-                Horses = trip.TripHorses.Select(h => new TripHorseInputModel { BookingHorseId = h.BookingHorseId, StallSlotNumber = h.StallSlotNumber, Notes = h.Notes }).ToList()
+                Horses = trip.TripHorses.Select(h => new TripHorseInputModel { BookingHorseId = h.BookingHorseId, StallSlotNumber = h.StallSlotNumber, Notes = h.Notes, EscortUserId = h.EscortUserId }).ToList()
             };
         }
     }

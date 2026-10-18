@@ -48,6 +48,7 @@ namespace RacehorseTransport.API.ResponseModels
         public string CrewRole { get; set; } = string.Empty;
         public bool IsLead { get; set; }
         public string? Duty { get; set; }
+        public int? AssignedHorseCount { get; set; }
     }
 
     public class TripHorseResponse
@@ -67,6 +68,8 @@ namespace RacehorseTransport.API.ResponseModels
         public string? PhotoUrl { get; set; }
         public string StallClass { get; set; } = string.Empty;
         public string? DossierStatus { get; set; }
+        public int? EscortUserId { get; set; }
+        public string? EscortName { get; set; }
         public string Status { get; set; } = string.Empty;
         public DateTimeOffset? PickedUpAt { get; set; }
         public DateTimeOffset? DeliveredAt { get; set; }

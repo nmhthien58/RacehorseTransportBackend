@@ -2967,7 +2967,10 @@ Mỗi phần tử của `horses`:
 |---|---|---|---|
 | `bookingHorseId` | số | Có | Lấy từ hàng chờ `unplanned-horses` |
 | `stallSlotNumber` | số | Có | Số ô chuồng trên xe, từ 1 đến sức chứa của xe; mỗi ô một con |
+| `escortUserId` | số | Không | Người áp tải phụ trách con này: `userId` của một người trong `crew` có `crewRole` = `Escort`. Mỗi người áp tải phụ trách tối đa 3 con. Bỏ trống = hệ thống tự phân (xem bên dưới) |
 | `notes` | chuỗi | Không | Ghi chú, tối đa 200 ký tự |
+
+**Phân công áp tải theo chuồng (tự phân):** con nào không gửi `escortUserId` thì hệ thống xếp các con đó theo số ô chuồng và giao cho người áp tải đầu tiên còn chỗ (trưởng nhóm áp tải trước, rồi theo thứ tự trong `crew`). Nghĩa là ô 1–3 cho người thứ nhất, ô 4–6 cho người thứ hai... Kết quả nằm trong `horses[].escortUserId` của response. Người áp tải chỉ ghi được nhật ký thể trạng cho ngựa mình phụ trách (trưởng nhóm áp tải ghi được cho mọi con).
 
 Mỗi phần tử của `checkpoints`:
 
@@ -3008,6 +3011,7 @@ Ví dụ request:
     {
       "bookingHorseId": 4,
       "stallSlotNumber": 2,
+      "escortUserId": 9,
       "notes": "Chuồng riêng"
     }
   ],
@@ -3053,6 +3057,8 @@ Lỗi thường gặp:
 | 400 | `Two horses cannot share the same stall slot.` | Hai con ngựa cùng một ô chuồng |
 | 400 | `A trip needs at least one driver.` | Đoàn xe không có ai là `Driver` |
 | 400 | `4 horse(s) need at least 2 escort(s) (one per 3 horses); this plan has 1.` | Thiếu người áp tải: cứ 3 con ngựa cần 1 `Escort` |
+| 400 | `User(s) with ID 18 are not escorts on this trip, so they cannot be put in charge of a horse.` | `escortUserId` không phải người có vai trò `Escort` trong `crew` của chuyến |
+| 400 | `An escort can look after at most 3 horses; user(s) with ID 9 have more.` | Chọn tay quá 3 con cho cùng một người áp tải |
 | 400 | `These crew members are already assigned during this period: ...` | Người trong đoàn trùng lịch |
 
 ### PUT /api/trips/{id} — Sửa bản nháp chuyến
@@ -3425,7 +3431,8 @@ Response `200` — phần `data`:
       "phoneNumber": "+84912000077",
       "crewRole": "Escort",
       "isLead": true,
-      "duty": "Chăm sóc ngựa trên đường"
+      "duty": "Chăm sóc ngựa trên đường",
+      "assignedHorseCount": 2
     }
   ],
   "vehicleCapacity": 6,
@@ -3521,9 +3528,11 @@ Response `200` — phần `data`:
 | `planRejectionCount`, `planRejectionReason` | Số lần kế hoạch bị trả về và lý do gần nhất |
 | `delayMinutes`, `onTimeStatus`, `kpiScore`, `closedByName`, `closedAt`, `executiveRemarks` | Kết quả khi đóng chuyến (mục 12). Trước khi đóng, các trường này mang giá trị mặc định |
 | `crew[]` | Đoàn xe: `userId`, `fullName`, `phoneNumber`, `crewRole`, `isLead`, `duty` |
+| `crew[].assignedHorseCount` | Với dòng `Escort`: số ngựa người này đang phụ trách trên chuyến (tối đa 3). Với dòng `Driver`: `null` |
 | `horses[]` | Ngựa trên chuyến |
 | `horses[].tripHorseId` | Mã "ngựa trên chuyến", dùng khi ghi nhật ký và báo sự cố |
 | `horses[].stallSlotNumber` | Ô chuồng |
+| `horses[].escortUserId`, `escortName` | Người áp tải phụ trách con ngựa. Dùng để vẽ sơ đồ chuồng (tô màu ô theo người áp tải) và để màn của áp tải chỉ hiện ngựa của mình |
 | `horses[].specialCareRequirements`, `photoUrl` | Yêu cầu chăm sóc và ảnh, để tài xế nhận diện |
 | `horses[].dossierStatus` | Trạng thái hồ sơ; chuyến chỉ xuất phát được khi mọi con đều `Cleared` |
 | `horses[].status` | Trạng thái của con ngựa trên chuyến (mục 3): `Planned`, `InTransit`, `Delivered`, `Offloaded`, `Cancelled` |
@@ -3778,7 +3787,7 @@ Lỗi thường gặp:
 
 Ghi một lần kiểm tra thể trạng của **một** con ngựa: nhiệt độ khoang, lượng nước uống, tình trạng ăn, mức căng thẳng, kèm ảnh nếu có. Ghi được từ lúc xuất phát tới khi bàn giao. Nếu ngựa bỏ ăn (`Refused`) hoặc kích động (`Agitated`), điều phối viên nhận cảnh báo.
 
-- **Ai gọi được:** Đoàn xe của chuyến, Admin
+- **Ai gọi được:** Đoàn xe của chuyến, Admin. Nếu con ngựa đã có người áp tải phụ trách (`horses[].escortUserId`) thì chỉ người đó, trưởng nhóm áp tải (`Escort` có `isLead` = true) hoặc Admin mới ghi được
 - **Dữ liệu gửi lên:** `multipart/form-data` (xem mục 2.5)
 
 Tham số trên đường dẫn:
@@ -3848,6 +3857,7 @@ Lỗi thường gặp:
 | 400 | `Trip horse with ID 99 is not on trip TRP-2026-0003.` | `tripHorseId` không thuộc chuyến |
 | 400 | `Welfare logs are recorded from departure until handover (current status: Scheduled).` | Chuyến chưa xuất phát hoặc đã đóng |
 | 400 | `FeedStatus '...' is invalid. Allowed values: Normal, Reduced, Refused.` | Viết sai giá trị |
+| 403 | `Only the escort in charge of this horse (or the lead escort) can record its welfare log.` | Người gọi không phụ trách con ngựa này và không phải trưởng nhóm áp tải |
 
 ### GET /api/trips/{id}/welfare-logs — Xem nhật ký của chuyến
 
@@ -6880,7 +6890,7 @@ Tổng cộng 118 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/checkpoints/{id}/clear` | Đã thông quan tại cửa khẩu | Đoàn xe của chuyến, Admin |
 | POST | `/api/checkpoints/{id}/depart` | Rời mốc | Đoàn xe của chuyến, Admin |
 | POST | `/api/trips/{id}/horses/{tripHorseId}/offload` | Ngựa rớt lại giữa đường | Đoàn xe của chuyến, FleetCoordinator, LogisticsManager, Admin |
-| POST | `/api/trips/{id}/welfare-logs` | Ghi nhật ký thể trạng ngựa | Đoàn xe của chuyến, Admin |
+| POST | `/api/trips/{id}/welfare-logs` | Ghi nhật ký thể trạng ngựa | Áp tải phụ trách con ngựa, trưởng nhóm áp tải, Admin |
 | GET | `/api/trips/{id}/welfare-logs` | Xem nhật ký của chuyến | Mọi nhân sự; tài xế / áp tải chỉ xem được chuyến của mình |
 | GET | `/api/tracking/trips` | Bảng theo dõi các chuyến | FleetCoordinator, LogisticsManager, Admin |
 | GET | `/api/tracking/bookings/{id}` | Khách theo dõi đơn của mình | Chủ đơn; chuyên viên phụ trách đơn; LogisticsManager, FleetCoordinator, Admin |

@@ -25,7 +25,8 @@ namespace RacehorseTransport.API.Mappers
                 {
                     BookingHorseId = h.BookingHorseId,
                     StallSlotNumber = h.StallSlotNumber,
-                    Notes = string.IsNullOrWhiteSpace(h.Notes) ? null : h.Notes.Trim()
+                    Notes = string.IsNullOrWhiteSpace(h.Notes) ? null : h.Notes.Trim(),
+                    EscortUserId = h.EscortUserId
                 }).ToList(),
                 Checkpoints = request.Checkpoints?.Select(c => c.ToBusinessModel()).ToList()
             };

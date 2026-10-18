@@ -69,6 +69,11 @@ namespace RacehorseTransport.API.RequestModels
 
         [MaxLength(200, ErrorMessage = "Notes cannot exceed 200 characters.")]
         public string? Notes { get; set; }
+
+        // Escort phụ trách con ngựa (R-06): UserId của một người trong Crew có CrewRole = Escort.
+        // Bỏ trống = hệ thống tự phân theo ô chuồng (ô 1-3 cho escort đầu tiên, 4-6 cho escort thứ hai...).
+        [Range(1, int.MaxValue, ErrorMessage = "EscortUserId must be a valid user ID.")]
+        public int? EscortUserId { get; set; }
     }
 
     public class CheckpointRequest

@@ -437,6 +437,13 @@ namespace RacehorseTransport.Services.Implementations
             {
                 throw new BusinessException($"Trip horse with ID {model.TripHorseId} is not on trip {trip.TripCode}.");
             }
+            // R-06: escort chỉ ghi nhật ký cho ngựa mình phụ trách; trưởng nhóm escort (và Admin) ghi được cho mọi con
+            bool isLeadEscort = trip.Crew.Any(c => c.UserId == currentUser.UserId && c.CrewRole == CrewRoles.Escort && c.IsLead);
+            if (currentUser.Role != UserRoles.Admin && loggedHorse.EscortUserId.HasValue
+                && loggedHorse.EscortUserId != currentUser.UserId && !isLeadEscort)
+            {
+                throw new ForbiddenException("Only the escort in charge of this horse (or the lead escort) can record its welfare log.");
+            }
             if (loggedHorse.Status != TripHorseStatuses.InTransit)
             {
                 throw new BusinessException($"Welfare logs are recorded while the horse is on board (horse status: {loggedHorse.Status}).");

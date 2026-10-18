@@ -212,6 +212,7 @@ namespace RacehorseTransport.Repositories.Context
                       .HasForeignKey(e => e.BookingHorseId);
 
                 entity.HasOne(e => e.Handover).WithMany().HasForeignKey(e => e.HandoverId);
+                entity.HasOne(e => e.Escort).WithMany().HasForeignKey(e => e.EscortUserId);
             });
 
             modelBuilder.Entity<RouteCheckpoint>(entity =>
