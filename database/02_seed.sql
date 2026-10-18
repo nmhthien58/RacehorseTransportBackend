@@ -342,6 +342,26 @@ INSERT INTO incident.trip_incidents (incident_id, incident_code, trip_id, report
 INSERT INTO acceptance.handover_acceptances (handover_id, trip_id, booking_id, handover_date_time, recipient_name, recipient_phone, recipient_id_card, digital_signature_url, overall_condition, remarks, driver_user_id) VALUES
 (1, 1, 1, '2026-10-02 19:00:00+08', 'Jane Smith', '+84988111222', 'PASSPORT-US-991283', 'https://storage.racehorse.vn/signatures/epod_trip1.png', 'Excellent', '2 cá thể ngựa đến nơi an toàn tuyệt đối, không trầy xước.', 4);
 
+-- Thanh toán (R-02) của đơn đã hoàn tất: cọc 30% sau khi duyệt, phần còn lại trước khi xuất phát,
+-- chi phí phát sinh 400 USD (sự cố INC-2026-0001) trả sau khi đóng chuyến. Tỉ giá minh họa 26.000 VND / USD.
+UPDATE booking.booking_requests
+SET deposit_percent = 30, deposit_amount = 2250.00, extra_charges = 400.00, extra_due_at = '2026-10-10 19:00:00+07'
+WHERE booking_id = 1;
+
+INSERT INTO billing.payments (payment_id, payment_code, booking_id, payment_type, provider, status, amount, currency_code, exchange_rate, amount_vnd,
+                              txn_ref, provider_txn_no, provider_pay_date, bank_code, response_code, note, created_by_user_id, created_at, paid_at) VALUES
+(1, 'PAY-2026-0001', 1, 'Deposit', 'VnPay',  'Succeeded', 2250.00, 'USD', 26000, 58500000,  'PAY20260001', '14612001', '20260920101500', 'NCB', '00', NULL, 5, '2026-09-20 10:10:00+07', '2026-09-20 10:15:00+07'),
+(2, 'PAY-2026-0002', 1, 'Balance', 'VnPay',  'Succeeded', 5250.00, 'USD', 26000, 136500000, 'PAY20260002', '14630017', '20260928170200', 'NCB', '00', NULL, 5, '2026-09-28 17:00:00+07', '2026-09-28 17:02:00+07'),
+(3, 'PAY-2026-0003', 1, 'Extra',   'Manual', 'Succeeded', 400.00,  'USD', 26000, 10400000,  'PAY20260003', NULL,       NULL,             NULL,  NULL, 'Khách chuyển khoản phí phát sinh nắn tuyến, mã CK VCB-88123', 1, '2026-10-05 09:00:00+07', '2026-10-05 09:00:00+07');
+
+-- Cấu hình thanh toán mặc định (Admin / Manager sửa được bằng PUT /api/settings/payment)
+INSERT INTO common.system_settings (setting_key, setting_value, description) VALUES
+('Payment.DepositPercent',               '30',    '% đặt cọc trên giá báo, thu sau khi Manager duyệt đơn'),
+('Payment.CancelRefundPercent',          '50',    '% tiền cọc được hoàn khi khách hủy đơn trước khi xuất phát'),
+('Payment.UsdVndRate',                   '26000', 'Tỉ giá quy đổi USD -> VND khi thanh toán qua VNPay'),
+('Payment.BalanceDueDaysBeforeDeparture','2',     'Phần còn lại phải trả trước ngày xuất phát bao nhiêu ngày'),
+('Payment.ExtraPaymentDueDays',          '7',     'Hạn trả chi phí phát sinh (ngày) tính từ khi đóng chuyến');
+
 INSERT INTO common.system_notifications (recipient_user_id, title, message, reference_type, reference_id, is_read, created_at) VALUES
 (5, 'Đơn BKG-2026-0001 đã được phê duyệt', 'Yêu cầu vận chuyển của bạn đã được phê duyệt và phân công nhân sự phụ trách.', 'Booking', 1, true,  '2026-09-20 09:00:00+07'),
 (5, 'Ngựa đã tới điểm bàn giao',           'Chuyến TRP-2026-0001 đã tới Trường đua Tùng Hóa. Vui lòng kiểm tra và ký biên bản bàn giao.', 'Trip', 1, false, '2026-10-02 18:30:00+08');
@@ -351,7 +371,8 @@ INSERT INTO common.code_counters (prefix, year, last_value) VALUES
 ('BKG', 2026, 1),
 ('DOS', 2026, 2),
 ('TRP', 2026, 1),
-('INC', 2026, 1);
+('INC', 2026, 1),
+('PAY', 2026, 3);
 
 -- =====================================================================================
 -- Các dòng trên chèn ID tường minh nên phải đẩy bộ đếm IDENTITY lên sau giá trị lớn nhất,
@@ -372,3 +393,4 @@ SELECT setval(pg_get_serial_sequence('fleet.route_checkpoints', 'checkpoint_id')
 SELECT setval(pg_get_serial_sequence('tracking.horse_welfare_logs', 'log_id'),         (SELECT max(log_id) FROM tracking.horse_welfare_logs));
 SELECT setval(pg_get_serial_sequence('incident.trip_incidents', 'incident_id'),        (SELECT max(incident_id) FROM incident.trip_incidents));
 SELECT setval(pg_get_serial_sequence('acceptance.handover_acceptances', 'handover_id'), (SELECT max(handover_id) FROM acceptance.handover_acceptances));
+SELECT setval(pg_get_serial_sequence('billing.payments', 'payment_id'),                 (SELECT max(payment_id) FROM billing.payments));

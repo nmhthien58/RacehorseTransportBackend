@@ -82,6 +82,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset? ReviewedAt { get; set; }
         public List<QuoteLineModel> QuoteLines { get; set; } = new();
         public List<BookingHorseModel> Horses { get; set; } = new();
+
+        // Tình hình thanh toán (R-02)
+        public BookingPaymentSummaryModel Payment { get; set; } = new();
     }
 
     public class BookingHorseModel

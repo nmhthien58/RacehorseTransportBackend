@@ -35,6 +35,8 @@ namespace RacehorseTransport.Repositories.Context
         public virtual DbSet<HandoverAcceptance> HandoverAcceptances { get; set; } = null!;
         public virtual DbSet<SystemNotification> SystemNotifications { get; set; } = null!;
         public virtual DbSet<PriceItem> PriceItems { get; set; } = null!;
+        public virtual DbSet<Payment> Payments { get; set; } = null!;
+        public virtual DbSet<SystemSetting> SystemSettings { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -86,6 +88,9 @@ namespace RacehorseTransport.Repositories.Context
                 entity.Property(e => e.EstimatedCost).HasPrecision(18, 2);
                 entity.Property(e => e.DeclaredValue).HasPrecision(18, 2);
                 entity.Property(e => e.EstimatedTransitHours).HasPrecision(7, 1);
+                entity.Property(e => e.DepositPercent).HasPrecision(5, 2);
+                entity.Property(e => e.DepositAmount).HasPrecision(18, 2);
+                entity.Property(e => e.ExtraCharges).HasPrecision(18, 2);
                 entity.Property(e => e.QuoteBreakdown).HasColumnType("jsonb");
 
                 entity.HasOne(e => e.Customer).WithMany().HasForeignKey(e => e.CustomerUserId);
@@ -279,6 +284,26 @@ namespace RacehorseTransport.Repositories.Context
                 entity.ToTable("price_items", "pricing");
                 entity.HasKey(e => e.PriceItemId);
                 entity.Property(e => e.Value).HasPrecision(18, 4);
+            });
+
+            // ---------- billing (R-02) ----------
+            modelBuilder.Entity<Payment>(entity =>
+            {
+                entity.ToTable("payments", "billing");
+                entity.HasKey(e => e.PaymentId);
+                entity.Property(e => e.Amount).HasPrecision(18, 2);
+                entity.Property(e => e.ExchangeRate).HasPrecision(18, 4);
+                entity.Property(e => e.RawResponse).HasColumnType("jsonb");
+
+                entity.HasOne(e => e.Booking).WithMany(b => b.Payments).HasForeignKey(e => e.BookingId);
+                entity.HasOne(e => e.RefundOf).WithMany().HasForeignKey(e => e.RefundOfPaymentId);
+                entity.HasOne(e => e.CreatedBy).WithMany().HasForeignKey(e => e.CreatedByUserId);
+            });
+
+            modelBuilder.Entity<SystemSetting>(entity =>
+            {
+                entity.ToTable("system_settings", "common");
+                entity.HasKey(e => e.SettingKey);
             });
 
             // DB không có ON DELETE CASCADE ở bất kỳ khóa ngoại nào.

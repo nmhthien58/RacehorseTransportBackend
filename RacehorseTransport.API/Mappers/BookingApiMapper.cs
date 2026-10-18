@@ -180,6 +180,7 @@ namespace RacehorseTransport.API.Mappers
                 ReviewedByName = model.ReviewedByName,
                 ReviewedAt = model.ReviewedAt,
                 QuoteLines = model.QuoteLines.Select(l => l.ToResponse()).ToList(),
+                Payment = model.Payment.ToResponse(),
                 Horses = model.Horses.Select(h => new BookingHorseResponse
                 {
                     BookingHorseId = h.BookingHorseId,

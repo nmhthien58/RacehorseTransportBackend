@@ -53,7 +53,11 @@ Tên biến dùng hai dấu gạch dưới `__` thay cho dấu `:` trong appsett
 | `Google__GmailRefreshToken` | Refresh token của tài khoản Gmail đồ án (mục Google, bước 5) |
 | `Email__Provider` | `GmailApi`. Bỏ trống thì hệ thống không gửi mail |
 | `Email__FromAddress` | Địa chỉ Gmail của đồ án (chính tài khoản đã cấp refresh token) |
-| `Email__FrontendBaseUrl` | Địa chỉ frontend, dùng để tạo link trong email, ví dụ `https://ten-app.vercel.app` |
+| `Email__FrontendBaseUrl` | Địa chỉ frontend, dùng để tạo link trong email, ví dụ `https://ten-app.vercel.app`. Cũng là nơi VNPay đưa khách về sau khi thanh toán |
+| `Payment__Provider` | `VnPay` (mặc định khi đã có khóa VNPay) hoặc `Mock` để demo không cần VNPay |
+| `Payment__PublicApiBaseUrl` | Địa chỉ công khai của API, ví dụ `https://racehorsetransportbackend-production.up.railway.app` (dùng làm `vnp_ReturnUrl`) |
+| `VnPay__TmnCode` | Mã website (Terminal ID) trong email VNPay gửi |
+| `VnPay__HashSecret` | Chuỗi bí mật tạo checksum trong email VNPay gửi. **Không** commit vào code |
 
 Railway tự cấp biến `PORT`, không cần thêm. Tạo `Jwt__Key` bằng PowerShell:
 
@@ -141,6 +145,13 @@ Frontend: đặt `VITE_GOOGLE_CLIENT_ID=<Client ID>` trong file `.env` của fro
 
 **Khi nào phải làm lại bước 5:** đổi mật khẩu tài khoản Gmail của đồ án, thu hồi quyền của ứng dụng trong Google Account, hoặc không dùng refresh token quá 6 tháng. Dấu hiệu: log có `Gmail API token failed with 400` kèm `invalid_grant`.
 
+### VNPay
+
+1. Đăng ký tài khoản sandbox tại `https://sandbox.vnpayment.vn/devreg/`; VNPay gửi email có `vnp_TmnCode`, `vnp_HashSecret` và tài khoản đăng nhập trang quản trị merchant.
+2. Điền `VnPay__TmnCode`, `VnPay__HashSecret`, `Payment__PublicApiBaseUrl` trên Railway. Ở máy, để khóa trong `appsettings.Local.json` (file này không được commit).
+3. Gửi VNPay địa chỉ IPN: `https://racehorsetransportbackend-production.up.railway.app/api/payments/vnpay-ipn` (IPN không gọi được về `localhost`; ở máy, kết quả vẫn được ghi qua trang return).
+4. Chạy `database/03_update_payments.sql` trên Supabase trước khi deploy bản có thanh toán.
+
 ## 3. Kiểm tra sau khi deploy
 
 1. `https://<domain>/health` trả `{"status":"Healthy","database":true,...}`.
@@ -159,6 +170,8 @@ Nếu deploy báo lỗi, mở tab **Deployments** → **View logs**:
 | Health check thất bại, log có `Failed to connect` / `No such host` | Sai host (đang dùng Direct connection) hoặc sai mật khẩu |
 | `28P01: password authentication failed` | Sai mật khẩu, hoặc `Username` thiếu phần `.<mã project>` |
 | `42P01: relation "identity.user_tokens" does not exist` | Chưa chạy `database/03_update_user_tokens.sql` |
+| `42P01: relation "billing.payments" does not exist` | Chưa chạy `database/03_update_payments.sql` |
+| `VNPay is not configured on the server` khi khách bấm thanh toán | Thiếu `VnPay__TmnCode` / `VnPay__HashSecret`, hoặc đặt `Payment__Provider=Mock` để demo |
 | `Email '...' could not be sent` kèm `timed out` | Đang dùng `Smtp` trên Railway (cổng bị chặn): đổi sang `GmailApi` |
 | `Gmail API token failed with 400` kèm `invalid_grant` | Refresh token hết hạn hoặc bị thu hồi: làm lại bước 5 của mục Google. Nếu lặp lại sau 7 ngày: ứng dụng còn ở trạng thái Testing (bước 3.3) |
 | `Gmail API token failed with 401` kèm `invalid_client` | Sai `Google__ClientId` hoặc `Google__ClientSecret` |

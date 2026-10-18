@@ -7,6 +7,7 @@ namespace RacehorseTransport.Services.Constants
         public const string Dossier = "DOS";
         public const string Trip = "TRP";
         public const string Incident = "INC";
+        public const string Payment = "PAY";
     }
 
     // Giá trị cột reference_type của thông báo: cho FE biết bấm vào thông báo thì mở màn hình nào

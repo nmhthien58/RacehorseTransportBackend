@@ -26,5 +26,8 @@ namespace RacehorseTransport.API.ResponseModels
         public string[] HandoverConditions { get; set; } = Array.Empty<string>();
         public string[] PriceCategories { get; set; } = Array.Empty<string>();
         public string[] PriceCalcTypes { get; set; } = Array.Empty<string>();
+        public string[] PaymentTypes { get; set; } = Array.Empty<string>();
+        public string[] PaymentStatuses { get; set; } = Array.Empty<string>();
+        public string[] PaymentProviders { get; set; } = Array.Empty<string>();
     }
 }

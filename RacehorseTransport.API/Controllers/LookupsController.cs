@@ -48,7 +48,10 @@ namespace RacehorseTransport.API.Controllers
                 IncidentStatuses = IncidentStatuses.All.ToArray(),
                 HandoverConditions = HandoverConditions.All.ToArray(),
                 PriceCategories = PriceCategories.All.ToArray(),
-                PriceCalcTypes = PriceCalcTypes.All.ToArray()
+                PriceCalcTypes = PriceCalcTypes.All.ToArray(),
+                PaymentTypes = PaymentTypes.All.ToArray(),
+                PaymentStatuses = PaymentStatuses.All.ToArray(),
+                PaymentProviders = PaymentProviders.All.ToArray()
             };
 
             return Ok(ApiResponse<EnumLookupsResponse>.SuccessResult(response, "Enum lookups retrieved successfully"));

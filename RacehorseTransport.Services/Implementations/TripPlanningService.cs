@@ -25,6 +25,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ITripService _tripService;
         private readonly ICodeGenerator _codeGenerator;
         private readonly INotificationService _notificationService;
+        private readonly ISystemSettingService _settingService;
         private readonly IUnitOfWork _unitOfWork;
 
         public TripPlanningService(
@@ -38,6 +39,7 @@ namespace RacehorseTransport.Services.Implementations
             ITripService tripService,
             ICodeGenerator codeGenerator,
             INotificationService notificationService,
+            ISystemSettingService settingService,
             IUnitOfWork unitOfWork)
         {
             _bookingHorseRepo = bookingHorseRepo;
@@ -50,6 +52,7 @@ namespace RacehorseTransport.Services.Implementations
             _tripService = tripService;
             _codeGenerator = codeGenerator;
             _notificationService = notificationService;
+            _settingService = settingService;
             _unitOfWork = unitOfWork;
         }
 

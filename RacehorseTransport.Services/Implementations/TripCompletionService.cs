@@ -31,6 +31,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ITrackingService _trackingService;
         private readonly IFileStorageService _fileStorage;
         private readonly INotificationService _notificationService;
+        private readonly ISystemSettingService _settingService;
         private readonly IUnitOfWork _unitOfWork;
 
         public TripCompletionService(
@@ -43,6 +44,7 @@ namespace RacehorseTransport.Services.Implementations
             ITrackingService trackingService,
             IFileStorageService fileStorage,
             INotificationService notificationService,
+            ISystemSettingService settingService,
             IUnitOfWork unitOfWork)
         {
             _tripRepo = tripRepo;
@@ -54,6 +56,7 @@ namespace RacehorseTransport.Services.Implementations
             _trackingService = trackingService;
             _fileStorage = fileStorage;
             _notificationService = notificationService;
+            _settingService = settingService;
             _unitOfWork = unitOfWork;
         }
 
@@ -211,6 +214,8 @@ namespace RacehorseTransport.Services.Implementations
 
             var bookingIds = trip.TripHorses.Select(th => th.BookingHorse!.BookingId).Distinct().ToList();
             var customerIds = trip.TripHorses.Select(th => th.BookingHorse!.Booking!.CustomerUserId).Distinct().ToList();
+            var extras = AllocateExtraCharges(trip, acceptedIncidents);
+            var paymentSettings = await _settingService.GetPaymentSettingsAsync();
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
@@ -232,7 +237,8 @@ namespace RacehorseTransport.Services.Implementations
 
                 await _tripRepo.UpdateAsync(trip);
 
-                var completedBookings = await CompleteFinishedBookingsAsync(bookingIds);
+                var (completedBookings, awaitingPayment) = await CompleteFinishedBookingsAsync(
+                    bookingIds, extras, paymentSettings.ExtraPaymentDueDays);
 
                 var recipients = new List<int>(trip.Crew.Select(c => c.UserId));
                 if (trip.PlannedByUserId.HasValue)
@@ -255,6 +261,17 @@ namespace RacehorseTransport.Services.Implementations
                         NotificationReferenceTypes.Booking,
                         booking.BookingId);
                 }
+
+                foreach (var booking in awaitingPayment)
+                {
+                    await _notificationService.SendAsync(
+                        booking.CustomerUserId,
+                        $"Extra charges for booking {booking.BookingCode}",
+                        $"All horses have been delivered. Approved extra costs during the trip (incidents) add up to {booking.ExtraCharges:N2} {booking.CurrencyCode}; please pay them by {booking.ExtraDueAt:yyyy-MM-dd} from the booking page to complete the booking.",
+                        NotificationReferenceTypes.Booking,
+                        booking.BookingId,
+                        emailCustomers: true);
+                }
             });
 
             await _trackingService.InvalidateTripAsync(tripId);
@@ -263,16 +280,29 @@ namespace RacehorseTransport.Services.Implementations
 
         // Đơn hoàn tất khi mọi con ngựa chưa hủy của đơn đã nằm trên ít nhất một chuyến Completed
         // và đơn không còn chuyến nào đang dang dở.
-        private async Task<List<BookingRequest>> CompleteFinishedBookingsAsync(List<int> bookingIds)
+        // R-02: chi phí phát sinh của chuyến được cộng vào từng đơn (extras); đơn giao xong mà còn nợ phát sinh
+        // thì sang AwaitingFinalPayment, trả đủ mới Completed (PaymentService). Đơn tạo trước khi có thanh toán không bị tính.
+        private async Task<(List<BookingRequest> Completed, List<BookingRequest> AwaitingPayment)> CompleteFinishedBookingsAsync(
+            List<int> bookingIds, Dictionary<int, decimal> extras, int extraDueDays)
         {
             var bookings = await _bookingRepo.GetQueryable()
+                .Include(b => b.Payments)
                 .Include(b => b.BookingHorses).ThenInclude(bh => bh.TripHorses).ThenInclude(th => th.Trip)
                 .Where(b => bookingIds.Contains(b.BookingId) && OpenBookingStatuses.Contains(b.Status))
                 .ToListAsync();
 
+            var now = DateTimeOffset.UtcNow;
             var completed = new List<BookingRequest>();
+            var awaitingPayment = new List<BookingRequest>();
             foreach (var booking in bookings)
             {
+                if (booking.DepositPercent.HasValue && extras.TryGetValue(booking.BookingId, out decimal extra) && extra > 0)
+                {
+                    booking.ExtraCharges += extra;
+                    booking.ExtraDueAt = now.AddDays(extraDueDays);
+                    booking.PaymentReminderCount = 0;
+                }
+
                 var activeHorses = booking.BookingHorses.Where(bh => bh.Status != BookingHorseStatuses.Cancelled).ToList();
 
                 bool allDelivered = activeHorses.Count > 0
@@ -283,13 +313,66 @@ namespace RacehorseTransport.Services.Implementations
 
                 if (allDelivered && !hasUnfinishedTrip)
                 {
-                    booking.Status = BookingStatuses.Completed;
-                    completed.Add(booking);
+                    decimal extraPaid = booking.Payments
+                        .Where(p => p.PaymentType == PaymentTypes.Extra && p.Status == PaymentStatuses.Succeeded)
+                        .Sum(p => p.Amount);
+
+                    if (booking.ExtraCharges > extraPaid)
+                    {
+                        booking.Status = BookingStatuses.AwaitingFinalPayment;
+                        awaitingPayment.Add(booking);
+                    }
+                    else
+                    {
+                        booking.Status = BookingStatuses.Completed;
+                        completed.Add(booking);
+                    }
                 }
             }
 
             await _bookingRepo.SaveChangesAsync();
-            return completed;
+            return (completed, awaitingPayment);
+        }
+
+        // Chia chi phí phát sinh của các sự cố được chấp nhận cho từng đơn trên chuyến:
+        // sự cố gắn với một con ngựa -> tính cho đơn của con ngựa đó; còn lại chia theo số ngựa của mỗi đơn trên chuyến.
+        private static Dictionary<int, decimal> AllocateExtraCharges(Trip trip, List<TripIncident> acceptedIncidents)
+        {
+            var result = new Dictionary<int, decimal>();
+            var horsesPerBooking = trip.TripHorses
+                .GroupBy(th => th.BookingHorse!.BookingId)
+                .Select(g => new { BookingId = g.Key, Count = g.Count() })
+                .OrderBy(x => x.BookingId)
+                .ToList();
+            int totalHorses = horsesPerBooking.Sum(x => x.Count);
+
+            void Add(int bookingId, decimal amount) =>
+                result[bookingId] = (result.TryGetValue(bookingId, out var current) ? current : 0) + amount;
+
+            foreach (var incident in acceptedIncidents.Where(i => i.AdditionalCost > 0))
+            {
+                var affected = incident.AffectedTripHorseId.HasValue
+                    ? trip.TripHorses.FirstOrDefault(th => th.TripHorseId == incident.AffectedTripHorseId.Value)
+                    : null;
+
+                if (affected != null)
+                {
+                    Add(affected.BookingHorse!.BookingId, incident.AdditionalCost);
+                    continue;
+                }
+
+                decimal allocated = 0;
+                for (int i = 0; i < horsesPerBooking.Count; i++)
+                {
+                    var share = i == horsesPerBooking.Count - 1
+                        ? incident.AdditionalCost - allocated // phần lẻ dồn cho đơn cuối để tổng đúng bằng chi phí
+                        : Math.Round(incident.AdditionalCost * horsesPerBooking[i].Count / totalHorses, 2);
+                    allocated += share;
+                    Add(horsesPerBooking[i].BookingId, share);
+                }
+            }
+
+            return result;
         }
 
         // ---------------------------------------------------------------------------------------------

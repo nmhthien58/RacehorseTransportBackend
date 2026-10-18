@@ -4,7 +4,8 @@ using RacehorseTransport.Services.Options;
 
 namespace RacehorseTransport.API.BackgroundJobs
 {
-    // Chạy nền cùng API: định kỳ chuyển các đơn Submitted quá hạn xét duyệt (mặc định 48 giờ) sang Expired.
+    // Chạy nền cùng API: định kỳ chuyển các đơn Submitted quá hạn xét duyệt (mặc định 48 giờ) và các đơn đã duyệt
+    // quá hạn đặt cọc sang Expired, rồi gửi nhắc nợ chi phí phát sinh quá hạn.
     // Quy tắc nằm ở BookingService.ExpireOverdueBookingsAsync; lớp này chỉ lo việc hẹn giờ.
     public class BookingExpiryJob : BackgroundService
     {
@@ -37,7 +38,15 @@ namespace RacehorseTransport.API.BackgroundJobs
                     int expired = await bookingService.ExpireOverdueBookingsAsync();
                     if (expired > 0)
                     {
-                        _logger.LogInformation("Expired {Count} booking(s) that passed the review deadline.", expired);
+                        _logger.LogInformation("Expired {Count} booking(s) that passed the review / deposit deadline.", expired);
+                    }
+
+                    // R-02: nhắc nợ chi phí phát sinh quá hạn (ngày đến hạn, +3, +7)
+                    var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentService>();
+                    int reminded = await paymentService.SendOverdueRemindersAsync();
+                    if (reminded > 0)
+                    {
+                        _logger.LogInformation("Sent payment reminders for {Count} booking(s).", reminded);
                     }
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
