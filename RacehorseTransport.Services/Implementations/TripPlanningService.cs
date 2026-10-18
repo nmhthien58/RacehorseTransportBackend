@@ -88,6 +88,7 @@ namespace RacehorseTransport.Services.Implementations
                     PickupCountryCode = bh.Booking.PickupCountryCode,
                     DropoffAddress = bh.Booking.DropoffAddress,
                     DropoffCountryCode = bh.Booking.DropoffCountryCode,
+                    TransitCountryCodes = bh.Booking.TransitCountries.OrderBy(t => t.SequenceOrder).Select(t => t.CountryCode).ToList(),
                     PickupWindowStart = bh.Booking.PickupWindowStart,
                     PickupWindowEnd = bh.Booking.PickupWindowEnd,
                     DeliveryDeadline = bh.Booking.DeliveryDeadline,

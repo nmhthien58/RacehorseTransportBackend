@@ -8,6 +8,7 @@ using RacehorseTransport.Repositories.Interfaces;
 using RacehorseTransport.Services.BusinessModels;
 using RacehorseTransport.Services.Constants;
 using RacehorseTransport.Services.Exceptions;
+using RacehorseTransport.Services.Helpers;
 using RacehorseTransport.Services.Interfaces;
 using RacehorseTransport.Services.Options;
 
@@ -18,6 +19,7 @@ namespace RacehorseTransport.Services.Implementations
     public class PricingService : IPricingService
     {
         public const int HorsesPerGroom = 3;
+        private const string TransitFeeCode = "FEE_TRANSIT";
 
         private static readonly TimeSpan PriceCacheTtl = TimeSpan.FromMinutes(30);
         private static readonly string[] SurchargeOrder = { "SUR_FUEL", "SUR_EXPRESS", "SUR_CLIMATE" };
@@ -27,6 +29,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ICacheService _cache;
         private readonly IDistanceService _distanceService;
         private readonly ITransitTimeEstimator _transitTimeEstimator;
+        private readonly IClearanceScheduleService _clearanceSchedule;
         private readonly BookingOptions _bookingOptions;
 
         public PricingService(
@@ -34,12 +37,14 @@ namespace RacehorseTransport.Services.Implementations
             ICacheService cache,
             IDistanceService distanceService,
             ITransitTimeEstimator transitTimeEstimator,
+            IClearanceScheduleService clearanceSchedule,
             IOptions<BookingOptions> bookingOptions)
         {
             _priceItemRepo = priceItemRepo;
             _cache = cache;
             _distanceService = distanceService;
             _transitTimeEstimator = transitTimeEstimator;
+            _clearanceSchedule = clearanceSchedule;
             _bookingOptions = bookingOptions.Value;
         }
 
@@ -67,15 +72,22 @@ namespace RacehorseTransport.Services.Implementations
             string destination = input.DropoffCountryCode.Trim().ToUpperInvariant();
             int horseCount = input.StallClasses.Count;
 
-            // Thời gian vận chuyển do hệ thống ước tính (không lấy từ ngày khách nhập), rồi kiểm tra lịch khách chọn
             string origin = string.IsNullOrWhiteSpace(input.PickupCountryCode) ? "VN" : input.PickupCountryCode.Trim().ToUpperInvariant();
+            var transitCountries = TransitCountryRules.Normalize(input.TransitCountryCodes, origin, destination);
+
+            // Thời gian vận chuyển do hệ thống ước tính (không lấy từ ngày khách nhập).
+            // Đường bộ khác nước: mỗi nước quá cảnh thêm một lần qua cửa khẩu.
             var transit = _transitTimeEstimator.Estimate(new TransitEstimateInputModel
             {
                 TransportMode = mode,
                 DistanceKm = input.DistanceKm,
-                BorderCrossings = mode == TransportModes.Ground && origin != destination ? 1 : 0
+                BorderCrossings = mode == TransportModes.Ground && origin != destination ? transitCountries.Count + 1 : 0
             });
-            var schedule = CheckSchedule(input, transit);
+
+            // Thời gian đặt trước tối thiểu theo thời gian làm hồ sơ của chính tuyến này, rồi kiểm tra lịch khách chọn
+            int clearanceDays = await _clearanceSchedule.GetClearanceDaysAsync(origin, transitCountries, destination);
+            int leadTimeDays = _bookingOptions.LeadTimeDaysFor(clearanceDays);
+            var schedule = CheckSchedule(input, transit, leadTimeDays);
 
             var prices = await GetApplicablePricesAsync(mode, destination);
 
@@ -147,9 +159,9 @@ namespace RacehorseTransport.Services.Implementations
                 }
             }
 
-            // 4. Phí thủ tục, thông quan, kiểm dịch
+            // 4. Phí thủ tục, thông quan, kiểm dịch (phí quá cảnh tính riêng bên dưới, theo số nước đi qua)
             var clearanceFees = prices.Values
-                .Where(p => p.Category == PriceCategories.Clearance && p.Value > 0)
+                .Where(p => p.Category == PriceCategories.Clearance && p.Value > 0 && p.ItemCode != TransitFeeCode)
                 .OrderBy(p => { int i = Array.IndexOf(ClearanceOrder, p.ItemCode); return i < 0 ? int.MaxValue : i; })
                 .ThenBy(p => p.ItemCode);
 
@@ -163,6 +175,20 @@ namespace RacehorseTransport.Services.Implementations
                     Quantity = quantity,
                     UnitPrice = Round(fee.Value),
                     Amount = Round(quantity * fee.Value)
+                });
+            }
+
+            // Phí thủ tục quá cảnh: mỗi nước đi qua một lần (× số ngựa nếu tính theo con)
+            if (transitCountries.Count > 0 && prices.TryGetValue(TransitFeeCode, out var transitFee) && transitFee.Value > 0)
+            {
+                int quantity = transitCountries.Count * (transitFee.CalcType == PriceCalcTypes.PerHorse ? horseCount : 1);
+                lines.Add(new QuoteLineModel
+                {
+                    Code = transitFee.ItemCode,
+                    Name = $"{transitFee.ItemName}: {string.Join(", ", transitCountries)}",
+                    Quantity = quantity,
+                    UnitPrice = Round(transitFee.Value),
+                    Amount = Round(quantity * transitFee.Value)
                 });
             }
 
@@ -200,7 +226,9 @@ namespace RacehorseTransport.Services.Implementations
                 DistanceKm = input.TransportMode == TransportModes.Ground ? input.DistanceKm : null,
                 EstimatedHours = transit.TotalHours,
                 RouteSummary = routeSummary,
-                LeadTimeDays = _bookingOptions.LeadTimeDays,
+                LeadTimeDays = leadTimeDays,
+                ClearanceDays = clearanceDays,
+                TransitCountryCodes = transitCountries,
                 EarliestPickupDate = schedule.EarliestPickupDate,
                 ExpressUntilDate = schedule.ExpressUntilDate,
                 EarliestDeliveryDeadline = schedule.EarliestDeliveryDeadline,
@@ -208,16 +236,12 @@ namespace RacehorseTransport.Services.Implementations
             };
         }
 
-        private DateOnly GetEarliestPickupDate()
-        {
-            return DateOnly.FromDateTime(DateTime.UtcNow).AddDays(_bookingOptions.LeadTimeDays);
-        }
-
         // Kiểm tra khoảng pickup / hạn giao khách chọn và xác định Express.
         // Ngày được so theo lịch của chính múi giờ khách gửi lên (khách chọn "ngày 10" thì là ngày 10 của họ).
-        private ScheduleCheck CheckSchedule(QuoteInputModel input, TransitEstimateModel transit)
+        private ScheduleCheck CheckSchedule(QuoteInputModel input, TransitEstimateModel transit, int leadTimeDays)
         {
-            var earliestPickup = GetEarliestPickupDate();
+            var quotedAt = input.QuotedAt ?? DateTimeOffset.UtcNow;
+            var earliestPickup = DateOnly.FromDateTime(quotedAt.UtcDateTime).AddDays(leadTimeDays);
             var expressUntil = earliestPickup.AddDays(_bookingOptions.ExpressWindowDays);
             var maxTransit = TimeSpan.FromHours((double)transit.MaxHours);
 
@@ -240,7 +264,7 @@ namespace RacehorseTransport.Services.Implementations
             if (startDay < earliestPickup)
             {
                 throw new BusinessException(
-                    $"PickupWindowStart must be on or after {earliestPickup:yyyy-MM-dd}: a booking needs about {_bookingOptions.LeadTimeDays} days for review, deposit, quarantine clearance and trip planning.");
+                    $"PickupWindowStart must be on or after {earliestPickup:yyyy-MM-dd}: a booking on this route needs about {leadTimeDays} days for review, deposit, quarantine clearance and trip planning.");
             }
             if (end < start)
             {

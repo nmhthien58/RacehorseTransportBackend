@@ -31,8 +31,7 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             var booking = dossier.BookingHorse!.Booking!;
-            var checklist = await BuildChecklistAsync(
-                booking.PickupCountryCode, booking.DropoffCountryCode, ToDocumentModels(dossier));
+            var checklist = await BuildChecklistAsync(booking, ToDocumentModels(dossier));
 
             var outstanding = checklist
                 .Where(c => c.IsMandatory && c.State != DocumentStatuses.Approved && c.State != DocumentStatuses.Pending)
@@ -265,8 +264,7 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             var booking = dossier.BookingHorse!.Booking!;
-            var checklist = await BuildChecklistAsync(
-                booking.PickupCountryCode, booking.DropoffCountryCode, ToDocumentModels(dossier));
+            var checklist = await BuildChecklistAsync(booking, ToDocumentModels(dossier));
 
             var notApproved = checklist
                 .Where(c => c.IsMandatory && c.State != DocumentStatuses.Approved)

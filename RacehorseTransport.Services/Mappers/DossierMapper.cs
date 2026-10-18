@@ -70,6 +70,10 @@ namespace RacehorseTransport.Services.Mappers
             model.MicrochipNumber = horse?.MicrochipNumber ?? string.Empty;
             model.PickupCountryCode = booking?.PickupCountryCode ?? string.Empty;
             model.DropoffCountryCode = booking?.DropoffCountryCode ?? string.Empty;
+            model.TransitCountryCodes = booking?.TransitCountries
+                .OrderBy(t => t.SequenceOrder)
+                .Select(t => t.CountryCode)
+                .ToList() ?? new List<string>();
             model.PickupWindowStart = booking?.PickupWindowStart ?? default;
             model.PickupWindowEnd = booking?.PickupWindowEnd ?? default;
             model.SpecialistUserId = entity.SpecialistUserId;

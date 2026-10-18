@@ -102,6 +102,7 @@ namespace RacehorseTransport.API.Mappers
             response.MicrochipNumber = model.MicrochipNumber;
             response.PickupCountryCode = model.PickupCountryCode;
             response.DropoffCountryCode = model.DropoffCountryCode;
+            response.TransitCountryCodes = model.TransitCountryCodes;
             response.PickupWindowStart = model.PickupWindowStart;
             response.PickupWindowEnd = model.PickupWindowEnd;
             response.SpecialistUserId = model.SpecialistUserId;

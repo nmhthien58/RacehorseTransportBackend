@@ -39,6 +39,7 @@ namespace RacehorseTransport.API.Mappers
                 RequiresClimateControl = request.RequiresClimateControl,
                 DeclaredValue = request.DeclaredValue,
                 SpecialInstructions = string.IsNullOrWhiteSpace(request.SpecialInstructions) ? null : request.SpecialInstructions.Trim(),
+                TransitCountryCodes = request.TransitCountryCodes ?? new List<string>(),
                 Horses = request.Horses.Select(h => new CreateBookingHorseModel
                 {
                     HorseId = h.HorseId,
@@ -65,6 +66,7 @@ namespace RacehorseTransport.API.Mappers
                 PickupWindowStart = request.PickupWindowStart,
                 PickupWindowEnd = request.PickupWindowEnd,
                 DeliveryDeadline = request.DeliveryDeadline,
+                TransitCountryCodes = request.TransitCountryCodes ?? new List<string>(),
                 StallClasses = request.Horses.Select(h => h.StallClass.Trim()).ToList()
             };
         }
@@ -120,6 +122,8 @@ namespace RacehorseTransport.API.Mappers
                 EstimatedHours = model.EstimatedHours,
                 RouteSummary = model.RouteSummary,
                 LeadTimeDays = model.LeadTimeDays,
+                ClearanceDays = model.ClearanceDays,
+                TransitCountryCodes = model.TransitCountryCodes,
                 EarliestPickupDate = model.EarliestPickupDate,
                 ExpressUntilDate = model.ExpressUntilDate,
                 EarliestDeliveryDeadline = model.EarliestDeliveryDeadline,
@@ -214,6 +218,7 @@ namespace RacehorseTransport.API.Mappers
             response.PickupCountryCode = model.PickupCountryCode;
             response.DropoffAddress = model.DropoffAddress;
             response.DropoffCountryCode = model.DropoffCountryCode;
+            response.TransitCountryCodes = model.TransitCountryCodes;
             response.PickupWindowStart = model.PickupWindowStart;
             response.PickupWindowEnd = model.PickupWindowEnd;
             response.DeliveryDeadline = model.DeliveryDeadline;

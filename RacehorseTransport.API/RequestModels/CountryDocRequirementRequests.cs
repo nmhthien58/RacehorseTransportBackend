@@ -38,6 +38,10 @@ namespace RacehorseTransport.API.RequestModels
         [Range(1, int.MaxValue, ErrorMessage = "ValidityDays must be greater than 0 when provided.")]
         public int? ValidityDays { get; set; }
 
+        // Số ngày cần để có giấy (xin phép, xét nghiệm, cách ly); dùng tính ngày pickup sớm nhất của tuyến
+        [Range(0, 365, ErrorMessage = "ProcessingDays must be between 0 and 365.")]
+        public int? ProcessingDays { get; set; }
+
         public bool IsMandatory { get; set; } = true;
 
         [MaxLength(255, ErrorMessage = "RegulationNote cannot exceed 255 characters.")]
@@ -59,6 +63,10 @@ namespace RacehorseTransport.API.RequestModels
 
         [Range(1, int.MaxValue, ErrorMessage = "ValidityDays must be greater than 0 when provided.")]
         public int? ValidityDays { get; set; }
+
+        // Số ngày cần để có giấy (xin phép, xét nghiệm, cách ly); dùng tính ngày pickup sớm nhất của tuyến
+        [Range(0, 365, ErrorMessage = "ProcessingDays must be between 0 and 365.")]
+        public int? ProcessingDays { get; set; }
 
         public bool IsMandatory { get; set; } = true;
 

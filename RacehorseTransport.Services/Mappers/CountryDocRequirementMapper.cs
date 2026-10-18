@@ -20,6 +20,7 @@ namespace RacehorseTransport.Services.Mappers
                 DocTypeCode = relatedDocumentType?.Code ?? string.Empty,
                 DocTypeName = relatedDocumentType?.Name ?? string.Empty,
                 ValidityDays = entity.ValidityDays,
+                ProcessingDays = entity.ProcessingDays,
                 IsMandatory = entity.IsMandatory,
                 RegulationNote = entity.RegulationNote
             };
@@ -34,6 +35,7 @@ namespace RacehorseTransport.Services.Mappers
                 Direction = model.Direction,
                 DocTypeId = model.DocTypeId,
                 ValidityDays = model.ValidityDays,
+                ProcessingDays = model.ProcessingDays,
                 IsMandatory = model.IsMandatory,
                 RegulationNote = model.RegulationNote
             };

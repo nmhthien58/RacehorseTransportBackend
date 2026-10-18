@@ -219,8 +219,9 @@ Không task nào của Tú chặn việc của Thiên. Chiều ngược lại:
 **Lịch của đơn (Thiên, 18/10/2026)**
 
 13. **Khách không chọn ngày khởi hành / ngày giao.** Khách nhập khoảng ngày ngựa sẵn sàng được đón (`pickup_window_start` → `pickup_window_end`, dài tối đa 30 ngày) và hạn giao trễ nhất (`delivery_deadline`). Ngày chạy thật do Coordinator chốt khi lập chuyến; chuyến phải khởi hành trong khoảng pickup và kết thúc trước hạn giao của mọi đơn trên chuyến.
-14. **Thời gian đặt trước tối thiểu:** ngày pickup sớm nhất = hôm nay + 2 ngày duyệt + 2 ngày đặt cọc + 14 ngày làm hồ sơ + 3 ngày xếp chuyến (= 21 ngày, chỉnh trong section `Booking`). Manager không duyệt được đơn mà khoảng pickup không còn đủ 2 + 14 + 3 ngày.
+14. **Thời gian đặt trước tối thiểu:** ngày pickup sớm nhất = hôm nay + 2 ngày duyệt + 2 ngày đặt cọc + số ngày làm hồ sơ của tuyến (xem mục 16) + 3 ngày xếp chuyến (chỉnh trong section `Booking`). Manager không duyệt được đơn mà khoảng pickup không còn đủ 2 + (hồ sơ) + 3 ngày.
 15. **Thời gian vận chuyển do hệ thống ước tính** từ quãng đường và phương thức (`TransitTimeEstimator`, tham số ở section `Transit`), dùng cho phí áp tải theo ngày và kiểm tra hạn giao.
+16. **Nước quá cảnh (R-03, 18/10/2026):** đơn có danh sách nước đi qua theo thứ tự (`booking.booking_transit_countries`), khách gợi ý lúc đặt, Manager xác nhận / sửa khi còn `Submitted` (`PUT /api/bookings/{id}/transit-countries`, tính lại giá). Checklist hồ sơ = Export (nước đi) + Transit (từng nước đi qua) + Import (nước đến). Mỗi nước quá cảnh: + phí `FEE_TRANSIT`, + một lần qua cửa khẩu. Thời gian làm hồ sơ của tuyến = `processing_days` lớn nhất trong các quy định của tuyến (mặc định 14 ngày nếu chưa có số liệu), dùng tính ngày pickup sớm nhất và hạn duyệt đơn.
 
 ---
 

@@ -102,6 +102,7 @@ namespace RacehorseTransport.Services.Implementations
             existing.Direction = model.Direction;
             existing.DocTypeId = model.DocTypeId;
             existing.ValidityDays = model.ValidityDays;
+            existing.ProcessingDays = model.ProcessingDays;
             existing.IsMandatory = model.IsMandatory;
             existing.RegulationNote = model.RegulationNote;
 
@@ -178,6 +179,11 @@ namespace RacehorseTransport.Services.Implementations
             if (model.ValidityDays.HasValue && model.ValidityDays.Value <= 0)
             {
                 throw new BusinessException("ValidityDays must be greater than 0 when provided.");
+            }
+
+            if (model.ProcessingDays.HasValue && model.ProcessingDays.Value < 0)
+            {
+                throw new BusinessException("ProcessingDays cannot be negative.");
             }
 
             if (model.RegulationNote?.Length > 255)

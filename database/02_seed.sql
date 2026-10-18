@@ -20,7 +20,8 @@ INSERT INTO clearance.document_types (doc_type_id, code, name, description, is_m
 (5, 'IMPORT_PERMIT',      'Giấy phép nhập khẩu',                             'Cơ quan thú y nước nhập khẩu cấp trước khi xuất phát (ví dụ: AVS Singapore, AFCD Hong Kong)', false),
 (6, 'GLANDERS_TEST',      'Xét nghiệm bệnh tỵ (Glanders)',                   'Kết quả âm tính bằng phản ứng kết hợp bổ thể (CFT)', false),
 (7, 'PIROPLASMOSIS_TEST', 'Xét nghiệm lê dạng trùng (Piroplasmosis)',        'Âm tính với Theileria equi và Babesia caballi (cELISA hoặc IFAT)', false),
-(8, 'EVA_TEST',           'Xét nghiệm viêm động mạch do virus (EVA)',        'Áp dụng cho ngựa đực chưa thiến ở các nước yêu cầu', false);
+(8, 'EVA_TEST',           'Xét nghiệm viêm động mạch do virus (EVA)',        'Áp dụng cho ngựa đực chưa thiến ở các nước yêu cầu', false),
+(9, 'TRANSIT_PERMIT',     'Giấy phép quá cảnh động vật',                     'Cơ quan thú y của nước ngựa đi qua cấp trước khi xuất phát, ghi rõ cửa khẩu vào / ra', false);
 
 -- ---------- A.2 Quy định giấy tờ theo quốc gia ----------
 -- validity_days: giấy phải được cấp / lấy mẫu trong vòng N ngày trước ngày đi (NULL = còn hiệu lực là được)
@@ -122,9 +123,42 @@ FROM (VALUES
     ('US', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính trong 30 ngày'),
     ('US', 'Import', 'GLANDERS_TEST',      30,   true,  'Glanders CFT âm tính trong 30 ngày'),
     ('US', 'Import', 'PIROPLASMOSIS_TEST', 30,   true,  'Piroplasmosis cELISA âm tính trong 30 ngày'),
-    ('US', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng')
+    ('US', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    -- Nga (ví dụ tuyến đường bộ dài VN -> TQ -> Nga)
+    ('RU', 'Import', 'HORSE_PASSPORT',     NULL, true,  'Hộ chiếu ngựa còn hiệu lực'),
+    ('RU', 'Import', 'IMPORT_PERMIT',      NULL, true,  'Giấy phép nhập khẩu của Rosselkhoznadzor'),
+    ('RU', 'Import', 'HEALTH_CERT',        5,    true,  'Chứng nhận thú y theo mẫu Liên minh Kinh tế Á-Âu'),
+    ('RU', 'Import', 'COGGINS_EIA',        30,   true,  'EIA âm tính trong 30 ngày'),
+    ('RU', 'Import', 'GLANDERS_TEST',      30,   true,  'Glanders CFT âm tính trong 30 ngày'),
+    ('RU', 'Import', 'PIROPLASMOSIS_TEST', 30,   true,  'Piroplasmosis âm tính trong 30 ngày'),
+    ('RU', 'Import', 'VACCINE',            180,  true,  'Tiêm phòng cúm ngựa trong 6 tháng'),
+    -- Quá cảnh (ngựa chỉ đi qua): giấy phép quá cảnh + chứng nhận sức khỏe còn hạn khi tới cửa khẩu
+    ('CN', 'Transit', 'TRANSIT_PERMIT',    NULL, true,  'Giấy phép quá cảnh của GACC, ghi cửa khẩu vào / ra'),
+    ('CN', 'Transit', 'HEALTH_CERT',       10,   true,  'Chứng nhận kiểm dịch còn hạn khi vào cửa khẩu Trung Quốc'),
+    ('LA', 'Transit', 'TRANSIT_PERMIT',    NULL, true,  'Giấy phép quá cảnh của Cục Chăn nuôi và Thú y Lào'),
+    ('LA', 'Transit', 'HEALTH_CERT',       10,   true,  'Chứng nhận kiểm dịch còn hạn khi vào Lào'),
+    ('KH', 'Transit', 'TRANSIT_PERMIT',    NULL, true,  'Giấy phép quá cảnh của Tổng cục Sản xuất và Thú y Campuchia'),
+    ('KH', 'Transit', 'HEALTH_CERT',       10,   true,  'Chứng nhận kiểm dịch còn hạn khi vào Campuchia'),
+    ('TH', 'Transit', 'TRANSIT_PERMIT',    NULL, true,  'Giấy phép quá cảnh của Cục Phát triển Chăn nuôi Thái Lan'),
+    ('TH', 'Transit', 'HEALTH_CERT',       10,   true,  'Chứng nhận kiểm dịch còn hạn khi vào Thái Lan'),
+    ('MY', 'Transit', 'TRANSIT_PERMIT',    NULL, true,  'Giấy phép quá cảnh của DVS Malaysia'),
+    ('MY', 'Transit', 'HEALTH_CERT',       7,    true,  'Chứng nhận kiểm dịch còn hạn khi vào Malaysia')
 ) AS c (country_code, direction, doc_code, validity_days, is_mandatory, note)
 JOIN clearance.document_types d ON d.code = c.doc_code;
+
+-- Số ngày cần để có từng loại giấy (dữ liệu minh họa): dùng tính ngày pickup sớm nhất của tuyến
+-- = max(processing_days) trên các yêu cầu Export + Transit + Import của đơn.
+UPDATE clearance.country_doc_requirements r
+SET processing_days = CASE
+        WHEN d.code = 'IMPORT_PERMIT' AND r.country_code IN ('AU', 'JP') THEN 30 -- cách ly trước xuất dài
+        WHEN d.code = 'IMPORT_PERMIT' AND r.country_code IN ('CN', 'RU') THEN 21
+        WHEN d.code IN ('IMPORT_PERMIT', 'TRANSIT_PERMIT') THEN 14
+        WHEN d.code IN ('COGGINS_EIA', 'GLANDERS_TEST', 'PIROPLASMOSIS_TEST', 'EVA_TEST') THEN 7
+        WHEN d.code = 'HEALTH_CERT' THEN 3
+        ELSE NULL
+    END
+FROM clearance.document_types d
+WHERE d.doc_type_id = r.doc_type_id;
 
 -- ---------- A.3 Bảng giá ----------
 INSERT INTO pricing.price_items (category, item_code, item_name, transport_mode, dest_country_code, calc_type, value, min_horses) VALUES
@@ -146,6 +180,7 @@ INSERT INTO pricing.price_items (category, item_code, item_name, transport_mode,
 ('Freight', 'FREIGHT', 'Zone G1 - Đường bộ (Lào)',         'Ground', 'LA', 'PerKmPerHorse', 1.00, NULL),
 ('Freight', 'FREIGHT', 'Zone G1 - Đường bộ (Thái Lan)',    'Ground', 'TH', 'PerKmPerHorse', 1.00, NULL),
 ('Freight', 'FREIGHT', 'Zone G1 - Đường bộ (Trung Quốc)',  'Ground', 'CN', 'PerKmPerHorse', 1.00, NULL),
+('Freight', 'FREIGHT', 'Zone G2 - Đường bộ (Nga)',         'Ground', 'RU', 'PerKmPerHorse', 1.10, NULL),
 -- Hệ số hạng chuồng
 ('StallClass', 'STALL_SHARED',  'Chuồng ghép (Shared) - 3 ngựa / pallet',   NULL, NULL, 'Multiplier', 1.00, NULL),
 ('StallClass', 'STALL_COMFORT', 'Chuồng rưỡi (Comfort) - 2 ngựa / pallet',  NULL, NULL, 'Multiplier', 1.40, NULL),
@@ -153,7 +188,7 @@ INSERT INTO pricing.price_items (category, item_code, item_name, transport_mode,
 -- Phụ phí trên cước
 ('Surcharge', 'SUR_FUEL',    'Phụ phí nhiên liệu',                          NULL, NULL, 'Percent', 8,  NULL),
 ('Surcharge', 'SUR_CLIMATE', 'Phụ phí khoang điều hòa / chăm sóc đặc biệt', NULL, NULL, 'Percent', 10, NULL),
-('Surcharge', 'SUR_EXPRESS', 'Phụ phí gấp (khởi hành dưới 7 ngày)',         NULL, NULL, 'Percent', 20, NULL),
+('Surcharge', 'SUR_EXPRESS', 'Phụ phí gấp (hồ sơ khẩn / hạn giao sát)',     NULL, NULL, 'Percent', 20, NULL),
 -- Chiết khấu số lượng trên cước
 ('Discount', 'DISC_VOL_2', 'Chiết khấu 2-3 ngựa',  NULL, NULL, 'Percent', 5,  2),
 ('Discount', 'DISC_VOL_4', 'Chiết khấu 4-6 ngựa',  NULL, NULL, 'Percent', 10, 4),
@@ -167,6 +202,7 @@ INSERT INTO pricing.price_items (category, item_code, item_name, transport_mode,
 ('Clearance', 'FEE_QUARANTINE', 'Phí kiểm dịch Úc (cách ly dài)',            'Air',    'AU', 'PerHorse',   2500, NULL),
 ('Clearance', 'FEE_QUARANTINE', 'Phí kiểm dịch Trung Quốc',                  'Ground', 'CN', 'PerHorse',   700,  NULL),
 ('Clearance', 'FEE_PICKUP',     'Phí điều xe đến điểm nhận',                 'Ground', NULL, 'PerBooking', 100,  NULL),
+('Clearance', 'FEE_TRANSIT',    'Phí thủ tục quá cảnh (mỗi nước đi qua)',    NULL,     NULL, 'PerHorse',   200,  NULL),
 -- Áp tải (1 nhân viên áp tải / 3 ngựa)
 ('Escort', 'ESCORT', 'Groom bay kèm',                     'Air',    NULL, 'PerGroom',    900, NULL),
 ('Escort', 'ESCORT', 'Groom đi kèm đường bộ (theo ngày)', 'Ground', NULL, 'PerGroomDay', 120, NULL),

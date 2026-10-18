@@ -88,6 +88,20 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
+        /// Confirm or change the transit countries of a submitted booking (re-calculates the quote).
+        /// </summary>
+        [HttpPut("{id:int}/transit-countries")]
+        [Authorize(Roles = ReviewRoles)]
+        [ProducesResponseType(typeof(ApiResponse<BookingDetailResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UpdateTransitCountries(int id, [FromBody] UpdateTransitCountriesRequest request)
+        {
+            var booking = await _bookingService.UpdateTransitCountriesAsync(id, request.TransitCountryCodes, User.ToCurrentUser());
+            return Ok(ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse(), "Transit countries updated successfully"));
+        }
+
+        /// <summary>
         /// Reject a submitted booking with a reason.
         /// </summary>
         [HttpPost("{id:int}/reject")]

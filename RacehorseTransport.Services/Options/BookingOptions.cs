@@ -32,10 +32,14 @@ namespace RacehorseTransport.Services.Options
         // ... hoặc hạn giao chỉ dư ít hơn bấy nhiêu giờ so với thời gian vận chuyển chậm nhất
         public int TightDeadlineHours { get; set; } = 24;
 
-        // Số ngày cần tính từ lúc DUYỆT đơn tới ngày pickup
-        public int ApprovalLeadDays => DepositDays + DefaultClearanceDays + PlanningBufferDays;
+        // Số ngày cần tính từ lúc DUYỆT đơn tới ngày pickup, với thời gian làm hồ sơ của tuyến (R-03)
+        public int ApprovalLeadDaysFor(int clearanceDays) => DepositDays + clearanceDays + PlanningBufferDays;
 
         // Số ngày cần tính từ lúc TẠO đơn tới ngày pickup
-        public int LeadTimeDays => (int)Math.Ceiling(ReviewSlaHours / 24.0) + ApprovalLeadDays;
+        public int LeadTimeDaysFor(int clearanceDays) => (int)Math.Ceiling(ReviewSlaHours / 24.0) + ApprovalLeadDaysFor(clearanceDays);
+
+        // Khi tuyến chưa có số liệu làm hồ sơ riêng
+        public int ApprovalLeadDays => ApprovalLeadDaysFor(DefaultClearanceDays);
+        public int LeadTimeDays => LeadTimeDaysFor(DefaultClearanceDays);
     }
 }

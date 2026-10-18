@@ -68,6 +68,9 @@ namespace RacehorseTransport.API.RequestModels
         [MaxLength(2000, ErrorMessage = "SpecialInstructions cannot exceed 2000 characters.")]
         public string? SpecialInstructions { get; set; }
 
+        // Nước ngựa đi qua theo thứ tự (gợi ý của khách, Manager xác nhận khi duyệt). Bỏ trống nếu đi thẳng.
+        public List<string>? TransitCountryCodes { get; set; }
+
         [Required(ErrorMessage = "Horses is required.")]
         [MinLength(1, ErrorMessage = "At least one horse is required.")]
         public List<CreateBookingHorseRequest> Horses { get; set; } = new();
@@ -90,6 +93,13 @@ namespace RacehorseTransport.API.RequestModels
     {
         [Required(ErrorMessage = "SpecialistUserId is required.")]
         public int? SpecialistUserId { get; set; }
+    }
+
+    // Danh sách nước quá cảnh mới (thay toàn bộ, theo thứ tự đi qua); mảng rỗng = đi thẳng
+    public class UpdateTransitCountriesRequest
+    {
+        [Required(ErrorMessage = "TransitCountryCodes is required.")]
+        public List<string> TransitCountryCodes { get; set; } = new();
     }
 
     public class RejectBookingRequest
@@ -128,6 +138,8 @@ namespace RacehorseTransport.API.RequestModels
         public DateTimeOffset? PickupWindowStart { get; set; }
         public DateTimeOffset? PickupWindowEnd { get; set; }
         public DateTimeOffset? DeliveryDeadline { get; set; }
+
+        public List<string>? TransitCountryCodes { get; set; }
 
         [Required(ErrorMessage = "Horses is required.")]
         [MinLength(1, ErrorMessage = "At least one horse is required.")]

@@ -20,6 +20,7 @@ namespace RacehorseTransport.Repositories.Context
         public virtual DbSet<HorseDocument> HorseDocuments { get; set; } = null!;
         public virtual DbSet<BookingRequest> BookingRequests { get; set; } = null!;
         public virtual DbSet<BookingHorse> BookingHorses { get; set; } = null!;
+        public virtual DbSet<BookingTransitCountry> BookingTransitCountries { get; set; } = null!;
         public virtual DbSet<DocumentType> DocumentTypes { get; set; } = null!;
         public virtual DbSet<CountryDocRequirement> CountryDocRequirements { get; set; } = null!;
         public virtual DbSet<DigitalDossier> DigitalDossiers { get; set; } = null!;
@@ -105,6 +106,16 @@ namespace RacehorseTransport.Repositories.Context
                 entity.HasOne(e => e.Horse)
                       .WithMany(h => h.BookingHorses)
                       .HasForeignKey(e => e.HorseId);
+            });
+
+            modelBuilder.Entity<BookingTransitCountry>(entity =>
+            {
+                entity.ToTable("booking_transit_countries", "booking");
+                entity.HasKey(e => new { e.BookingId, e.SequenceOrder });
+
+                entity.HasOne(e => e.Booking)
+                      .WithMany(b => b.TransitCountries)
+                      .HasForeignKey(e => e.BookingId);
             });
 
             // ---------- clearance ----------

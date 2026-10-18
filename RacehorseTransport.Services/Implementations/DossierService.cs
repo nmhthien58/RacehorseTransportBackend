@@ -13,9 +13,15 @@ namespace RacehorseTransport.Services.Implementations
     // Phần xem nằm ở file này; phần nộp, thẩm định và thông quan nằm ở DossierService.Workflow.cs
     public partial class DossierService : IDossierService
     {
+        private static readonly string[] RouteOrder =
+        {
+            RequirementDirections.Export, RequirementDirections.Transit, RequirementDirections.Import
+        };
+
         private readonly IRepository<DigitalDossier> _dossierRepo;
         private readonly IRepository<DossierDocument> _documentRepo;
         private readonly IRepository<CountryDocRequirement> _requirementRepo;
+        private readonly IRepository<BookingTransitCountry> _transitRepo;
         private readonly IRepository<DocumentType> _docTypeRepo;
         private readonly IFileStorageService _fileStorage;
         private readonly INotificationService _notificationService;
@@ -25,6 +31,7 @@ namespace RacehorseTransport.Services.Implementations
             IRepository<DigitalDossier> dossierRepo,
             IRepository<DossierDocument> documentRepo,
             IRepository<CountryDocRequirement> requirementRepo,
+            IRepository<BookingTransitCountry> transitRepo,
             IRepository<DocumentType> docTypeRepo,
             IFileStorageService fileStorage,
             INotificationService notificationService,
@@ -33,6 +40,7 @@ namespace RacehorseTransport.Services.Implementations
             _dossierRepo = dossierRepo;
             _documentRepo = documentRepo;
             _requirementRepo = requirementRepo;
+            _transitRepo = transitRepo;
             _docTypeRepo = docTypeRepo;
             _fileStorage = fileStorage;
             _notificationService = notificationService;
@@ -88,6 +96,7 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(d => d.Specialist)
                 .Include(d => d.BookingHorse!).ThenInclude(bh => bh.Horse)
                 .Include(d => d.BookingHorse!).ThenInclude(bh => bh.Booking!).ThenInclude(b => b.Customer)
+                .Include(d => d.BookingHorse!).ThenInclude(bh => bh.Booking!).ThenInclude(b => b.TransitCountries)
                 .Include(d => d.Documents).ThenInclude(doc => doc.DocumentType)
                 .Include(d => d.Documents).ThenInclude(doc => doc.UploadedBy)
                 .Include(d => d.Documents).ThenInclude(doc => doc.ReviewedBy)
@@ -106,7 +115,7 @@ namespace RacehorseTransport.Services.Implementations
             var model = dossier.ToDetailModel();
             var booking = dossier.BookingHorse!.Booking!;
 
-            model.Checklist = await BuildChecklistAsync(booking.PickupCountryCode, booking.DropoffCountryCode, model.Documents);
+            model.Checklist = await BuildChecklistAsync(booking, model.Documents);
 
             var mandatory = model.Checklist.Where(c => c.IsMandatory).ToList();
             model.RequiredCount = mandatory.Count;
@@ -119,16 +128,25 @@ namespace RacehorseTransport.Services.Implementations
             return model;
         }
 
-        // Danh sách giấy tờ cần có = quy định xuất khẩu của nước đi + quy định nhập khẩu của nước đến.
-        // Loại giấy được cả hai nước yêu cầu thì gộp thành một dòng, lấy thời hạn ngặt hơn.
-        // Nếu chưa có quy định nào cho cặp nước này thì dùng các loại giấy bắt buộc mặc định trong danh mục.
+        // Danh sách giấy tờ cần có = quy định xuất khẩu của nước đi + quy định quá cảnh của từng nước đi qua (R-03)
+        // + quy định nhập khẩu của nước đến. Loại giấy được nhiều nước yêu cầu thì gộp thành một dòng, lấy thời hạn ngặt hơn.
+        // Nếu chưa có quy định nào cho tuyến này thì dùng các loại giấy bắt buộc mặc định trong danh mục.
         private async Task<List<DossierChecklistItemModel>> BuildChecklistAsync(
-            string pickupCountry, string dropoffCountry, List<DossierDocumentModel> documents)
+            BookingRequest booking, List<DossierDocumentModel> documents)
         {
+            string pickupCountry = booking.PickupCountryCode;
+            string dropoffCountry = booking.DropoffCountryCode;
+            var transitCountries = await _transitRepo.GetQueryable()
+                .AsNoTracking()
+                .Where(t => t.BookingId == booking.BookingId)
+                .Select(t => t.CountryCode)
+                .ToListAsync();
+
             var requirements = await _requirementRepo.GetQueryable()
                 .AsNoTracking()
                 .Include(r => r.DocumentType)
                 .Where(r => (r.CountryCode == pickupCountry && r.Direction == RequirementDirections.Export)
+                         || (transitCountries.Contains(r.CountryCode) && r.Direction == RequirementDirections.Transit)
                          || (r.CountryCode == dropoffCountry && r.Direction == RequirementDirections.Import))
                 .ToListAsync();
 
@@ -146,7 +164,9 @@ namespace RacehorseTransport.Services.Implementations
                         IsMandatory = g.Any(r => r.IsMandatory),
                         ValidityDays = g.Min(r => r.ValidityDays),
                         RegulationNote = string.Join("; ", g.Where(r => !string.IsNullOrWhiteSpace(r.RegulationNote)).Select(r => r.RegulationNote)),
-                        RequiredBy = g.OrderBy(r => r.Direction).Select(r => $"{r.CountryCode} {r.Direction}").ToList()
+                        // Theo thứ tự đường đi: nước đi (Export) -> nước quá cảnh (Transit) -> nước đến (Import)
+                        RequiredBy = g.OrderBy(r => Array.IndexOf(RouteOrder, r.Direction)).ThenBy(r => r.CountryCode)
+                            .Select(r => $"{r.CountryCode} {r.Direction}").ToList()
                     })
                     .ToList();
             }
