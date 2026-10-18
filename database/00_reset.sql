@@ -5,5 +5,5 @@
 -- =====================================================================================
 
 DROP SCHEMA IF EXISTS
-    pricing, common, acceptance, incident, tracking, fleet, clearance, booking, racehorse, identity
+    billing, pricing, common, acceptance, incident, tracking, fleet, clearance, booking, racehorse, identity
 CASCADE;

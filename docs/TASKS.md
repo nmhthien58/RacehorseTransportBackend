@@ -212,7 +212,7 @@ Không task nào của Tú chặn việc của Thiên. Chiều ngược lại:
 **Tài khoản và hạ tầng**
 
 9. **Không xác thực email khi đăng ký**: đăng ký xong là dùng được ngay. (Từng làm thử rồi bỏ ngày 08/10/2026 để giảm số email phải gửi.)
-10. **Có làm**: quên mật khẩu, thông báo qua email cho khách, đăng nhập bằng Google. Email gửi từ Gmail lập riêng cho đồ án, qua Gmail API vì Railway chặn cổng SMTP. **Chưa làm**: thanh toán / đặt cọc.
+10. **Có làm**: quên mật khẩu, thông báo qua email cho khách, đăng nhập bằng Google. Email gửi từ Gmail lập riêng cho đồ án, qua Gmail API vì Railway chặn cổng SMTP. Thanh toán / đặt cọc: làm sau, xem mục 17.
 11. **File lưu trên Supabase Storage**, cùng project Supabase mới của nhóm với database.
 12. **Thông báo của API bằng tiếng Anh.**
 
@@ -222,6 +222,13 @@ Không task nào của Tú chặn việc của Thiên. Chiều ngược lại:
 14. **Thời gian đặt trước tối thiểu:** ngày pickup sớm nhất = hôm nay + 2 ngày duyệt + 2 ngày đặt cọc + số ngày làm hồ sơ của tuyến (xem mục 16) + 3 ngày xếp chuyến (chỉnh trong section `Booking`). Manager không duyệt được đơn mà khoảng pickup không còn đủ 2 + (hồ sơ) + 3 ngày.
 15. **Thời gian vận chuyển do hệ thống ước tính** từ quãng đường và phương thức (`TransitTimeEstimator`, tham số ở section `Transit`), dùng cho phí áp tải theo ngày và kiểm tra hạn giao.
 16. **Nước quá cảnh (R-03, 18/10/2026):** đơn có danh sách nước đi qua theo thứ tự (`booking.booking_transit_countries`), khách gợi ý lúc đặt, Manager xác nhận / sửa khi còn `Submitted` (`PUT /api/bookings/{id}/transit-countries`, tính lại giá). Checklist hồ sơ = Export (nước đi) + Transit (từng nước đi qua) + Import (nước đến). Mỗi nước quá cảnh: + phí `FEE_TRANSIT`, + một lần qua cửa khẩu. Thời gian làm hồ sơ của tuyến = `processing_days` lớn nhất trong các quy định của tuyến (mặc định 14 ngày nếu chưa có số liệu), dùng tính ngày pickup sớm nhất và hạn duyệt đơn.
+
+**Thanh toán (R-02, Thiên, 18/10/2026)**
+
+17. **Báo giá USD, khách trả VND qua VNPay** theo tỉ giá cấu hình (`common.system_settings`, Manager sửa ở `PUT /api/settings/payment`). Giao dịch lưu ở `billing.payments`.
+18. **Các khoản:** cọc `Payment.DepositPercent`% (mặc định 30%, chốt vào đơn lúc duyệt) trả ngay sau khi duyệt → đơn `AwaitingDeposit` → `Approved` và mới mở hồ sơ; phần còn lại trả trước ngày xuất phát (`BalanceDueDaysBeforeDeparture`), chuyến không `start` được nếu còn đơn chưa trả đủ; sau khi đóng chuyến chỉ còn chi phí sự cố đã duyệt (phân bổ cho đơn có ngựa bị ảnh hưởng, không rõ thì chia theo số ngựa) → `AwaitingFinalPayment`, hạn `ExtraPaymentDueDays` ngày. 0% = duyệt là xác nhận, 100% = thu đủ khi duyệt.
+19. **Hủy sau khi cọc, trước khi ngựa lên chuyến:** hoàn `CancelRefundPercent`% cọc (mặc định 50%) + 100% phần còn lại đã trả, gọi API hoàn tiền VNPay; lỗi thì Manager thử lại hoặc hoàn tay và đánh dấu. Khách thấy dòng hoàn tiền trong lịch sử thanh toán + nhận thông báo / email.
+20. **Nợ phát sinh quá hạn:** nhắc ở ngày đến hạn, +3, +7 (job chạy cùng `BookingExpiryJob`), khách không tạo được đơn mới cho tới khi trả. Không cọc đúng hạn thì đơn `Expired`. Tài xế không thu tiền; Manager ghi nhận được khoản trả ngoài hệ thống. Đơn cũ trước tính năng này (`deposit_percent` NULL) không bắt thanh toán.
 
 ---
 

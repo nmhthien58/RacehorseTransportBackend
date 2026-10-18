@@ -37,6 +37,13 @@ namespace RacehorseTransport.Repositories.Entities
         public string? QuoteBreakdown { get; set; } // JSON các dòng báo giá
         public decimal? EstimatedTransitHours { get; set; } // ước tính lúc báo giá
 
+        // Thanh toán (R-02). DepositPercent = null: đơn tạo trước khi có thanh toán, không bắt trả tiền.
+        public decimal? DepositPercent { get; set; }
+        public decimal DepositAmount { get; set; }
+        public decimal ExtraCharges { get; set; }      // chi phí phát sinh chốt khi đóng chuyến
+        public DateTimeOffset? ExtraDueAt { get; set; }
+        public int PaymentReminderCount { get; set; }
+
         // Navigation properties
         public virtual User? Customer { get; set; }
         public virtual User? ReviewedBy { get; set; }
@@ -44,5 +51,6 @@ namespace RacehorseTransport.Repositories.Entities
         public virtual User? AssignedCoordinator { get; set; }
         public virtual ICollection<BookingHorse> BookingHorses { get; set; } = new List<BookingHorse>();
         public virtual ICollection<BookingTransitCountry> TransitCountries { get; set; } = new List<BookingTransitCountry>();
+        public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
     }
 }

@@ -28,8 +28,9 @@ Tài liệu này hướng dẫn gọi API của hệ thống vận chuyển ng�
 16. [Quy định giấy tờ theo quốc gia](#16-quy-định-giấy-tờ-theo-quốc-gia)
 17. [Bảng giá](#17-bảng-giá)
 18. [Danh mục giá trị cho dropdown](#18-danh-mục-giá-trị-cho-dropdown)
-19. [Những phần chưa có API](#19-những-phần-chưa-có-api)
-20. [Bảng tra nhanh mọi endpoint](#20-bảng-tra-nhanh-mọi-endpoint)
+19. [Thanh toán (đặt cọc, phần còn lại, phát sinh, hoàn tiền)](#19-thanh-toán-đặt-cọc-phần-còn-lại-phát-sinh-hoàn-tiền)
+20. [Những phần chưa có API](#20-những-phần-chưa-có-api)
+21. [Bảng tra nhanh mọi endpoint](#21-bảng-tra-nhanh-mọi-endpoint)
 
 ---
 
@@ -408,7 +409,10 @@ Các trường dưới đây chỉ nhận đúng những giá trị liệt kê, 
 
 | Trường | Giá trị và ý nghĩa |
 |---|---|
-| Trạng thái đơn (`status`) | `Submitted` chờ duyệt · `Approved` đã duyệt · `Completed` đã giao xong · `Rejected` bị từ chối · `Expired` quá 48 giờ không ai duyệt · `Cancelled` khách hủy |
+| Trạng thái đơn (`status`) | `Submitted` chờ duyệt · `AwaitingDeposit` đã duyệt, chờ khách đặt cọc · `Approved` đã cọc, đang làm hồ sơ · `Assigned` đã xếp chuyến · `AwaitingFinalPayment` giao xong nhưng còn chi phí phát sinh chưa trả · `Completed` hoàn tất · `Rejected` bị từ chối · `Expired` quá hạn duyệt hoặc quá hạn đặt cọc · `Cancelled` khách hủy |
+| `paymentType` (mục 19) | `Deposit` đặt cọc · `Balance` phần còn lại · `Extra` phát sinh · `Refund` hoàn tiền |
+| Trạng thái giao dịch (mục 19) | `Pending` đang chờ cổng · `Succeeded` thành công · `Failed` thất bại · `Expired` link bị thay |
+| `provider` (mục 19) | `VnPay` · `Mock` cổng giả lập · `Manual` ghi nhận tay |
 | Trạng thái ngựa trong đơn | `Pending` · `Approved` · `Cancelled` |
 | `transportMode` | `Ground` đường bộ · `Air` đường hàng không |
 | `stallClass` (hạng chuồng) | `Shared` chuồng ghép · `Comfort` chuồng rưỡi · `Private` chuồng riêng |
@@ -1457,15 +1461,16 @@ Lỗi thường gặp:
 
 ## 7. Flow 1 – Đơn vận chuyển
 
-Khách hàng gửi một **đơn vận chuyển** (booking) cho một hoặc nhiều con ngựa. Quản lý duyệt hoặc từ chối. Khi duyệt, quản lý chọn một chuyên viên thủ tục phụ trách, và hệ thống tự mở một hồ sơ kiểm dịch cho mỗi con ngựa (Flow 2).
+Khách hàng gửi một **đơn vận chuyển** (booking) cho một hoặc nhiều con ngựa. Quản lý duyệt hoặc từ chối. Khi duyệt, quản lý chọn một chuyên viên thủ tục phụ trách; đơn chuyển sang chờ khách **đặt cọc** (mục 19). Khi khách cọc xong, hệ thống tự mở một hồ sơ kiểm dịch cho mỗi con ngựa (Flow 2).
 
 Vòng đời của một đơn:
 
 ```
-Submitted ──(quản lý duyệt)──────────────> Approved ──(mọi ngựa đã giao xong)──> Completed
-    │
-    ├──(quản lý từ chối)──────────────────> Rejected
-    ├──(khách hủy)────────────────────────> Cancelled
+Submitted ──(quản lý duyệt)──> AwaitingDeposit ──(khách cọc)──> Approved ──(xếp chuyến)──> Assigned ──(giao xong)──> Completed
+    │                              │                                                              │
+    │                              └─(quá hạn không cọc)─> Expired                                └─(còn phát sinh)─> AwaitingFinalPayment ─(trả xong)─> Completed
+    ├──(quản lý từ chối)──────────> Rejected
+    ├──(khách hủy, trước khi lên chuyến)──> Cancelled   (đã trả tiền thì tự hoàn, xem mục 19)
     └──(quá 48 giờ không ai duyệt)────────> Expired
 ```
 
@@ -1476,6 +1481,7 @@ Thứ tự gọi thông thường:
 3. Khách: `POST /api/bookings` để gửi đơn.
 4. Quản lý: `GET /api/bookings?status=Submitted` để xem đơn chờ duyệt, `GET /api/users/staff?role=TransportSpecialist` để lấy danh sách chuyên viên.
 5. Quản lý: `POST /api/bookings/{id}/approve` hoặc `POST /api/bookings/{id}/reject`.
+6. Khách: `GET /api/bookings/{id}/payments` rồi `POST /api/bookings/{id}/payments` để đặt cọc qua VNPay (mục 19).
 
 Ai thấy đơn nào: khách thấy đơn của mình; chuyên viên thấy đơn mình phụ trách; `LogisticsManager`, `FleetCoordinator`, `Admin` thấy tất cả; tài xế không xem đơn (gọi vào nhận 403).
 
@@ -1969,6 +1975,7 @@ Ngoài các trường của danh sách, chi tiết có thêm:
 | `horses[].bookingHorseId` | Mã "ngựa trong đơn", dùng khi xếp chuyến |
 | `horses[].dossierId`, `dossierCode`, `dossierStatus` | Hồ sơ kiểm dịch của con ngựa; có sau khi đơn được duyệt |
 | `horses[].trips[]` | Các chuyến con ngựa được xếp lên, kèm `tripStatus` |
+| `payment` | Tóm tắt thanh toán của đơn, cùng dạng `data` của `GET /api/bookings/{id}/payments` (mục 19) |
 
 Một đơn có thể đi nhiều chuyến và một chuyến có thể chở ngựa của nhiều đơn, nên luôn đọc chuyến theo từng con ngựa.
 
@@ -1981,7 +1988,7 @@ Lỗi thường gặp:
 
 ### POST /api/bookings/{id}/cancel — Khách hủy đơn
 
-Hủy đơn của mình khi đơn còn ở trạng thái `Submitted` (chưa ai duyệt).
+Hủy đơn của mình khi đơn đang `Submitted`, `AwaitingDeposit`, `Approved` hoặc `Assigned` **và chưa con ngựa nào nằm trên một chuyến** (chưa bị hủy). Nếu khách đã trả tiền, server tự tạo dòng hoàn tiền: `cancelRefundPercent`% tiền cọc (cấu hình, mặc định 50%) + 100% phần còn lại đã trả, gọi API hoàn tiền của VNPay, và báo khách qua thông báo + email. Khách xem kết quả hoàn tiền trong `GET /api/bookings/{id}/payments`.
 
 - **Ai gọi được:** Customer (chủ đơn)
 - **Dữ liệu gửi lên:** không có (không cần body)
@@ -1998,12 +2005,13 @@ Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
-| 400 | `Only a Submitted booking can be cancelled (current status: Approved).` | Đơn đã được duyệt hoặc đã kết thúc |
+| 400 | `A booking can only be cancelled before departure (current status: Completed).` | Đơn đã kết thúc hoặc không còn hủy được |
+| 400 | `Horses of this booking are already planned on trip TRP-2026-0003. Please contact the logistics team to cancel.` | Ngựa đã được xếp lên chuyến |
 | 403 | `You can only cancel your own bookings.` | Hủy đơn của người khác |
 
 ### POST /api/bookings/{id}/approve — Duyệt đơn
 
-Duyệt một đơn đang `Submitted` và chọn chuyên viên phụ trách. Hệ thống tự mở một hồ sơ kiểm dịch cho mỗi con ngựa và báo cho khách cùng chuyên viên.
+Duyệt một đơn đang `Submitted` và chọn chuyên viên phụ trách. Đơn chuyển sang `AwaitingDeposit` và chốt `% cọc` hiện tại trong cấu hình; khách được báo để đặt cọc. Khi khách cọc đủ, đơn chuyển `Approved`, hệ thống mở một hồ sơ kiểm dịch cho mỗi con ngựa và báo chuyên viên. Nếu cấu hình `% cọc = 0`, đơn chuyển thẳng `Approved` ngay khi duyệt. Không cọc trong thời hạn thì đơn tự chuyển `Expired`.
 
 - **Ai gọi được:** LogisticsManager, Admin
 - **Dữ liệu gửi lên:** JSON
@@ -2028,7 +2036,7 @@ Ví dụ request:
 }
 ```
 
-Response `200`: `data` là chi tiết đơn với `status` là `Approved`; mỗi con ngựa đã có `dossierId`.
+Response `200`: `data` là chi tiết đơn với `status` là `AwaitingDeposit` (hoặc `Approved` kèm `dossierId` cho từng ngựa nếu `% cọc = 0`); trường `payment.nextPaymentType` là `Deposit`.
 
 Lỗi thường gặp:
 
@@ -3376,6 +3384,7 @@ Lỗi thường gặp:
 | HTTP | `message` | Khi nào |
 |---|---|---|
 | 400 | `The trip cannot depart: clearance is not complete for Red Flash, Golden Pegasus.` | Còn ngựa chưa thông quan; `message` nêu tên từng con |
+| 400 | `The trip cannot depart: the remaining balance is not paid for BKG-2026-0007.` | Có đơn trên chuyến chưa trả đủ cọc + phần còn lại (mục 19) |
 | 400 | `Only a scheduled trip can depart (current status: Draft).` | Chuyến chưa được duyệt, hoặc đã xuất phát rồi |
 | 403 | `Only the crew assigned to this trip can update its progress.` | Người gọi không thuộc đoàn xe |
 
@@ -5614,6 +5623,9 @@ Các danh sách trong `data`:
 | `handoverConditions` | Tình trạng ngựa lúc bàn giao |
 | `priceCategories` | Nhóm dòng giá |
 | `priceCalcTypes` | Cách tính dòng giá |
+| `paymentTypes` | Loại khoản thanh toán |
+| `paymentStatuses` | Trạng thái giao dịch |
+| `paymentProviders` | Hình thức thanh toán |
 
 Mỗi trường là một mảng chuỗi. Giá trị trong mảng là đúng chuỗi phải gửi lên API (phân biệt hoa thường); muốn hiện tiếng Việt cho người dùng thì frontend tự đổi tên hiển thị.
 
@@ -5639,8 +5651,10 @@ Response `200`:
     ],
     "bookingStatuses": [
       "Submitted",
+      "AwaitingDeposit",
       "Approved",
       "Assigned",
+      "AwaitingFinalPayment",
       "Completed",
       "Rejected",
       "Expired",
@@ -5773,6 +5787,23 @@ Response `200`:
       "PerBooking",
       "PerGroom",
       "PerGroomDay"
+    ],
+    "paymentTypes": [
+      "Deposit",
+      "Balance",
+      "Extra",
+      "Refund"
+    ],
+    "paymentStatuses": [
+      "Pending",
+      "Succeeded",
+      "Failed",
+      "Expired"
+    ],
+    "paymentProviders": [
+      "VnPay",
+      "Mock",
+      "Manual"
     ]
   },
   "errors": null
@@ -5804,7 +5835,408 @@ export async function getLookups() {
 
 ---
 
-## 19. Những phần chưa có API
+## 19. Thanh toán (đặt cọc, phần còn lại, phát sinh, hoàn tiền)
+
+Báo giá của đơn tính bằng **USD**; khách trả bằng **VND** qua cổng **VNPay**. Số VND = số USD × tỉ giá trong cấu hình (làm tròn tới đồng). Tài xế không bao giờ thu tiền.
+
+Đơn đi qua các khoản tiền sau:
+
+| Khoản (`paymentType`) | Khi nào phải trả | Số tiền |
+|---|---|---|
+| `Deposit` đặt cọc | Ngay sau khi quản lý duyệt (đơn ở `AwaitingDeposit`) | `% cọc` × báo giá; % được **chốt lúc duyệt** |
+| `Balance` phần còn lại | Khi đơn đã `Approved` / `Assigned`, hạn là trước ngày xuất phát của chuyến (cấu hình số ngày) | Báo giá − tiền cọc |
+| `Extra` phát sinh | Sau khi đóng chuyến, nếu sự cố có chi phí được duyệt (đơn ở `AwaitingFinalPayment`) | Chi phí sự cố phân bổ cho đơn |
+| `Refund` hoàn tiền | Tự tạo khi khách hủy đơn đã trả tiền | `% hoàn cọc` × tiền cọc + 100% phần còn lại đã trả |
+
+Vòng đời đơn có thanh toán:
+
+```
+Submitted ─(duyệt)─> AwaitingDeposit ─(trả đủ cọc)─> Approved ─(xếp chuyến)─> Assigned ─(giao xong)─> Completed
+                          │                              │                                    │
+                          │                              │                                    └─(còn phát sinh chưa trả)─> AwaitingFinalPayment ─(trả xong)─> Completed
+                          ├─(quá hạn không cọc)─> Expired
+                          └─(khách hủy)─> Cancelled   (khách hủy khi Approved: tự hoàn tiền)
+```
+
+Quy tắc cần biết khi làm giao diện:
+
+- Cấu hình `% cọc = 0` thì duyệt là `Approved` luôn, không có bước cọc. `% cọc = 100` là thu đủ ngay khi duyệt (khi đó không còn khoản `Balance`).
+- Hồ sơ kiểm dịch chỉ được mở **sau khi đã cọc** (lúc chuyển sang `Approved`).
+- Chuyến **không xuất phát được** nếu có đơn trên chuyến chưa trả đủ cọc + phần còn lại (`POST /api/trips/{id}/start` trả 400).
+- Khoản phát sinh quá hạn: hệ thống nhắc khách ở ngày đến hạn, +3 và +7 ngày; trong lúc còn nợ quá hạn khách **không tạo được đơn mới**.
+- Đơn tạo trước khi có tính năng này (`paymentRequired = false`) không bắt thanh toán cọc / phần còn lại.
+- Luôn để server quyết định số tiền: frontend chỉ gửi `paymentType`, không gửi số tiền.
+
+Luồng thanh toán online trên frontend:
+
+1. Gọi `GET /api/bookings/{id}/payments`. Nếu `nextPaymentType` khác `null` thì hiện nút "Thanh toán" với `nextPaymentAmount` (USD) và `nextPaymentAmountVnd`.
+2. Khi khách bấm: `POST /api/bookings/{id}/payments` với `{ "paymentType": nextPaymentType }`, rồi chuyển trình duyệt sang `paymentUrl` (`window.location.href = paymentUrl`).
+3. Khách trả trên trang VNPay. VNPay gọi server (IPN) và đưa khách về server; server chuyển tiếp khách về trang frontend `/customer/payments/result?status=success|failed|invalid&code=PAY-...&bookingId=...`.
+4. Trang kết quả chỉ để hiển thị; trạng thái thật đọc lại bằng `GET /api/bookings/{id}/payments` hoặc `GET /api/bookings/{id}`.
+
+Thẻ test VNPay sandbox: ngân hàng **NCB**, số thẻ `9704198526191432198`, tên `NGUYEN VAN A`, ngày phát hành `07/15`, OTP `123456`.
+
+Khi backend chạy với `Payment:Provider = Mock` (demo không cần VNPay), `paymentUrl` trỏ về trang frontend `/customer/payments/mock?txnRef=...&amountVnd=...`; trang này gọi `POST /api/payments/mock/{txnRef}/complete` để giả lập kết quả.
+
+### GET /api/bookings/{id}/payments — Tóm tắt thanh toán của đơn
+
+Số tiền từng khoản, đã trả bao nhiêu, khoản cần trả tiếp theo và toàn bộ lịch sử giao dịch (gồm cả hoàn tiền). Cùng dữ liệu này cũng có trong trường `payment` của `GET /api/bookings/{id}`.
+
+- **Ai gọi được:** Customer (chủ đơn), LogisticsManager, TransportSpecialist, FleetCoordinator, Admin
+- **Dữ liệu gửi lên:** không có
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã đơn (`bookingId`) |
+
+Response `200` (đơn đã cọc rồi bị khách hủy, được hoàn 50% cọc):
+
+```json
+{
+  "success": true,
+  "message": "Payments retrieved successfully",
+  "data": {
+    "paymentRequired": true,
+    "currencyCode": "USD",
+    "usdVndRate": 26000,
+    "estimatedCost": 2948.0,
+    "depositPercent": 30.0,
+    "depositAmount": 884.4,
+    "depositPaid": 884.4,
+    "balanceAmount": 2063.6,
+    "balancePaid": 0,
+    "balanceDueAt": null,
+    "extraAmount": 0.0,
+    "extraPaid": 0,
+    "extraDueAt": null,
+    "extraOverdue": false,
+    "refundedAmount": 442.2,
+    "totalDue": 2948.0,
+    "totalPaid": 884.4,
+    "outstanding": 0,
+    "nextPaymentType": null,
+    "nextPaymentAmount": null,
+    "nextPaymentAmountVnd": null,
+    "payments": [
+      {
+        "paymentId": 12,
+        "paymentCode": "PAY-2026-0012",
+        "bookingId": 6,
+        "paymentType": "Refund",
+        "provider": "Mock",
+        "status": "Succeeded",
+        "amount": 442.2,
+        "currencyCode": "USD",
+        "exchangeRate": 26000.0,
+        "amountVnd": 11497200,
+        "providerTxnNo": "MOCK-PAY20260012",
+        "bankCode": null,
+        "responseCode": "00",
+        "refundOfPaymentId": 11,
+        "note": "Refund 50% of PAY-2026-0011 (deposit) after cancellation",
+        "createdByName": "Trần Ngọc Anh",
+        "createdAt": "2026-10-18T08:22:24.287456+00:00",
+        "paidAt": "2026-10-18T08:22:24.291111+00:00"
+      },
+      {
+        "paymentId": 11,
+        "paymentCode": "PAY-2026-0011",
+        "bookingId": 6,
+        "paymentType": "Deposit",
+        "provider": "Mock",
+        "status": "Succeeded",
+        "amount": 884.4,
+        "currencyCode": "USD",
+        "exchangeRate": 26000.0,
+        "amountVnd": 22994400,
+        "providerTxnNo": "MOCK20261018082134",
+        "bankCode": null,
+        "responseCode": "00",
+        "refundOfPaymentId": null,
+        "note": null,
+        "createdByName": "Trần Ngọc Anh",
+        "createdAt": "2026-10-18T08:21:28.619495+00:00",
+        "paidAt": "2026-10-18T08:21:34.116482+00:00"
+      }
+    ]
+  },
+  "errors": null
+}
+```
+
+Ý nghĩa các trường:
+
+| Trường | Ý nghĩa |
+|---|---|
+| `paymentRequired` | `false` với đơn chưa duyệt hoặc đơn tạo trước khi có thanh toán online |
+| `usdVndRate` | Tỉ giá hiện tại trong cấu hình |
+| `depositPercent`, `depositAmount` | % cọc đã chốt lúc duyệt và số tiền cọc (USD) |
+| `depositPaid`, `balancePaid`, `extraPaid` | Đã trả thành công cho từng khoản (USD) |
+| `balanceAmount` | Báo giá − tiền cọc |
+| `balanceDueAt` | Hạn trả phần còn lại; chỉ có khi ngựa của đơn đã được xếp chuyến |
+| `extraAmount`, `extraDueAt`, `extraOverdue` | Chi phí phát sinh sau khi đóng chuyến, hạn trả, và đã quá hạn hay chưa |
+| `refundedAmount` | Tổng đã hoàn cho khách |
+| `totalDue`, `totalPaid`, `outstanding` | Tổng phải trả, tổng đã trả, còn thiếu (đơn đã hủy / từ chối / hết hạn thì `outstanding = 0`) |
+| `nextPaymentType`, `nextPaymentAmount`, `nextPaymentAmountVnd` | Khoản khách trả được **ngay bây giờ**; `null` nếu không có gì để trả |
+| `payments[]` | Lịch sử giao dịch, mới nhất trước |
+| `payments[].status` | `Pending` đang chờ cổng · `Succeeded` thành công · `Failed` thất bại · `Expired` link cũ bị thay bằng link mới |
+| `payments[].provider` | `VnPay` · `Mock` cổng giả lập · `Manual` ghi nhận tay (ngoài hệ thống) |
+| `payments[].amountVnd`, `exchangeRate` | Số VND thực trả và tỉ giá tại thời điểm tạo giao dịch |
+| `payments[].refundOfPaymentId` | Với dòng `Refund`: giao dịch gốc được hoàn |
+| `payments[].providerTxnNo` | Mã giao dịch phía cổng / mã chuyển khoản |
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 403 | `You do not have access to this booking.` | Khách xem đơn của khách khác |
+| 403 | `Drivers and escorts do not see booking payments.` | Tài xế / áp tải gọi |
+| 404 | `Booking with ID 99 was not found.` | Không có đơn |
+
+### POST /api/bookings/{id}/payments — Tạo link thanh toán
+
+Tạo một giao dịch cho khoản đang mở của đơn và trả về đường dẫn sang cổng thanh toán. Link cũ chưa trả của cùng khoản sẽ chuyển `Expired`, nên khách bấm nhiều lần cũng không bị trả trùng. Link VNPay có hiệu lực 15 phút.
+
+- **Ai gọi được:** Customer (chủ đơn)
+- **Dữ liệu gửi lên:** JSON
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `paymentType` | chuỗi | Có | Phải đúng bằng `nextPaymentType` của tóm tắt: `Deposit`, `Balance` hoặc `Extra` |
+
+Ví dụ request:
+
+```json
+{
+  "paymentType": "Balance"
+}
+```
+
+Response `201`:
+
+```json
+{
+  "success": true,
+  "message": "Payment created; open paymentUrl to pay",
+  "data": {
+    "payment": {
+      "paymentId": 14,
+      "paymentCode": "PAY-2026-0014",
+      "bookingId": 7,
+      "paymentType": "Balance",
+      "provider": "Mock",
+      "status": "Pending",
+      "amount": 2063.6,
+      "currencyCode": "USD",
+      "exchangeRate": 26000,
+      "amountVnd": 53653600,
+      "providerTxnNo": null,
+      "bankCode": null,
+      "responseCode": null,
+      "refundOfPaymentId": null,
+      "note": null,
+      "createdByName": null,
+      "createdAt": "2026-10-18T08:24:27.1393283+00:00",
+      "paidAt": null
+    },
+    "paymentUrl": "http://localhost:3001/customer/payments/mock?txnRef=PAY20260014&amountVnd=53653600"
+  },
+  "errors": null
+}
+```
+
+Khi chạy VNPay thật, `paymentUrl` có dạng `https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_Amount=...&vnp_SecureHash=...`.
+
+```js
+const res = await api.post(`/api/bookings/${bookingId}/payments`, { paymentType: summary.nextPaymentType });
+window.location.href = res.data.data.paymentUrl;
+```
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Booking BKG-2026-0007 is waiting for the Balance payment, not Extra.` | Gửi sai khoản |
+| 400 | `Booking BKG-2026-0006 has nothing to pay right now (status: Cancelled).` | Không có khoản nào đang mở |
+| 400 | `PaymentType 'Abc' is invalid. Allowed values: Deposit, Balance, Extra.` | Giá trị `paymentType` không hợp lệ |
+| 400 | `VNPay is not configured on the server (VnPay:TmnCode / VnPay:HashSecret).` | Server chưa cấu hình khóa VNPay |
+| 403 | `You can only pay for your own bookings.` | Trả cho đơn của người khác |
+
+### GET /api/payments/vnpay-return — VNPay đưa khách về
+
+Frontend **không gọi** API này. Đây là `vnp_ReturnUrl`: sau khi khách trả, VNPay chuyển trình duyệt về đây kèm các tham số `vnp_*`. Server kiểm tra chữ ký, cập nhật giao dịch rồi chuyển hướng (HTTP 302) tới:
+
+```
+{FrontendBaseUrl}/customer/payments/result?status=success|failed|invalid&code=PAY-2026-0011&bookingId=6
+```
+
+| `status` | Ý nghĩa |
+|---|---|
+| `success` | Thanh toán thành công |
+| `failed` | Khách hủy hoặc ngân hàng từ chối |
+| `invalid` | Chữ ký sai hoặc không tìm thấy giao dịch |
+
+- **Ai gọi được:** không cần đăng nhập (VNPay gọi)
+
+### GET /api/payments/vnpay-ipn — VNPay báo kết quả cho server
+
+Frontend **không gọi** API này. VNPay gọi trực tiếp server-to-server để báo kết quả (kể cả khi khách đóng trình duyệt giữa chừng). Địa chỉ này phải được đăng ký với VNPay: `https://racehorsetransportbackend-production.up.railway.app/api/payments/vnpay-ipn`.
+
+- **Ai gọi được:** không cần đăng nhập (VNPay gọi)
+- Response là JSON theo chuẩn VNPay (không bọc trong khuôn `success/data`): `{ "RspCode": "00", "Message": "Confirm Success" }`. Các mã khác: `01` không thấy giao dịch, `02` giao dịch đã xử lý rồi, `04` sai số tiền, `97` sai chữ ký, `99` lỗi khác.
+
+### POST /api/payments/mock/{txnRef}/complete — Hoàn tất giao dịch giả lập
+
+Chỉ dùng khi backend chạy `Payment:Provider = Mock`. Trang `/customer/payments/mock` gọi API này khi khách bấm "Thanh toán thành công" hoặc "Giả lập thất bại".
+
+- **Ai gọi được:** Customer (chủ giao dịch)
+- **Dữ liệu gửi lên:** JSON
+
+| Tham số / trường | Mô tả |
+|---|---|
+| `txnRef` (đường dẫn) | Lấy từ query `txnRef` của `paymentUrl` |
+| `success` (body, true/false) | Kết quả muốn giả lập; mặc định `true` |
+
+Response `200`: `data` gồm `success` (true/false), `message`, `payment` (giao dịch sau khi cập nhật). Frontend chuyển sang `/customer/payments/result?status=...&code=...&bookingId=...`.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 403 | `You can only complete your own payments.` | Giao dịch của người khác |
+| 404 | `Mock payment PAY20260099 was not found.` | Sai `txnRef`, hoặc giao dịch không phải của cổng giả lập |
+
+### POST /api/bookings/{id}/payments/manual — Ghi nhận khoản trả ngoài hệ thống
+
+Quản lý ghi nhận tiền khách đã chuyển khoản / trả tại văn phòng. Có tác dụng y như thanh toán online: ghi đủ cọc thì đơn chuyển `Approved` và mở hồ sơ; ghi đủ phát sinh thì đơn `Completed`.
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `paymentType` | chuỗi | Có | `Deposit`, `Balance` hoặc `Extra` |
+| `amount` | số (USD) | Có | > 0 và không vượt số còn thiếu của khoản đó; được phép trả một phần |
+| `reference` | chuỗi | Có | Mã chuyển khoản / số biên lai, tối đa 100 ký tự |
+| `note` | chuỗi | Không | Tối đa 300 ký tự |
+
+Ví dụ request:
+
+```json
+{
+  "paymentType": "Deposit",
+  "amount": 884.4,
+  "reference": "FT26291123456",
+  "note": "Khách chuyển khoản Vietcombank"
+}
+```
+
+Response `201`: `data` là giao dịch vừa tạo (`provider` = `Manual`, `status` = `Succeeded`).
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Amount 1,000.00 is more than the outstanding Deposit amount 884.40 USD.` | Ghi quá số còn thiếu |
+| 400 | `Nothing is outstanding for the Balance payment of booking BKG-2026-0007.` | Khoản đó đã trả đủ |
+| 400 | `Booking BKG-2026-0006 is Cancelled; no payment can be recorded.` | Đơn đã hủy / từ chối / hết hạn |
+
+### POST /api/payments/{id}/retry-refund — Thử hoàn tiền lại qua cổng
+
+Khi khách hủy đơn, server tự gọi API hoàn tiền của VNPay. Nếu thất bại, dòng `Refund` ở trạng thái `Failed` và quản lý nhận thông báo; dùng API này để thử lại.
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** không có. `id` là `paymentId` của dòng `Refund`.
+
+Response `200`: `data` là dòng hoàn tiền sau khi thử (`status` `Succeeded` hoặc vẫn `Failed`).
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `This refund was paid outside the system; refund it manually and mark it as refunded.` | Tiền gốc trả ngoài hệ thống (`Manual`): phải hoàn tay |
+| 400 | `Refund PAY-2026-0012 has already been completed.` | Đã hoàn xong |
+| 404 | `Refund with ID 99 was not found.` | Sai mã, hoặc không phải dòng hoàn tiền |
+
+### POST /api/payments/{id}/mark-refunded — Đánh dấu đã hoàn tiền thủ công
+
+Quản lý đã chuyển trả tiền cho khách ngoài hệ thống (bắt buộc với khoản gốc trả tay). Khách nhận thông báo + email.
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `reference` | chuỗi | Có | Mã chuyển khoản hoàn, tối đa 50 ký tự |
+| `note` | chuỗi | Không | Tối đa 300 ký tự |
+
+Response `200`: `data` là dòng hoàn tiền với `status` = `Succeeded`. Lỗi giống `retry-refund` (trừ lỗi `Manual`).
+
+### GET /api/settings/payment — Xem cấu hình thanh toán
+
+- **Ai gọi được:** Mọi người đã đăng nhập (khách dùng để hiện % cọc / % hoàn khi hủy)
+- **Dữ liệu gửi lên:** không có
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Request processed successfully",
+  "data": {
+    "depositPercent": 30,
+    "cancelRefundPercent": 50,
+    "usdVndRate": 26000,
+    "balanceDueDaysBeforeDeparture": 2,
+    "extraPaymentDueDays": 7,
+    "updatedAt": "2026-10-18T08:08:56.354544+00:00",
+    "updatedByName": "Trần Quốc Bảo"
+  },
+  "errors": null
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `depositPercent` | % cọc áp dụng cho đơn được duyệt từ bây giờ (0–100) |
+| `cancelRefundPercent` | % tiền cọc được hoàn khi khách hủy (phần còn lại đã trả luôn hoàn 100%) |
+| `usdVndRate` | Tỉ giá quy đổi USD → VND khi thanh toán |
+| `balanceDueDaysBeforeDeparture` | Phần còn lại phải trả trước ngày xuất phát bao nhiêu ngày |
+| `extraPaymentDueDays` | Phát sinh phải trả trong bao nhiêu ngày sau khi đóng chuyến |
+
+### PUT /api/settings/payment — Sửa cấu hình thanh toán
+
+Giá trị mới chỉ áp dụng cho đơn duyệt sau đó; đơn đã duyệt giữ % cọc đã chốt.
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON, gửi đủ cả 5 trường
+
+| Trường | Kiểu | Giới hạn |
+|---|---|---|
+| `depositPercent` | số | 0 – 100 |
+| `cancelRefundPercent` | số | 0 – 100 |
+| `usdVndRate` | số | 1 – 1.000.000 |
+| `balanceDueDaysBeforeDeparture` | số nguyên | 0 – 30 |
+| `extraPaymentDueDays` | số nguyên | 1 – 90 |
+
+Ví dụ request:
+
+```json
+{
+  "depositPercent": 30,
+  "cancelRefundPercent": 50,
+  "usdVndRate": 26000,
+  "balanceDueDaysBeforeDeparture": 2,
+  "extraPaymentDueDays": 7
+}
+```
+
+Response `200`: `data` là cấu hình sau khi lưu (dạng giống GET).
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Validation failed` (kèm `errors`, ví dụ `DepositPercent must be between 0 and 100.`) | Giá trị ngoài giới hạn |
+| 403 | | Không phải quản lý / Admin |
+
+---
+
+## 20. Những phần chưa có API
 
 Các phần dưới đây backend chưa làm. Frontend có thể dựng giao diện trước nhưng chưa nối được.
 
@@ -5816,9 +6248,9 @@ Tiến độ từng phần xem ở [TASKS.md](TASKS.md).
 
 ---
 
-## 20. Bảng tra nhanh mọi endpoint
+## 21. Bảng tra nhanh mọi endpoint
 
-Tổng cộng 105 endpoint. Chi tiết từng cái xem ở mục tương ứng.
+Tổng cộng 115 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 
 **4. Đăng nhập và tài khoản của tôi**
 
@@ -5999,3 +6431,18 @@ Tổng cộng 105 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | Method | Đường dẫn | Việc | Ai gọi được |
 |---|---|---|---|
 | GET | `/api/lookups/enums` | Lấy mọi danh sách giá trị cố định | Mọi người đã đăng nhập |
+
+**19. Thanh toán**
+
+| Method | Đường dẫn | Việc | Ai gọi được |
+|---|---|---|---|
+| GET | `/api/bookings/{id}/payments` | Tóm tắt thanh toán của đơn | Customer (chủ đơn), LogisticsManager, TransportSpecialist, FleetCoordinator, Admin |
+| POST | `/api/bookings/{id}/payments` | Tạo link thanh toán | Customer (chủ đơn) |
+| POST | `/api/bookings/{id}/payments/manual` | Ghi nhận khoản trả ngoài hệ thống | LogisticsManager, Admin |
+| GET | `/api/payments/vnpay-return` | VNPay đưa khách về (frontend không gọi) | Không cần đăng nhập |
+| GET | `/api/payments/vnpay-ipn` | VNPay báo kết quả (frontend không gọi) | Không cần đăng nhập |
+| POST | `/api/payments/mock/{txnRef}/complete` | Hoàn tất giao dịch giả lập | Customer |
+| POST | `/api/payments/{id}/retry-refund` | Thử hoàn tiền lại qua cổng | LogisticsManager, Admin |
+| POST | `/api/payments/{id}/mark-refunded` | Đánh dấu đã hoàn tiền thủ công | LogisticsManager, Admin |
+| GET | `/api/settings/payment` | Xem cấu hình thanh toán | Mọi người đã đăng nhập |
+| PUT | `/api/settings/payment` | Sửa cấu hình thanh toán | LogisticsManager, Admin |

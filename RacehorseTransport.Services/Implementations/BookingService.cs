@@ -18,7 +18,13 @@ namespace RacehorseTransport.Services.Implementations
         // Đơn ở các trạng thái này còn đang chạy: ngựa trong đơn chưa thể vào đơn khác trùng thời gian
         private static readonly string[] OpenStatuses =
         {
-            BookingStatuses.Submitted, BookingStatuses.Approved, BookingStatuses.Assigned
+            BookingStatuses.Submitted, BookingStatuses.AwaitingDeposit, BookingStatuses.Approved, BookingStatuses.Assigned
+        };
+
+        // Khách tự hủy được khi đơn còn ở các trạng thái này (và ngựa chưa nằm trên chuyến nào)
+        private static readonly string[] CancellableStatuses =
+        {
+            BookingStatuses.Submitted, BookingStatuses.AwaitingDeposit, BookingStatuses.Approved, BookingStatuses.Assigned
         };
 
         private readonly IRepository<BookingRequest> _bookingRepo;
@@ -26,8 +32,12 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IRepository<Horse> _horseRepo;
         private readonly IRepository<User> _userRepo;
         private readonly IRepository<DigitalDossier> _dossierRepo;
+        private readonly IRepository<TripHorse> _tripHorseRepo;
         private readonly IPricingService _pricingService;
         private readonly IClearanceScheduleService _clearanceSchedule;
+        private readonly IPaymentService _paymentService;
+        private readonly ISystemSettingService _settingService;
+        private readonly IBookingActivator _bookingActivator;
         private readonly INotificationService _notificationService;
         private readonly ICodeGenerator _codeGenerator;
         private readonly IUnitOfWork _unitOfWork;
@@ -39,8 +49,12 @@ namespace RacehorseTransport.Services.Implementations
             IRepository<Horse> horseRepo,
             IRepository<User> userRepo,
             IRepository<DigitalDossier> dossierRepo,
+            IRepository<TripHorse> tripHorseRepo,
             IPricingService pricingService,
             IClearanceScheduleService clearanceSchedule,
+            IPaymentService paymentService,
+            ISystemSettingService settingService,
+            IBookingActivator bookingActivator,
             INotificationService notificationService,
             ICodeGenerator codeGenerator,
             IUnitOfWork unitOfWork,
@@ -51,8 +65,12 @@ namespace RacehorseTransport.Services.Implementations
             _horseRepo = horseRepo;
             _userRepo = userRepo;
             _dossierRepo = dossierRepo;
+            _tripHorseRepo = tripHorseRepo;
             _pricingService = pricingService;
             _clearanceSchedule = clearanceSchedule;
+            _paymentService = paymentService;
+            _settingService = settingService;
+            _bookingActivator = bookingActivator;
             _notificationService = notificationService;
             _codeGenerator = codeGenerator;
             _unitOfWork = unitOfWork;
@@ -124,6 +142,7 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(b => b.BookingHorses).ThenInclude(bh => bh.Horse)
                 .Include(b => b.BookingHorses).ThenInclude(bh => bh.Dossier)
                 .Include(b => b.BookingHorses).ThenInclude(bh => bh.TripHorses).ThenInclude(th => th.Trip)
+                .Include(b => b.Payments).ThenInclude(p => p.CreatedBy)
                 .FirstOrDefaultAsync(b => b.BookingId == id);
 
             if (booking == null)
@@ -136,7 +155,9 @@ namespace RacehorseTransport.Services.Implementations
                 throw new ForbiddenException("You do not have access to this booking.");
             }
 
-            return booking.ToDetailModel(_pricingService.ParseLines(booking.QuoteBreakdown));
+            var model = booking.ToDetailModel(_pricingService.ParseLines(booking.QuoteBreakdown));
+            model.Payment = _paymentService.BuildSummary(booking, await _settingService.GetPaymentSettingsAsync());
+            return model;
         }
 
         // ---------------------------------------------------------------------------------------------
@@ -145,6 +166,12 @@ namespace RacehorseTransport.Services.Implementations
 
         public async Task<BookingDetailModel> CreateBookingAsync(CreateBookingModel model, CurrentUser currentUser)
         {
+            // R-02: còn chi phí phát sinh quá hạn chưa trả thì chưa được đặt đơn mới
+            if (await _paymentService.HasOverdueDebtAsync(currentUser.UserId))
+            {
+                throw new BusinessException("You have overdue extra charges on a previous booking. Please pay them before creating a new booking.");
+            }
+
             var horseIds = model.Horses.Select(h => h.HorseId).ToList();
             if (horseIds.Count != horseIds.Distinct().Count())
             {
@@ -274,36 +301,20 @@ namespace RacehorseTransport.Services.Implementations
 
             var specialist = await GetActiveSpecialistAsync(specialistUserId);
 
+            // R-02: duyệt xong khách phải đặt cọc (% cấu hình, chụp lại vào đơn) rồi mới làm hồ sơ / xếp chuyến
+            var settings = await _settingService.GetPaymentSettingsAsync();
+            decimal depositAmount = Math.Round(booking.EstimatedCost * settings.DepositPercent / 100, 2);
+
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
-                booking.Status = BookingStatuses.Approved;
+                booking.Status = BookingStatuses.AwaitingDeposit;
                 booking.ReviewedByUserId = currentUser.UserId;
                 booking.ReviewedAt = DateTimeOffset.UtcNow;
                 booking.AssignedSpecialistId = specialist.UserId;
                 booking.RejectionReason = null;
-
-                var dossiers = new List<DigitalDossier>();
-                foreach (var bookingHorse in booking.BookingHorses.Where(bh => bh.Status != BookingHorseStatuses.Cancelled))
-                {
-                    bookingHorse.Status = BookingHorseStatuses.Approved;
-                    dossiers.Add(new DigitalDossier
-                    {
-                        DossierCode = await _codeGenerator.NextAsync(CodePrefixes.Dossier),
-                        BookingHorseId = bookingHorse.BookingHorseId,
-                        SpecialistUserId = specialist.UserId,
-                        Status = DossierStatuses.Draft
-                    });
-                }
-
+                booking.DepositPercent = settings.DepositPercent;
+                booking.DepositAmount = depositAmount;
                 await _bookingRepo.UpdateAsync(booking);
-                await _dossierRepo.AddRangeAsync(dossiers);
-
-                await _notificationService.SendAsync(
-                    booking.CustomerUserId,
-                    $"Booking {booking.BookingCode} approved",
-                    $"Your transport request has been approved. {specialist.FullName} will handle the documents and quarantine clearance.",
-                    NotificationReferenceTypes.Booking,
-                    booking.BookingId);
 
                 await _notificationService.EmailCustomerAsync(
                     booking.CustomerUserId,
@@ -311,10 +322,17 @@ namespace RacehorseTransport.Services.Implementations
                     CustomerPages.Booking(booking.BookingId),
                     new Dictionary<string, string> { ["BookingCode"] = booking.BookingCode });
 
+                if (depositAmount <= 0)
+                {
+                    // Cấu hình cọc 0%: không cần cọc, mở hồ sơ ngay
+                    await _bookingActivator.ActivateAsync(booking);
+                    return;
+                }
+
                 await _notificationService.SendAsync(
-                    specialist.UserId,
-                    $"Booking {booking.BookingCode} assigned to you",
-                    $"You are responsible for the clearance dossiers of {dossiers.Count} horse(s) in this booking.",
+                    booking.CustomerUserId,
+                    $"Booking {booking.BookingCode} approved - deposit required",
+                    $"Your transport request has been approved. Please pay the {settings.DepositPercent:0.##}% deposit of {depositAmount:N2} {booking.CurrencyCode} within {_options.DepositDays} days to confirm it; {specialist.FullName} will then start the quarantine documents.",
                     NotificationReferenceTypes.Booking,
                     booking.BookingId);
             });
@@ -433,7 +451,9 @@ namespace RacehorseTransport.Services.Implementations
         public async Task<BookingDetailModel> ReassignSpecialistAsync(int id, int specialistUserId, CurrentUser currentUser)
         {
             var booking = await GetTrackedBookingAsync(id);
-            if (booking.Status != BookingStatuses.Approved && booking.Status != BookingStatuses.Assigned)
+            if (booking.Status != BookingStatuses.AwaitingDeposit
+                && booking.Status != BookingStatuses.Approved
+                && booking.Status != BookingStatuses.Assigned)
             {
                 throw new BusinessException($"The specialist can only be changed on an approved booking (current status: {booking.Status}).");
             }
@@ -482,7 +502,9 @@ namespace RacehorseTransport.Services.Implementations
             return await GetBookingByIdAsync(id, currentUser);
         }
 
-        // Khách tự hủy đơn của mình, chỉ khi đơn chưa được xét duyệt
+        // Khách tự hủy đơn của mình trước khi ngựa được xếp lên chuyến (R-02):
+        //   Submitted / AwaitingDeposit -> không mất gì; Approved (đã cọc) -> hoàn % cọc theo cấu hình + phần còn lại đã trả.
+        // Ngựa đã nằm trên một chuyến thì phải nhờ điều phối / quản lý gỡ khỏi chuyến trước.
         public async Task<BookingDetailModel> CancelBookingAsync(int id, CurrentUser currentUser)
         {
             var booking = await GetTrackedBookingAsync(id);
@@ -490,8 +512,22 @@ namespace RacehorseTransport.Services.Implementations
             {
                 throw new ForbiddenException("You can only cancel your own bookings.");
             }
-            EnsureStatus(booking, BookingStatuses.Submitted, "cancelled");
+            if (!CancellableStatuses.Contains(booking.Status))
+            {
+                throw new BusinessException($"A booking can only be cancelled before departure (current status: {booking.Status}).");
+            }
 
+            var bookingHorseIds = booking.BookingHorses.Select(bh => bh.BookingHorseId).ToList();
+            var onTrip = await _tripHorseRepo.GetQueryable()
+                .Where(th => bookingHorseIds.Contains(th.BookingHorseId) && th.Trip!.OverallStatus != TripStatuses.Cancelled)
+                .Select(th => th.Trip!.TripCode)
+                .FirstOrDefaultAsync();
+            if (onTrip != null)
+            {
+                throw new BusinessException($"Horses of this booking are already planned on trip {onTrip}. Please contact the logistics team to cancel.");
+            }
+
+            string previousStatus = booking.Status;
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 booking.Status = BookingStatuses.Cancelled;
@@ -502,10 +538,18 @@ namespace RacehorseTransport.Services.Implementations
                 await _notificationService.SendToRoleAsync(
                     UserRoles.LogisticsManager,
                     $"Booking {booking.BookingCode} cancelled",
-                    "The customer cancelled this transport request before it was reviewed.",
+                    previousStatus == BookingStatuses.Submitted
+                        ? "The customer cancelled this transport request before it was reviewed."
+                        : $"The customer cancelled this booking (was {previousStatus}). Any refund is processed automatically.",
                     NotificationReferenceTypes.Booking,
                     booking.BookingId);
             });
+
+            // Hoàn tiền sau khi đã chốt hủy (gọi cổng thanh toán nên không giữ transaction DB trong lúc chờ)
+            if (previousStatus != BookingStatuses.Submitted)
+            {
+                await _paymentService.RefundForCancellationAsync(booking, currentUser);
+            }
 
             return await GetBookingByIdAsync(id, currentUser);
         }
@@ -533,6 +577,32 @@ namespace RacehorseTransport.Services.Implementations
                         booking.BookingId);
                 });
             }
+
+            // R-02: đã duyệt mà quá hạn chưa đặt cọc -> hết hạn, trả ngựa về cho khách đặt đơn khác
+            var depositCutoff = DateTimeOffset.UtcNow.AddDays(-_options.DepositDays);
+            var unpaid = await _bookingRepo.GetQueryable()
+                .Include(b => b.BookingHorses)
+                .Where(b => b.Status == BookingStatuses.AwaitingDeposit && b.ReviewedAt != null && b.ReviewedAt < depositCutoff)
+                .ToListAsync();
+
+            foreach (var booking in unpaid)
+            {
+                await _unitOfWork.ExecuteInTransactionAsync(async () =>
+                {
+                    booking.Status = BookingStatuses.Expired;
+                    CancelHorses(booking);
+                    await _bookingRepo.UpdateAsync(booking);
+
+                    await _notificationService.SendAsync(
+                        booking.CustomerUserId,
+                        $"Booking {booking.BookingCode} has expired",
+                        $"The deposit was not paid within {_options.DepositDays} days after approval, so the booking has expired. Please submit a new request.",
+                        NotificationReferenceTypes.Booking,
+                        booking.BookingId,
+                        emailCustomers: true);
+                });
+            }
+            overdue.AddRange(unpaid);
 
             return overdue.Count;
         }

@@ -95,6 +95,9 @@ namespace RacehorseTransport.API.ResponseModels
         public DateTimeOffset? ReviewedAt { get; set; }
         public List<QuoteLineResponse> QuoteLines { get; set; } = new();
         public List<BookingHorseResponse> Horses { get; set; } = new();
+
+        // Tình hình thanh toán (R-02)
+        public BookingPaymentSummaryResponse Payment { get; set; } = new();
     }
 
     public class BookingHorseResponse

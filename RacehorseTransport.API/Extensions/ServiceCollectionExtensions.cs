@@ -68,6 +68,8 @@ namespace RacehorseTransport.API.Extensions
         {
             services.Configure<BookingOptions>(configuration.GetSection(BookingOptions.SectionName));
             services.Configure<TransitOptions>(configuration.GetSection(TransitOptions.SectionName));
+            services.Configure<PaymentOptions>(configuration.GetSection(PaymentOptions.SectionName));
+            services.Configure<VnPayOptions>(configuration.GetSection(VnPayOptions.SectionName));
             services.Configure<SupabaseOptions>(configuration.GetSection(SupabaseOptions.SectionName));
             services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
             services.Configure<GoogleOptions>(configuration.GetSection(GoogleOptions.SectionName));
@@ -109,6 +111,15 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<IHorseDocumentService, HorseDocumentService>();
             services.AddSingleton<ITransitTimeEstimator, TransitTimeEstimator>();
             services.AddScoped<IClearanceScheduleService, ClearanceScheduleService>();
+
+            // Thanh toán (R-02): cổng VNPay thật + cổng giả lập; PaymentGatewayResolver chọn cổng theo cấu hình
+            services.AddScoped<ISystemSettingService, SystemSettingService>();
+            services.AddHttpClient<VnPayGateway>(client => client.Timeout = TimeSpan.FromSeconds(30));
+            services.AddScoped<IPaymentGateway>(sp => sp.GetRequiredService<VnPayGateway>());
+            services.AddScoped<IPaymentGateway, MockPaymentGateway>();
+            services.AddScoped<IPaymentGatewayResolver, PaymentGatewayResolver>();
+            services.AddScoped<IBookingActivator, BookingActivator>();
+            services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IPricingService, PricingService>();
             services.AddScoped<IPriceItemService, PriceItemService>();
             services.AddScoped<IBookingService, BookingService>();

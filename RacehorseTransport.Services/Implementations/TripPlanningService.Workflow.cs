@@ -211,6 +211,10 @@ namespace RacehorseTransport.Services.Implementations
                 .Distinct()
                 .ToListAsync();
 
+            // R-02: nhắc khách trả phần còn lại trước ngày xuất phát
+            var paymentSettings = await _settingService.GetPaymentSettingsAsync();
+            var balanceDueAt = trip.PlannedStartDate.AddDays(-paymentSettings.BalanceDueDaysBeforeDeparture);
+
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 trip.OverallStatus = TripStatuses.Scheduled;
@@ -239,7 +243,7 @@ namespace RacehorseTransport.Services.Implementations
                 await _notificationService.SendToUsersAsync(
                     customerIds,
                     $"Your horses are scheduled on trip {trip.TripCode}",
-                    $"Transport has been scheduled. Planned departure: {trip.PlannedStartDate:yyyy-MM-dd HH:mm} UTC.",
+                    $"Transport has been scheduled. Planned departure: {trip.PlannedStartDate:yyyy-MM-dd HH:mm} UTC. If your booking still has a remaining balance, please pay it before {balanceDueAt:yyyy-MM-dd}; the horses cannot depart until it is paid.",
                     NotificationReferenceTypes.Trip,
                     trip.TripId);
             });

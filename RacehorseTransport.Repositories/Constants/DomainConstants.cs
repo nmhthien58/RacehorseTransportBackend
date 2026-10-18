@@ -37,14 +37,49 @@ namespace RacehorseTransport.Repositories.Constants
     public static class BookingStatuses
     {
         public const string Submitted = "Submitted";
-        public const string Approved = "Approved";
-        public const string Assigned = "Assigned";
+        public const string AwaitingDeposit = "AwaitingDeposit";           // Manager đã duyệt, chờ khách đặt cọc
+        public const string Approved = "Approved";                         // đã cọc: làm hồ sơ, xếp chuyến
+        public const string Assigned = "Assigned";                         // trạng thái cũ, không còn tạo mới
+        public const string AwaitingFinalPayment = "AwaitingFinalPayment"; // chuyến đã đóng, còn chi phí phát sinh chưa trả
         public const string Completed = "Completed";
         public const string Rejected = "Rejected";
         public const string Expired = "Expired";
         public const string Cancelled = "Cancelled";
 
-        public static readonly string[] All = { Submitted, Approved, Assigned, Completed, Rejected, Expired, Cancelled };
+        public static readonly string[] All =
+        {
+            Submitted, AwaitingDeposit, Approved, Assigned, AwaitingFinalPayment, Completed, Rejected, Expired, Cancelled
+        };
+    }
+
+    public static class PaymentTypes
+    {
+        public const string Deposit = "Deposit"; // cọc sau khi duyệt
+        public const string Balance = "Balance"; // phần còn lại của giá báo, trả trước khi xuất phát
+        public const string Extra = "Extra";     // chi phí phát sinh (sự cố) sau khi đóng chuyến
+        public const string Refund = "Refund";   // hoàn tiền khi hủy đơn
+
+        public static readonly string[] Charges = { Deposit, Balance, Extra };
+        public static readonly string[] All = { Deposit, Balance, Extra, Refund };
+    }
+
+    public static class PaymentStatuses
+    {
+        public const string Pending = "Pending";
+        public const string Succeeded = "Succeeded";
+        public const string Failed = "Failed";
+        public const string Expired = "Expired";
+
+        public static readonly string[] All = { Pending, Succeeded, Failed, Expired };
+    }
+
+    public static class PaymentProviders
+    {
+        public const string VnPay = "VnPay";
+        public const string Mock = "Mock";     // cổng giả lập khi chưa cấu hình VNPay
+        public const string Manual = "Manual"; // Manager ghi nhận tiền nhận ngoài hệ thống
+
+        public static readonly string[] All = { VnPay, Mock, Manual };
     }
 
     public static class BookingHorseStatuses

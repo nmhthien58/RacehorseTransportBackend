@@ -76,6 +76,29 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"The trip cannot depart: clearance is not complete for {string.Join(", ", notCleared)}.");
             }
 
+            // R-02: phần còn lại của giá báo phải trả đủ trước khi xuất phát (đơn tạo trước khi có thanh toán thì bỏ qua)
+            var unpaidBookings = await _tripHorseRepo.GetQueryable()
+                .Where(th => th.TripId == tripId)
+                .Select(th => th.BookingHorse!.Booking!)
+                .Where(b => b.DepositPercent != null)
+                .Distinct()
+                .Select(b => new
+                {
+                    b.BookingCode,
+                    b.EstimatedCost,
+                    Paid = b.Payments
+                        .Where(p => p.Status == PaymentStatuses.Succeeded
+                            && (p.PaymentType == PaymentTypes.Deposit || p.PaymentType == PaymentTypes.Balance))
+                        .Sum(p => (decimal?)p.Amount) ?? 0
+                })
+                .ToListAsync();
+
+            var notPaid = unpaidBookings.Where(b => b.Paid < b.EstimatedCost).Select(b => b.BookingCode).ToList();
+            if (notPaid.Count > 0)
+            {
+                throw new BusinessException($"The trip cannot depart: the remaining balance is not paid for {string.Join(", ", notPaid)}.");
+            }
+
             var origin = ActiveRoute(trip).FirstOrDefault();
             if (origin == null || origin.CheckpointType != CheckpointTypes.Origin)
             {
