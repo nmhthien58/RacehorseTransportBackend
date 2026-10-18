@@ -75,7 +75,12 @@ namespace RacehorseTransport.Services.Implementations
             ["Guangzhou"] = (23.1291, 113.2644),
             ["Quảng Châu"] = (23.1291, 113.2644),
             ["Kunming"] = (25.0406, 102.7129),
-            ["Côn Minh"] = (25.0406, 102.7129)
+            ["Côn Minh"] = (25.0406, 102.7129),
+
+            // Nga (RU)
+            ["Moscow"] = (55.7558, 37.6173),
+            ["Saint Petersburg"] = (59.9311, 30.3609),
+            ["Novosibirsk"] = (55.0084, 82.9357)
         };
 
         public DistanceService(HttpClient httpClient, IConfiguration configuration, ILogger<DistanceService> logger)
@@ -321,6 +326,24 @@ namespace RacehorseTransport.Services.Implementations
                     routeDesc = "TP.HCM/Miền Nam → Quốc lộ 1A → Hữu Nghị Quan → Nam Ninh";
                 }
             }
+            else if (destCountry == "RU") // Nga: đường bộ đi qua Trung Quốc (và Kazakhstan / Mông Cổ)
+            {
+                bool siberia = MatchesCity(destCity, "Novosibirsk");
+                if (originRegion == "North")
+                {
+                    distanceKm = siberia ? 6400 : 9300;
+                    routeDesc = siberia
+                        ? "Hà Nội → Hữu Nghị Quan → Trung Quốc → Mông Cổ → Novosibirsk"
+                        : "Hà Nội → Hữu Nghị Quan → Trung Quốc → Kazakhstan → Moscow";
+                }
+                else
+                {
+                    distanceKm = siberia ? 8000 : 10900;
+                    routeDesc = siberia
+                        ? "TP.HCM → Hữu Nghị Quan → Trung Quốc → Mông Cổ → Novosibirsk"
+                        : "TP.HCM → Hữu Nghị Quan → Trung Quốc → Kazakhstan → Moscow";
+                }
+            }
             else // Nội địa hoặc tuyến khác
             {
                 if (originRegion == "South" && MatchesCity(destCity, "Hà Nội", "Hanoi"))
@@ -376,6 +399,7 @@ namespace RacehorseTransport.Services.Implementations
             if (cc == "TH") return KnownCityCoordinates["Bangkok"];
             if (cc == "LA") return KnownCityCoordinates["Vientiane"];
             if (cc == "CN") return KnownCityCoordinates["Nam Ninh"];
+            if (cc == "RU") return KnownCityCoordinates["Moscow"];
 
             return null;
         }
