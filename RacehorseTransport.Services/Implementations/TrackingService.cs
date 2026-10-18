@@ -194,8 +194,13 @@ namespace RacehorseTransport.Services.Implementations
                 Trips = trips.Select(trip =>
                 {
                     var route = ActiveRoute(trip);
+                    var myPickup = TripRouteRules.PickupCheckpoint(route, bookingId);
+                    var myDropoff = TripRouteRules.DropoffCheckpoint(route, bookingId);
                     return new TrackingTripModel
                     {
+                        PickupCheckpointId = myPickup?.CheckpointId,
+                        DropoffCheckpointId = myDropoff?.CheckpointId,
+                        EstimatedDeliveryAt = myDropoff?.PlannedTime,
                         TripId = trip.TripId,
                         TripCode = trip.TripCode,
                         OverallStatus = trip.OverallStatus,
@@ -207,18 +212,26 @@ namespace RacehorseTransport.Services.Implementations
                         ActualEndDate = trip.ActualEndDate,
                         DelayMinutes = CurrentDelay(route),
                         HandoverCompleted = trip.Handovers.Any(h => h.BookingId == bookingId),
-                        Checkpoints = route.Select(c => new TrackingCheckpointModel
+                        Checkpoints = route.Select(c =>
                         {
-                            CheckpointId = c.CheckpointId,
-                            SequenceOrder = c.SequenceOrder,
-                            CheckpointName = c.CheckpointName,
-                            CheckpointType = c.CheckpointType,
-                            Address = c.Address,
-                            PlannedTime = c.PlannedTime,
-                            ActualArrivalTime = c.ActualArrivalTime,
-                            ActualDepartureTime = c.ActualDepartureTime,
-                            Status = c.Status,
-                            DelayMinutes = Delay(c)
+                            // Khách không được thấy điểm đón / trả của khách khác đi chung chuyến
+                            bool otherStop = c.BookingId != null && c.BookingId != bookingId;
+                            return new TrackingCheckpointModel
+                            {
+                                CheckpointId = c.CheckpointId,
+                                SequenceOrder = c.SequenceOrder,
+                                CheckpointName = otherStop ? string.Empty : c.CheckpointName,
+                                CheckpointType = c.CheckpointType,
+                                Address = otherStop ? string.Empty : c.Address,
+                                PlannedTime = c.PlannedTime,
+                                ActualArrivalTime = c.ActualArrivalTime,
+                                ActualDepartureTime = c.ActualDepartureTime,
+                                Status = c.Status,
+                                DelayMinutes = Delay(c),
+                                IsOtherBookingStop = otherStop,
+                                IsMyPickup = c.CheckpointId == myPickup?.CheckpointId,
+                                IsMyDropoff = c.CheckpointId == myDropoff?.CheckpointId
+                            };
                         }).ToList(),
                         // Khách chỉ thấy ngựa của đơn mình, không thấy ngựa của đơn khác đi chung chuyến
                         Horses = activeBookingHorses
@@ -238,6 +251,11 @@ namespace RacehorseTransport.Services.Implementations
                                     HorseId = x.BookingHorse.HorseId,
                                     HorseName = x.BookingHorse.Horse!.Name,
                                     StallSlotNumber = x.TripHorse.StallSlotNumber,
+                                    Status = x.TripHorse.Status,
+                                    PickedUpAt = x.TripHorse.PickedUpAt,
+                                    DeliveredAt = x.TripHorse.DeliveredAt,
+                                    OffloadedAt = x.TripHorse.OffloadedAt,
+                                    OffloadReason = x.TripHorse.OffloadReason,
                                     LatestLog = logs.FirstOrDefault(),
                                     Logs = logs
                                 };

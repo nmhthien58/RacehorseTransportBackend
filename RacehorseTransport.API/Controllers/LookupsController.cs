@@ -41,6 +41,7 @@ namespace RacehorseTransport.API.Controllers
                 CrewRoles = CrewRoles.All.ToArray(),
                 CheckpointTypes = CheckpointTypes.All.ToArray(),
                 CheckpointStatuses = CheckpointStatuses.All.ToArray(),
+                TripHorseStatuses = TripHorseStatuses.All.ToArray(),
                 FeedStatuses = FeedStatuses.All.ToArray(),
                 StressLevels = StressLevels.All.ToArray(),
                 IncidentTypes = IncidentTypes.All.ToArray(),

@@ -64,7 +64,12 @@ namespace RacehorseTransport.API.Mappers
                     SpecialCareRequirements = h.SpecialCareRequirements,
                     PhotoUrl = h.PhotoUrl,
                     StallClass = h.StallClass,
-                    DossierStatus = h.DossierStatus
+                    DossierStatus = h.DossierStatus,
+                    Status = h.Status,
+                    PickedUpAt = h.PickedUpAt,
+                    DeliveredAt = h.DeliveredAt,
+                    OffloadedAt = h.OffloadedAt,
+                    OffloadReason = h.OffloadReason
                 }).ToList(),
                 Checkpoints = model.Checkpoints.Select(c => new TripCheckpointResponse
                 {
@@ -78,7 +83,9 @@ namespace RacehorseTransport.API.Mappers
                     ActualArrivalTime = c.ActualArrivalTime,
                     ActualDepartureTime = c.ActualDepartureTime,
                     Status = c.Status,
-                    IsActive = c.IsActive
+                    IsActive = c.IsActive,
+                    BookingId = c.BookingId,
+                    BookingCode = c.BookingCode
                 }).ToList(),
                 Bookings = model.Bookings.Select(b => new TripBookingResponse
                 {
@@ -89,7 +96,13 @@ namespace RacehorseTransport.API.Mappers
                     PickupAddress = b.PickupAddress,
                     DropoffAddress = b.DropoffAddress,
                     HorseCountOnTrip = b.HorseCountOnTrip,
-                    HandoverCompleted = b.HandoverCompleted
+                    HandoverCompleted = b.HandoverCompleted,
+                    PickupCheckpointId = b.PickupCheckpointId,
+                    DropoffCheckpointId = b.DropoffCheckpointId,
+                    EstimatedDeliveryAt = b.EstimatedDeliveryAt,
+                    DeliveryDeadline = b.DeliveryDeadline,
+                    DeliveredHorseCount = b.DeliveredHorseCount,
+                    OffloadedHorseCount = b.OffloadedHorseCount
                 }).ToList()
             };
 

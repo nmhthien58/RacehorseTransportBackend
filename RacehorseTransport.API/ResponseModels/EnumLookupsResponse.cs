@@ -18,6 +18,7 @@ namespace RacehorseTransport.API.ResponseModels
         public string[] CrewRoles { get; set; } = Array.Empty<string>();
         public string[] CheckpointTypes { get; set; } = Array.Empty<string>();
         public string[] CheckpointStatuses { get; set; } = Array.Empty<string>();
+        public string[] TripHorseStatuses { get; set; } = Array.Empty<string>();
         public string[] FeedStatuses { get; set; } = Array.Empty<string>();
         public string[] StressLevels { get; set; } = Array.Empty<string>();
         public string[] IncidentTypes { get; set; } = Array.Empty<string>();

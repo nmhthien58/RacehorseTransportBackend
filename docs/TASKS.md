@@ -230,6 +230,14 @@ Không task nào của Tú chặn việc của Thiên. Chiều ngược lại:
 19. **Hủy sau khi cọc, trước khi ngựa lên chuyến:** hoàn `CancelRefundPercent`% cọc (mặc định 50%) + 100% phần còn lại đã trả, gọi API hoàn tiền VNPay; lỗi thì Manager thử lại hoặc hoàn tay và đánh dấu. Khách thấy dòng hoàn tiền trong lịch sử thanh toán + nhận thông báo / email.
 20. **Nợ phát sinh quá hạn:** nhắc ở ngày đến hạn, +3, +7 (job chạy cùng `BookingExpiryJob`), khách không tạo được đơn mới cho tới khi trả. Không cọc đúng hạn thì đơn `Expired`. Tài xế không thu tiền; Manager ghi nhận được khoản trả ngoài hệ thống. Đơn cũ trước tính năng này (`deposit_percent` NULL) không bắt thanh toán.
 
+**Ghép nhiều đơn vào một chuyến và trạng thái từng ngựa (R-04, R-05, Thiên, 19/10/2026)**
+
+21. **Mốc gắn đơn:** `PickUp` / `DropOff` có `booking_id`. Đơn không có `PickUp` lên xe ở `Origin`, không có `DropOff` thì giao ở `Destination` (chuyến cũ vẫn chạy như trước). Khi trình / duyệt: giờ đón của từng đơn nằm trong khoảng pickup, giờ tới điểm trả của từng đơn không trễ hạn giao (`TripRouteRules`).
+22. **Gợi ý lộ trình** (`POST /api/trips/suggest-route`, `RouteSuggestionBuilder`): tham lam "điểm gần nhất tiếp theo", chèn cửa khẩu khi đổi nước, giờ dự kiến theo `TransitTimeEstimator`; cảnh báo trễ hạn, giờ đón ngoài khoảng, đi vòng > `Transit:MaxDetourRatio` (1,3), điểm đón cách xa > `Transit:MaxPickupSpreadKm` (150 km), khác nước xuất phát, hồ sơ chưa thông quan, chặng cần nghỉ đêm. Chỉ là gợi ý, không lưu.
+23. **Trạng thái từng ngựa** (`trip_horses.status`): `Planned → InTransit → Delivered`, nhánh `Offloaded` (rớt lại giữa đường, quay về hàng chờ, đơn chưa xong cho tới khi giao nốt) và `Cancelled` (chuyến hủy). Không có bước "Loaded" riêng: ngựa `InTransit` khi xe rời điểm đón của nó.
+24. **e-POD giữa đường:** ký ở điểm trả của đơn (xe đang `Arrived` ở mốc đó); chưa ký thì xe không rời `DropOff`. Đơn giao hết ngựa thì `Completed` ngay. Chi phí phát sinh chốt khi đóng chuyến và chỉ chia cho đơn còn ngựa trên xe lúc báo sự cố; đơn đã `Completed` mà có phát sinh thì sang `AwaitingFinalPayment`.
+25. **Riêng tư khi đi chung chuyến:** khách chỉ thấy ngựa của mình; điểm đón / trả của khách khác bị ẩn tên và địa chỉ trên màn theo dõi.
+
 ---
 
 ## Phụ lục: công thức nghiệp vụ (chuyển từ stored procedure của bản SQL Server)

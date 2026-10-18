@@ -315,9 +315,9 @@ INSERT INTO fleet.trip_crew (trip_id, user_id, crew_role, is_lead) VALUES
 (1, 4, 'Driver', true),
 (1, 4, 'Escort', true);
 
-INSERT INTO fleet.trip_horses (trip_horse_id, trip_id, booking_horse_id, stall_slot_number, notes) VALUES
-(1, 1, 1, 1, 'Red Flash - Chuồng số 1'),
-(2, 1, 2, 2, 'Golden Pegasus - Chuồng số 2');
+INSERT INTO fleet.trip_horses (trip_horse_id, trip_id, booking_horse_id, stall_slot_number, notes, status, picked_up_at) VALUES
+(1, 1, 1, 1, 'Red Flash - Chuồng số 1',      'InTransit', '2026-10-01 06:30:00+07'),
+(2, 1, 2, 2, 'Golden Pegasus - Chuồng số 2', 'InTransit', '2026-10-01 06:30:00+07');
 
 -- Luồng 4 + 5: mốc Hữu Nghị (2) bị hủy do tắc biên, thay bằng mốc Tân Thanh (5)
 INSERT INTO fleet.route_checkpoints (checkpoint_id, trip_id, sequence_order, checkpoint_name, checkpoint_type, address, planned_time, mandatory_rest_minutes,
@@ -339,8 +339,10 @@ INSERT INTO incident.trip_incidents (incident_id, incident_code, trip_id, report
  1, '2026-10-01 11:20:00+07', '2026-10-01 11:00:00+07', 'Moderate', '2026-10-01 13:45:00+07');
 
 -- Luồng 6: khách ký biên bản e-POD
-INSERT INTO acceptance.handover_acceptances (handover_id, trip_id, booking_id, handover_date_time, recipient_name, recipient_phone, recipient_id_card, digital_signature_url, overall_condition, remarks, driver_user_id) VALUES
-(1, 1, 1, '2026-10-02 19:00:00+08', 'Jane Smith', '+84988111222', 'PASSPORT-US-991283', 'https://storage.racehorse.vn/signatures/epod_trip1.png', 'Excellent', '2 cá thể ngựa đến nơi an toàn tuyệt đối, không trầy xước.', 4);
+INSERT INTO acceptance.handover_acceptances (handover_id, trip_id, booking_id, handover_date_time, recipient_name, recipient_phone, recipient_id_card, digital_signature_url, overall_condition, remarks, driver_user_id, checkpoint_id) VALUES
+(1, 1, 1, '2026-10-02 19:00:00+08', 'Jane Smith', '+84988111222', 'PASSPORT-US-991283', 'https://storage.racehorse.vn/signatures/epod_trip1.png', 'Excellent', '2 cá thể ngựa đến nơi an toàn tuyệt đối, không trầy xước.', 4, 4);
+
+UPDATE fleet.trip_horses SET status = 'Delivered', delivered_at = '2026-10-02 19:00:00+08', handover_id = 1 WHERE trip_id = 1;
 
 -- Thanh toán (R-02) của đơn đã hoàn tất: cọc 30% sau khi duyệt, phần còn lại trước khi xuất phát,
 -- chi phí phát sinh 400 USD (sự cố INC-2026-0001) trả sau khi đóng chuyến. Tỉ giá minh họa 26.000 VND / USD.

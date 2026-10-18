@@ -73,6 +73,9 @@ namespace RacehorseTransport.API.ResponseModels
         public DateTimeOffset? ActualEndDate { get; set; }
         public int DelayMinutes { get; set; }
         public bool HandoverCompleted { get; set; }
+        public int? PickupCheckpointId { get; set; }
+        public int? DropoffCheckpointId { get; set; }
+        public DateTimeOffset? EstimatedDeliveryAt { get; set; }
         public List<TrackingCheckpointResponse> Checkpoints { get; set; } = new();
         public List<TrackingHorseResponse> Horses { get; set; } = new();
     }
@@ -89,6 +92,9 @@ namespace RacehorseTransport.API.ResponseModels
         public DateTimeOffset? ActualDepartureTime { get; set; }
         public string Status { get; set; } = string.Empty;
         public int? DelayMinutes { get; set; }
+        public bool IsOtherBookingStop { get; set; }
+        public bool IsMyPickup { get; set; }
+        public bool IsMyDropoff { get; set; }
     }
 
     public class TrackingHorseResponse
@@ -97,6 +103,11 @@ namespace RacehorseTransport.API.ResponseModels
         public int HorseId { get; set; }
         public string HorseName { get; set; } = string.Empty;
         public int StallSlotNumber { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public DateTimeOffset? PickedUpAt { get; set; }
+        public DateTimeOffset? DeliveredAt { get; set; }
+        public DateTimeOffset? OffloadedAt { get; set; }
+        public string? OffloadReason { get; set; }
         public WelfareLogResponse? LatestLog { get; set; }
         public List<WelfareLogResponse> Logs { get; set; } = new();
     }

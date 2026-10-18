@@ -62,6 +62,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset PlannedTime { get; set; }
         public int MandatoryRestMinutes { get; set; }
 
+        // Bắt buộc với mốc PickUp / DropOff: đơn được đón / trả ở mốc này; để trống với các loại mốc khác
+        public int? BookingId { get; set; }
+
         // Chỉ dùng khi thêm một mốc: vị trí chèn (1 = đầu tiên). Bỏ trống = thêm vào cuối.
         public int? Position { get; set; }
     }

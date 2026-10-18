@@ -11,6 +11,9 @@ namespace RacehorseTransport.Services.Interfaces
         Task<TripDetailModel> ClearCheckpointAsync(int checkpointId, CurrentUser currentUser);
         Task<TripDetailModel> DepartCheckpointAsync(int checkpointId, CurrentUser currentUser);
 
+        // R-05: một con ngựa rớt lại giữa đường (sự cố / thú y); chuyến vẫn đi tiếp, ngựa quay về hàng chờ xếp chuyến
+        Task<TripDetailModel> OffloadHorseAsync(int tripId, int tripHorseId, OffloadHorseModel model, CurrentUser currentUser);
+
         Task<WelfareLogModel> AddWelfareLogAsync(int tripId, CreateWelfareLogModel model, CurrentUser currentUser);
         Task<IReadOnlyList<WelfareLogModel>> GetWelfareLogsAsync(int tripId, int? tripHorseId, CurrentUser currentUser);
     }

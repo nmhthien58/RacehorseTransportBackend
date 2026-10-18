@@ -33,6 +33,7 @@ namespace RacehorseTransport.API.Mappers
                 BookingCode = model.BookingCode,
                 CustomerName = model.CustomerName,
                 DropoffAddress = model.DropoffAddress,
+                CheckpointId = model.CheckpointId,
                 HandoverDateTime = model.HandoverDateTime,
                 RecipientName = model.RecipientName,
                 RecipientPhone = model.RecipientPhone,

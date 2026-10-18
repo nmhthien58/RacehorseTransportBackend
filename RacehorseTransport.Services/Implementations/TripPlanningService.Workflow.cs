@@ -135,6 +135,7 @@ namespace RacehorseTransport.Services.Implementations
             checkpoint.Address = input.Address;
             checkpoint.PlannedTime = input.PlannedTime;
             checkpoint.MandatoryRestMinutes = input.MandatoryRestMinutes;
+            checkpoint.BookingId = input.BookingId;
 
             await _checkpointRepo.UpdateAsync(checkpoint);
             return await _tripService.GetTripByIdAsync(tripId, currentUser);
@@ -180,8 +181,8 @@ namespace RacehorseTransport.Services.Implementations
             var trip = await GetDraftForEditAsync(tripId, currentUser);
 
             // Kiểm tra lại toàn bộ: từ lúc lập nháp tới giờ xe, người hoặc đơn có thể đã thay đổi
-            await ValidatePlanAsync(ToPlan(trip), excludeTripId: tripId);
-            ValidateRoute(trip);
+            var bookings = await ValidatePlanAsync(ToPlan(trip), excludeTripId: tripId);
+            ValidateRoute(trip, bookings);
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
@@ -203,7 +204,8 @@ namespace RacehorseTransport.Services.Implementations
         {
             var trip = await GetTrackedTripAsync(tripId);
             EnsureStatus(trip, TripStatuses.PendingApproval, "approved");
-            await ValidatePlanAsync(ToPlan(trip), excludeTripId: tripId);
+            var bookings = await ValidatePlanAsync(ToPlan(trip), excludeTripId: tripId);
+            ValidateRoute(trip, bookings);
 
             var customerIds = await _tripHorseRepo.GetQueryable()
                 .Where(th => th.TripId == tripId)
@@ -263,6 +265,10 @@ namespace RacehorseTransport.Services.Implementations
                 trip.PlanRejectionReason = reason.Trim();
                 bool cancelled = trip.PlanRejectionCount >= TripStatuses.MaxPlanRejectionCount;
                 trip.OverallStatus = cancelled ? TripStatuses.Cancelled : TripStatuses.Draft;
+                if (cancelled)
+                {
+                    ReleaseHorses(trip);
+                }
                 await _tripRepo.UpdateAsync(trip);
 
                 if (trip.PlannedByUserId.HasValue)
@@ -304,6 +310,7 @@ namespace RacehorseTransport.Services.Implementations
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 trip.OverallStatus = TripStatuses.Cancelled;
+                ReleaseHorses(trip);
                 await _tripRepo.UpdateAsync(trip);
 
                 var recipients = new List<int>();
@@ -332,7 +339,8 @@ namespace RacehorseTransport.Services.Implementations
         // =============================================================================================
 
         // Mọi quy tắc về xe, ngựa và đoàn xe của một kế hoạch. excludeTripId: bỏ qua chính chuyến đang sửa khi dò trùng lịch.
-        private async Task ValidatePlanAsync(TripPlanModel plan, int? excludeTripId)
+        // Trả về các đơn có ngựa trên chuyến (dùng cho quy tắc lộ trình khi trình / duyệt).
+        private async Task<List<RouteBookingRule>> ValidatePlanAsync(TripPlanModel plan, int? excludeTripId)
         {
             var startUtc = plan.PlannedStartDate.ToUniversalTime();
             var endUtc = plan.PlannedEndDate.ToUniversalTime();
@@ -383,20 +391,21 @@ namespace RacehorseTransport.Services.Implementations
                     $"Horse '{notPlannable.Horse!.Name}' cannot be planned: booking {notPlannable.Booking!.BookingCode} is {notPlannable.Booking.Status}. Only horses of approved bookings can be placed on a trip.");
             }
 
-            // Ngày chạy phải nằm trong khoảng pickup của mọi đơn trên chuyến (ngày cuối khoảng tính trọn ngày),
-            // và chuyến phải kết thúc trước hạn giao của mọi đơn.
-            // TODO(R-04): khi có mốc trả hàng riêng từng đơn, so hạn giao với giờ tới mốc trả của đơn đó thay vì cuối chuyến.
-            foreach (var booking in bookingHorses.Select(bh => bh.Booking!).DistinctBy(b => b.BookingId))
+            // Xe không thể đón đơn nào sau khi khoảng pickup của đơn đã qua (ngày cuối khoảng tính trọn ngày).
+            // Giờ đón cụ thể (Origin hoặc mốc PickUp của đơn) và hạn giao theo mốc trả của từng đơn được kiểm tra
+            // ở TripRouteRules khi trình / duyệt, vì chuyến ghép đón / trả mỗi đơn ở một mốc khác nhau (R-04).
+            var bookings = bookingHorses.Select(bh => bh.Booking!).DistinctBy(b => b.BookingId).ToList();
+            foreach (var booking in bookings)
             {
-                if (startUtc < booking.PickupWindowStart || startUtc >= booking.PickupWindowEnd.AddDays(1))
+                if (startUtc >= booking.PickupWindowEnd.AddDays(1))
                 {
                     throw new BusinessException(
-                        $"Booking {booking.BookingCode} can only be picked up between {booking.PickupWindowStart:yyyy-MM-dd} and {booking.PickupWindowEnd:yyyy-MM-dd}; PlannedStartDate is outside this window.");
+                        $"Booking {booking.BookingCode} can only be picked up between {booking.PickupWindowStart:yyyy-MM-dd} and {booking.PickupWindowEnd:yyyy-MM-dd}; PlannedStartDate is after this window.");
                 }
-                if (endUtc > booking.DeliveryDeadline)
+                if (startUtc > booking.DeliveryDeadline)
                 {
                     throw new BusinessException(
-                        $"Booking {booking.BookingCode} must be delivered by {booking.DeliveryDeadline:yyyy-MM-dd HH:mm zzz}; PlannedEndDate is later than that.");
+                        $"Booking {booking.BookingCode} must be delivered by {booking.DeliveryDeadline:yyyy-MM-dd HH:mm zzz}; PlannedStartDate is already later than that.");
                 }
             }
 
@@ -411,7 +420,8 @@ namespace RacehorseTransport.Services.Implementations
             var alreadyPlanned = await _tripHorseRepo.GetQueryable()
                 .Where(th => bookingHorseIds.Contains(th.BookingHorseId)
                     && th.TripId != excludeTripId
-                    && th.Trip!.OverallStatus != TripStatuses.Cancelled)
+                    && th.Trip!.OverallStatus != TripStatuses.Cancelled
+                    && TripHorseStatuses.Holding.Contains(th.Status))
                 .Select(th => th.BookingHorse!.Horse!.Name + " (" + th.Trip!.TripCode + ")")
                 .ToListAsync();
 
@@ -512,6 +522,15 @@ namespace RacehorseTransport.Services.Implementations
             {
                 throw new BusinessException($"These crew members are already assigned during this period: {string.Join(", ", busyCrew)}.");
             }
+
+            return bookings.Select(b => new RouteBookingRule
+            {
+                BookingId = b.BookingId,
+                BookingCode = b.BookingCode,
+                PickupWindowStart = b.PickupWindowStart,
+                PickupWindowEnd = b.PickupWindowEnd,
+                DeliveryDeadline = b.DeliveryDeadline
+            }).ToList();
         }
 
         private static void ValidateCheckpointInputs(IEnumerable<CheckpointInputModel> checkpoints)
@@ -526,44 +545,32 @@ namespace RacehorseTransport.Services.Implementations
                 {
                     throw new BusinessException("MandatoryRestMinutes cannot be negative.");
                 }
+
+                bool isBookingStop = CheckpointTypes.BookingStops.Contains(checkpoint.CheckpointType);
+                if (isBookingStop && checkpoint.BookingId == null)
+                {
+                    throw new BusinessException($"A {checkpoint.CheckpointType} checkpoint needs BookingId: the booking picked up / dropped off there.");
+                }
+                if (!isBookingStop && checkpoint.BookingId != null)
+                {
+                    throw new BusinessException($"Only PickUp and DropOff checkpoints can have a BookingId ('{checkpoint.CheckpointName}' is {checkpoint.CheckpointType}).");
+                }
             }
         }
 
-        // Lộ trình hoàn chỉnh mới được trình: bắt đầu bằng Origin, kết thúc bằng Destination, thời gian tăng dần
-        // và nằm trong khoảng thời gian kế hoạch của chuyến.
-        private static void ValidateRoute(Trip trip)
+        // Lộ trình hoàn chỉnh mới được trình (xem TripRouteRules)
+        private static void ValidateRoute(Trip trip, List<RouteBookingRule> bookings)
         {
             var route = trip.Checkpoints.Where(c => c.IsActive).OrderBy(c => c.SequenceOrder).ToList();
+            TripRouteRules.Validate(route, bookings, trip.PlannedStartDate, trip.PlannedEndDate);
+        }
 
-            if (route.Count < 2)
+        // Chuyến bị hủy: ngựa không còn bị giữ, quay lại hàng chờ xếp chuyến
+        private static void ReleaseHorses(Trip trip)
+        {
+            foreach (var tripHorse in trip.TripHorses.Where(th => th.Status == TripHorseStatuses.Planned))
             {
-                throw new BusinessException("The route needs at least an origin and a destination checkpoint.");
-            }
-            if (route[0].CheckpointType != CheckpointTypes.Origin)
-            {
-                throw new BusinessException("The first checkpoint must be of type Origin.");
-            }
-            if (route[^1].CheckpointType != CheckpointTypes.Destination)
-            {
-                throw new BusinessException("The last checkpoint must be of type Destination.");
-            }
-            if (route.Skip(1).Any(c => c.CheckpointType == CheckpointTypes.Origin)
-                || route.Take(route.Count - 1).Any(c => c.CheckpointType == CheckpointTypes.Destination))
-            {
-                throw new BusinessException("Only the first checkpoint can be an Origin and only the last can be a Destination.");
-            }
-
-            for (int i = 1; i < route.Count; i++)
-            {
-                if (route[i].PlannedTime <= route[i - 1].PlannedTime)
-                {
-                    throw new BusinessException($"Checkpoint '{route[i].CheckpointName}' must be planned after '{route[i - 1].CheckpointName}'.");
-                }
-            }
-
-            if (route[0].PlannedTime < trip.PlannedStartDate || route[^1].PlannedTime > trip.PlannedEndDate)
-            {
-                throw new BusinessException("Checkpoint times must fall between the trip's planned start and end.");
+                tripHorse.Status = TripHorseStatuses.Cancelled;
             }
         }
 
@@ -687,6 +694,7 @@ namespace RacehorseTransport.Services.Implementations
                 Address = input.Address,
                 PlannedTime = input.PlannedTime,
                 MandatoryRestMinutes = input.MandatoryRestMinutes,
+                BookingId = input.BookingId,
                 Status = CheckpointStatuses.Pending,
                 IsActive = true
             };

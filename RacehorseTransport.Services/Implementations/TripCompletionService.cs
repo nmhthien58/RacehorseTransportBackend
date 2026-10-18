@@ -10,17 +10,23 @@ using RacehorseTransport.Services.Interfaces;
 
 namespace RacehorseTransport.Services.Implementations
 {
-    // Flow 6:
-    //   ArrivedDestination ──(mỗi đơn trên chuyến ký một biên bản e-POD)──> (đủ biên bản) ──(Manager đóng chuyến)──> Completed
+    // Flow 6 (có ghép nhiều đơn, R-04 / R-05):
+    //   Mỗi đơn ký một biên bản e-POD ở mốc trả của mình (DropOff của đơn, không có thì Destination).
+    //   Ký xong: ngựa của đơn -> Delivered; mọi ngựa của đơn đã giao -> đơn Completed ngay (không chờ đóng chuyến).
+    //   Tới Destination + đủ biên bản -> Manager đóng chuyến, chốt KPI, chia chi phí phát sinh cho các đơn.
     public class TripCompletionService : ITripCompletionService
     {
+        // Chuyến đang chạy: ký e-POD ở mốc DropOff giữa đường được
+        private static readonly string[] HandoverTripStatuses =
+        {
+            TripStatuses.InTransit, TripStatuses.EmergencyRerouting, TripStatuses.ArrivedDestination
+        };
+
         // Sự cố ở các trạng thái này được tính là bất khả kháng và chi phí phát sinh được cộng vào chuyến
         private static readonly string[] AcceptedIncidentStatuses = { IncidentStatuses.Approved, IncidentStatuses.Resolved };
 
         // Đơn còn đang chạy (Assigned là trạng thái cũ, không còn được tạo mới)
         private static readonly string[] OpenBookingStatuses = { BookingStatuses.Approved, BookingStatuses.Assigned };
-
-        private static readonly string[] FinishedTripStatuses = { TripStatuses.Completed, TripStatuses.Cancelled };
 
         private readonly IRepository<Trip> _tripRepo;
         private readonly IRepository<HandoverAcceptance> _handoverRepo;
@@ -73,9 +79,9 @@ namespace RacehorseTransport.Services.Implementations
                 throw new ForbiddenException("Only the crew assigned to this trip can record a handover.");
             }
 
-            if (trip.OverallStatus != TripStatuses.ArrivedDestination)
+            if (!HandoverTripStatuses.Contains(trip.OverallStatus))
             {
-                throw new BusinessException($"Horses can only be handed over after the trip has arrived at the destination (current status: {trip.OverallStatus}).");
+                throw new BusinessException($"Horses can only be handed over while the trip is under way or has arrived (current status: {trip.OverallStatus}).");
             }
 
             if (!HandoverConditions.All.Contains(model.OverallCondition))
@@ -84,16 +90,33 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             // Ngựa của đơn này trên chuyến
-            var horses = trip.TripHorses.Where(th => th.BookingHorse!.BookingId == model.BookingId).ToList();
-            if (horses.Count == 0)
+            var bookingHorsesOnTrip = trip.TripHorses.Where(th => th.BookingHorse!.BookingId == model.BookingId).ToList();
+            if (bookingHorsesOnTrip.Count == 0)
             {
                 throw new BusinessException($"Booking with ID {model.BookingId} has no horses on trip {trip.TripCode}.");
             }
-            var booking = horses[0].BookingHorse!.Booking!;
+            var booking = bookingHorsesOnTrip[0].BookingHorse!.Booking!;
 
             if (trip.Handovers.Any(h => h.BookingId == model.BookingId))
             {
                 throw new BusinessException($"Booking {booking.BookingCode} has already been handed over on trip {trip.TripCode}.");
+            }
+
+            // R-04: chỉ ký được khi xe đang đứng ở mốc trả của đơn (DropOff riêng, hoặc Destination)
+            var route = trip.Checkpoints.Where(c => c.IsActive).OrderBy(c => c.SequenceOrder).ToList();
+            var dropoff = TripRouteRules.DropoffCheckpoint(route, model.BookingId);
+            if (dropoff == null || dropoff.Status != CheckpointStatuses.Arrived)
+            {
+                throw new BusinessException(dropoff == null
+                    ? $"Trip {trip.TripCode} has no drop-off point for booking {booking.BookingCode}."
+                    : $"Booking {booking.BookingCode} is handed over at '{dropoff.CheckpointName}'; record the arrival there first (status: {dropoff.Status}).");
+            }
+
+            // Ngựa còn trên xe phải giao (con đã rớt lại giữa đường thì không giao ở đây)
+            var horses = bookingHorsesOnTrip.Where(th => th.Status == TripHorseStatuses.InTransit).ToList();
+            if (horses.Count == 0)
+            {
+                throw new BusinessException($"Booking {booking.BookingCode} has no horses on board to hand over.");
             }
 
             // Đối chiếu mã vi mạch quét được với các con ngựa phải giao
@@ -129,16 +152,31 @@ namespace RacehorseTransport.Services.Implementations
                 DigitalSignatureUrl = signature.Path,
                 OverallCondition = model.OverallCondition,
                 Remarks = model.Remarks,
-                DriverUserId = currentUser.UserId
+                DriverUserId = currentUser.UserId,
+                CheckpointId = dropoff.CheckpointId
             };
 
-            // Đây có phải biên bản cuối cùng của chuyến không
-            var bookingIdsOnTrip = trip.TripHorses.Select(th => th.BookingHorse!.BookingId).Distinct().ToList();
-            bool allHandedOver = bookingIdsOnTrip.All(id => id == model.BookingId || trip.Handovers.Any(h => h.BookingId == id));
+            // Đây có phải biên bản cuối cùng của chuyến không (đơn có ngựa rớt lại hết thì không cần biên bản)
+            var bookingIdsToHandOver = BookingsNeedingHandover(trip);
+            bool allHandedOver = trip.OverallStatus == TripStatuses.ArrivedDestination
+                && bookingIdsToHandOver.All(id => id == model.BookingId || trip.Handovers.Any(h => h.BookingId == id));
+
+            var now = DateTimeOffset.UtcNow;
+            BookingRequest? completedBooking = null;
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 await _handoverRepo.AddAsync(handover);
+
+                foreach (var tripHorse in horses)
+                {
+                    tripHorse.Status = TripHorseStatuses.Delivered;
+                    tripHorse.DeliveredAt = now;
+                    tripHorse.HandoverId = handover.HandoverId;
+                }
+                await _tripRepo.SaveChangesAsync();
+
+                completedBooking = await CompleteIfDeliveredAsync(booking.BookingId);
 
                 await _notificationService.SendAsync(
                     booking.CustomerUserId,
@@ -146,6 +184,16 @@ namespace RacehorseTransport.Services.Implementations
                     $"{horses.Count} horse(s) were handed over to {handover.RecipientName} (condition: {handover.OverallCondition}).",
                     NotificationReferenceTypes.Booking,
                     booking.BookingId);
+
+                if (completedBooking != null)
+                {
+                    await _notificationService.SendAsync(
+                        completedBooking.CustomerUserId,
+                        $"Booking {completedBooking.BookingCode} is completed",
+                        "All horses of this booking have been delivered. Thank you for travelling with us.",
+                        NotificationReferenceTypes.Booking,
+                        completedBooking.BookingId);
+                }
 
                 if (allHandedOver)
                 {
@@ -195,11 +243,12 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Only a trip that has arrived at the destination can be closed (current status: {trip.OverallStatus}).");
             }
 
-            // Mọi đơn trên chuyến phải đã ký biên bản bàn giao
+            // Mọi đơn trên chuyến phải đã ký biên bản bàn giao (trừ đơn có ngựa rớt lại hết giữa đường)
+            var needHandover = BookingsNeedingHandover(trip);
             var notHandedOver = trip.TripHorses
                 .Select(th => th.BookingHorse!.Booking!)
                 .DistinctBy(b => b.BookingId)
-                .Where(b => !trip.Handovers.Any(h => h.BookingId == b.BookingId))
+                .Where(b => needHandover.Contains(b.BookingId) && !trip.Handovers.Any(h => h.BookingId == b.BookingId))
                 .Select(b => b.BookingCode)
                 .ToList();
 
@@ -278,17 +327,16 @@ namespace RacehorseTransport.Services.Implementations
             return await _tripService.GetTripByIdAsync(tripId, currentUser);
         }
 
-        // Đơn hoàn tất khi mọi con ngựa chưa hủy của đơn đã nằm trên ít nhất một chuyến Completed
-        // và đơn không còn chuyến nào đang dang dở.
-        // R-02: chi phí phát sinh của chuyến được cộng vào từng đơn (extras); đơn giao xong mà còn nợ phát sinh
-        // thì sang AwaitingFinalPayment, trả đủ mới Completed (PaymentService). Đơn tạo trước khi có thanh toán không bị tính.
+        // Đóng chuyến: cộng chi phí phát sinh vào từng đơn (R-02) rồi xét lại trạng thái đơn.
+        //   - Đơn còn mở mà mọi ngựa đã giao -> Completed, hoặc AwaitingFinalPayment nếu còn nợ phát sinh.
+        //   - Đơn đã Completed lúc ký e-POD giữa đường mà giờ mới có phát sinh -> AwaitingFinalPayment.
+        // Đơn tạo trước khi có thanh toán (DepositPercent = null) không bị tính phát sinh.
         private async Task<(List<BookingRequest> Completed, List<BookingRequest> AwaitingPayment)> CompleteFinishedBookingsAsync(
             List<int> bookingIds, Dictionary<int, decimal> extras, int extraDueDays)
         {
-            var bookings = await _bookingRepo.GetQueryable()
-                .Include(b => b.Payments)
-                .Include(b => b.BookingHorses).ThenInclude(bh => bh.TripHorses).ThenInclude(th => th.Trip)
-                .Where(b => bookingIds.Contains(b.BookingId) && OpenBookingStatuses.Contains(b.Status))
+            var bookings = await LoadBookingsForCompletion()
+                .Where(b => bookingIds.Contains(b.BookingId)
+                    && (OpenBookingStatuses.Contains(b.Status) || b.Status == BookingStatuses.Completed))
                 .ToListAsync();
 
             var now = DateTimeOffset.UtcNow;
@@ -296,37 +344,32 @@ namespace RacehorseTransport.Services.Implementations
             var awaitingPayment = new List<BookingRequest>();
             foreach (var booking in bookings)
             {
+                bool wasCompleted = booking.Status == BookingStatuses.Completed;
+                bool gotExtra = false;
                 if (booking.DepositPercent.HasValue && extras.TryGetValue(booking.BookingId, out decimal extra) && extra > 0)
                 {
                     booking.ExtraCharges += extra;
                     booking.ExtraDueAt = now.AddDays(extraDueDays);
                     booking.PaymentReminderCount = 0;
+                    gotExtra = true;
                 }
 
-                var activeHorses = booking.BookingHorses.Where(bh => bh.Status != BookingHorseStatuses.Cancelled).ToList();
-
-                bool allDelivered = activeHorses.Count > 0
-                    && activeHorses.All(bh => bh.TripHorses.Any(th => th.Trip!.OverallStatus == TripStatuses.Completed));
-                bool hasUnfinishedTrip = activeHorses
-                    .SelectMany(bh => bh.TripHorses)
-                    .Any(th => !FinishedTripStatuses.Contains(th.Trip!.OverallStatus));
-
-                if (allDelivered && !hasUnfinishedTrip)
+                if (wasCompleted)
                 {
-                    decimal extraPaid = booking.Payments
-                        .Where(p => p.PaymentType == PaymentTypes.Extra && p.Status == PaymentStatuses.Succeeded)
-                        .Sum(p => p.Amount);
-
-                    if (booking.ExtraCharges > extraPaid)
+                    if (gotExtra && booking.ExtraCharges > ExtraPaid(booking))
                     {
                         booking.Status = BookingStatuses.AwaitingFinalPayment;
                         awaitingPayment.Add(booking);
                     }
-                    else
-                    {
-                        booking.Status = BookingStatuses.Completed;
-                        completed.Add(booking);
-                    }
+                    continue;
+                }
+
+                if (AllHorsesDelivered(booking))
+                {
+                    booking.Status = booking.ExtraCharges > ExtraPaid(booking)
+                        ? BookingStatuses.AwaitingFinalPayment
+                        : BookingStatuses.Completed;
+                    (booking.Status == BookingStatuses.Completed ? completed : awaitingPayment).Add(booking);
                 }
             }
 
@@ -334,17 +377,61 @@ namespace RacehorseTransport.Services.Implementations
             return (completed, awaitingPayment);
         }
 
+        // Ký e-POD xong: đơn đã giao hết ngựa thì hoàn tất ngay (chi phí phát sinh, nếu có, chốt khi đóng chuyến)
+        private async Task<BookingRequest?> CompleteIfDeliveredAsync(int bookingId)
+        {
+            var booking = await LoadBookingsForCompletion().FirstAsync(b => b.BookingId == bookingId);
+            if (!OpenBookingStatuses.Contains(booking.Status) || !AllHorsesDelivered(booking))
+            {
+                return null;
+            }
+
+            booking.Status = booking.ExtraCharges > ExtraPaid(booking)
+                ? BookingStatuses.AwaitingFinalPayment
+                : BookingStatuses.Completed;
+            await _bookingRepo.SaveChangesAsync();
+            return booking.Status == BookingStatuses.Completed ? booking : null;
+        }
+
+        private IQueryable<BookingRequest> LoadBookingsForCompletion()
+        {
+            return _bookingRepo.GetQueryable()
+                .AsSplitQuery()
+                .Include(b => b.Payments)
+                .Include(b => b.BookingHorses).ThenInclude(bh => bh.TripHorses).ThenInclude(th => th.Trip);
+        }
+
+        // R-05: mọi con ngựa chưa hủy của đơn đã được giao (Delivered) trên một chuyến còn hiệu lực
+        private static bool AllHorsesDelivered(BookingRequest booking)
+        {
+            var activeHorses = booking.BookingHorses.Where(bh => bh.Status != BookingHorseStatuses.Cancelled).ToList();
+            return activeHorses.Count > 0
+                && activeHorses.All(bh => bh.TripHorses.Any(th =>
+                    th.Status == TripHorseStatuses.Delivered && th.Trip!.OverallStatus != TripStatuses.Cancelled));
+        }
+
+        private static decimal ExtraPaid(BookingRequest booking)
+        {
+            return booking.Payments
+                .Where(p => p.PaymentType == PaymentTypes.Extra && p.Status == PaymentStatuses.Succeeded)
+                .Sum(p => p.Amount);
+        }
+
+        // Đơn phải ký biên bản trên chuyến: còn ít nhất một con ngựa không bị rớt lại
+        private static HashSet<int> BookingsNeedingHandover(Trip trip)
+        {
+            return trip.TripHorses
+                .Where(th => th.Status != TripHorseStatuses.Offloaded && th.Status != TripHorseStatuses.Cancelled)
+                .Select(th => th.BookingHorse!.BookingId)
+                .ToHashSet();
+        }
+
         // Chia chi phí phát sinh của các sự cố được chấp nhận cho từng đơn trên chuyến:
-        // sự cố gắn với một con ngựa -> tính cho đơn của con ngựa đó; còn lại chia theo số ngựa của mỗi đơn trên chuyến.
-        private static Dictionary<int, decimal> AllocateExtraCharges(Trip trip, List<TripIncident> acceptedIncidents)
+        // sự cố gắn với một con ngựa -> tính cho đơn của con ngựa đó; còn lại chia theo số ngựa của mỗi đơn
+        // đang ở trên xe lúc xảy ra sự cố (R-04: đơn đã giao giữa đường trước đó, hoặc chưa được đón, không chịu).
+        public static Dictionary<int, decimal> AllocateExtraCharges(Trip trip, List<TripIncident> acceptedIncidents)
         {
             var result = new Dictionary<int, decimal>();
-            var horsesPerBooking = trip.TripHorses
-                .GroupBy(th => th.BookingHorse!.BookingId)
-                .Select(g => new { BookingId = g.Key, Count = g.Count() })
-                .OrderBy(x => x.BookingId)
-                .ToList();
-            int totalHorses = horsesPerBooking.Sum(x => x.Count);
 
             void Add(int bookingId, decimal amount) =>
                 result[bookingId] = (result.TryGetValue(bookingId, out var current) ? current : 0) + amount;
@@ -358,6 +445,22 @@ namespace RacehorseTransport.Services.Implementations
                 if (affected != null)
                 {
                     Add(affected.BookingHorse!.BookingId, incident.AdditionalCost);
+                    continue;
+                }
+
+                var onBoard = trip.TripHorses.Where(th => WasOnBoard(th, incident.ReportedAt)).ToList();
+                if (onBoard.Count == 0)
+                {
+                    onBoard = trip.TripHorses.Where(th => th.Status != TripHorseStatuses.Cancelled).ToList();
+                }
+                var horsesPerBooking = onBoard
+                    .GroupBy(th => th.BookingHorse!.BookingId)
+                    .Select(g => new { BookingId = g.Key, Count = g.Count() })
+                    .OrderBy(x => x.BookingId)
+                    .ToList();
+                int totalHorses = horsesPerBooking.Sum(x => x.Count);
+                if (totalHorses == 0)
+                {
                     continue;
                 }
 
@@ -375,6 +478,19 @@ namespace RacehorseTransport.Services.Implementations
             return result;
         }
 
+        // Con ngựa có ở trên xe lúc at không: đã được đón (chưa có giờ đón thì coi như lên xe từ đầu), chưa giao, chưa rớt lại
+        private static bool WasOnBoard(TripHorse tripHorse, DateTimeOffset at)
+        {
+            if (tripHorse.Status == TripHorseStatuses.Cancelled)
+            {
+                return false;
+            }
+            bool pickedUp = tripHorse.PickedUpAt == null || tripHorse.PickedUpAt <= at;
+            bool stillOn = (tripHorse.DeliveredAt == null || tripHorse.DeliveredAt > at)
+                && (tripHorse.OffloadedAt == null || tripHorse.OffloadedAt > at);
+            return pickedUp && stillOn;
+        }
+
         // ---------------------------------------------------------------------------------------------
 
         private async Task<Trip> GetTripWithCargoAsync(int tripId)
@@ -384,6 +500,7 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(t => t.Crew)
                 .Include(t => t.Handovers)
                 .Include(t => t.Incidents)
+                .Include(t => t.Checkpoints)
                 .Include(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Horse)
                 .Include(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Booking)
                 .FirstOrDefaultAsync(t => t.TripId == tripId);
@@ -425,8 +542,10 @@ namespace RacehorseTransport.Services.Implementations
                 Remarks = h.Remarks,
                 DriverUserId = h.DriverUserId,
                 DriverName = h.Driver?.FullName,
+                CheckpointId = h.CheckpointId,
                 Horses = (h.Trip?.TripHorses ?? Enumerable.Empty<TripHorse>())
-                    .Where(th => th.BookingHorse?.BookingId == h.BookingId)
+                    .Where(th => th.BookingHorse?.BookingId == h.BookingId
+                        && (th.HandoverId == null || th.HandoverId == h.HandoverId))
                     .OrderBy(th => th.StallSlotNumber)
                     .Select(th => new HandoverHorseModel
                     {

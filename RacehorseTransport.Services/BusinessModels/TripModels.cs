@@ -80,6 +80,13 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? PhotoUrl { get; set; }
         public string StallClass { get; set; } = string.Empty;
         public string? DossierStatus { get; set; } // chuyến chỉ xuất phát được khi mọi con đều Cleared
+
+        // Trạng thái riêng của con ngựa trên chuyến (R-05)
+        public string Status { get; set; } = string.Empty;
+        public DateTimeOffset? PickedUpAt { get; set; }
+        public DateTimeOffset? DeliveredAt { get; set; }
+        public DateTimeOffset? OffloadedAt { get; set; }
+        public string? OffloadReason { get; set; }
     }
 
     public class TripCheckpointModel
@@ -95,6 +102,10 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset? ActualDepartureTime { get; set; }
         public string Status { get; set; } = string.Empty;
         public bool IsActive { get; set; } // false = mốc đã bị thay thế khi nắn tuyến
+
+        // Mốc PickUp / DropOff: đơn được đón / trả ở đây (R-04)
+        public int? BookingId { get; set; }
+        public string? BookingCode { get; set; }
     }
 
     // Một đơn có ngựa trên chuyến này (chuyến có thể ghép nhiều đơn, mỗi đơn bàn giao riêng)
@@ -108,5 +119,13 @@ namespace RacehorseTransport.Services.BusinessModels
         public string DropoffAddress { get; set; } = string.Empty;
         public int HorseCountOnTrip { get; set; }
         public bool HandoverCompleted { get; set; }
+
+        // Mốc đón / trả của đơn trên chuyến (R-04): PickUp / DropOff riêng, không có thì Origin / Destination
+        public int? PickupCheckpointId { get; set; }
+        public int? DropoffCheckpointId { get; set; }
+        public DateTimeOffset? EstimatedDeliveryAt { get; set; } // giờ dự kiến tới mốc trả
+        public DateTimeOffset DeliveryDeadline { get; set; }
+        public int DeliveredHorseCount { get; set; }
+        public int OffloadedHorseCount { get; set; }
     }
 }

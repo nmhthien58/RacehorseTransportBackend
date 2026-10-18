@@ -386,6 +386,11 @@ namespace RacehorseTransport.Services.Implementations
                 {
                     throw new BusinessException($"'{checkpoint.CheckpointName}' is the {checkpoint.CheckpointType.ToLower()} and cannot be removed from the route.");
                 }
+                // Điểm đón / trả của một đơn: bỏ đi thì ngựa của đơn không được đón / giao (R-04)
+                if (CheckpointTypes.BookingStops.Contains(checkpoint.CheckpointType))
+                {
+                    throw new BusinessException($"'{checkpoint.CheckpointName}' is where a booking is picked up or dropped off and cannot be removed from the route.");
+                }
                 if (checkpoint.Status != CheckpointStatuses.Pending)
                 {
                     throw new BusinessException($"'{checkpoint.CheckpointName}' has already been reached (status: {checkpoint.Status}) and cannot be removed.");

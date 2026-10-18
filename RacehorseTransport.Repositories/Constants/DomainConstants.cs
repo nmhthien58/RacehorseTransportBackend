@@ -203,11 +203,34 @@ namespace RacehorseTransport.Repositories.Constants
     public static class CheckpointTypes
     {
         public const string Origin = "Origin";
+        public const string PickUp = "PickUp";       // đón ngựa của một đơn (R-04); đơn không có mốc này lên xe ở Origin
         public const string RestStop = "RestStop";
         public const string BorderGate = "BorderGate";
+        public const string DropOff = "DropOff";     // trả ngựa của một đơn giữa đường; đơn không có mốc này giao ở Destination
         public const string Destination = "Destination";
 
-        public static readonly string[] All = { Origin, RestStop, BorderGate, Destination };
+        public static readonly string[] All = { Origin, PickUp, RestStop, BorderGate, DropOff, Destination };
+
+        // Mốc gắn với một đơn (cột booking_id bắt buộc)
+        public static readonly string[] BookingStops = { PickUp, DropOff };
+    }
+
+    // Trạng thái riêng của từng con ngựa trên chuyến (R-05)
+    public static class TripHorseStatuses
+    {
+        public const string Planned = "Planned";       // đã xếp chuyến, chưa lên xe
+        public const string InTransit = "InTransit";   // xe đã rời điểm đón của con ngựa
+        public const string Delivered = "Delivered";   // đã ký biên bản bàn giao
+        public const string Offloaded = "Offloaded";   // rớt lại giữa đường (sự cố / thú y), quay về hàng chờ xếp chuyến
+        public const string Cancelled = "Cancelled";   // chuyến bị hủy
+
+        public static readonly string[] All = { Planned, InTransit, Delivered, Offloaded, Cancelled };
+
+        // Con ngựa đang được một chuyến "giữ" (chưa thể xếp lên chuyến khác)
+        public static readonly string[] Holding = { Planned, InTransit, Delivered };
+
+        // Con ngựa còn phải chở / giao trên chuyến
+        public static readonly string[] OnBoard = { Planned, InTransit };
     }
 
     public static class CheckpointStatuses

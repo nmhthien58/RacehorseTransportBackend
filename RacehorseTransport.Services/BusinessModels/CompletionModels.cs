@@ -26,6 +26,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public string BookingCode { get; set; } = string.Empty;
         public string? CustomerName { get; set; }
         public string DropoffAddress { get; set; } = string.Empty;
+        public int? CheckpointId { get; set; } // mốc nơi ký nhận (DropOff của đơn hoặc Destination)
         public DateTimeOffset HandoverDateTime { get; set; }
         public string RecipientName { get; set; } = string.Empty;
         public string RecipientPhone { get; set; } = string.Empty;

@@ -90,9 +90,33 @@ namespace RacehorseTransport.API.RequestModels
         [Range(0, 2880, ErrorMessage = "MandatoryRestMinutes must be between 0 and 2880.")]
         public int MandatoryRestMinutes { get; set; }
 
+        // Bắt buộc với mốc PickUp / DropOff: đơn được đón / trả ở mốc này
+        [Range(1, int.MaxValue, ErrorMessage = "BookingId must be a valid booking ID.")]
+        public int? BookingId { get; set; }
+
         // Chỉ có tác dụng khi thêm một mốc: vị trí chèn (1 = đầu tiên). Bỏ trống = thêm vào cuối.
         [Range(1, 1000, ErrorMessage = "Position must be 1 or greater.")]
         public int? Position { get; set; }
+    }
+
+    public class SuggestRouteRequest
+    {
+        [Required(ErrorMessage = "BookingHorseIds is required.")]
+        [MinLength(1, ErrorMessage = "Choose at least one horse.")]
+        public List<int> BookingHorseIds { get; set; } = new();
+
+        [Required(ErrorMessage = "PlannedStartDate is required.")]
+        public DateTimeOffset? PlannedStartDate { get; set; }
+
+        [Range(1, 4, ErrorMessage = "DriverCount must be between 1 and 4.")]
+        public int DriverCount { get; set; } = 1;
+    }
+
+    public class OffloadHorseRequest
+    {
+        [Required(ErrorMessage = "Reason is required.")]
+        [MaxLength(300, ErrorMessage = "Reason cannot exceed 300 characters.")]
+        public string Reason { get; set; } = string.Empty;
     }
 
     public class ReorderCheckpointsRequest
