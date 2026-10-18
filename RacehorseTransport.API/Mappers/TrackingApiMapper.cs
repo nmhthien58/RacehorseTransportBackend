@@ -100,6 +100,9 @@ namespace RacehorseTransport.API.Mappers
                     ActualEndDate = t.ActualEndDate,
                     DelayMinutes = t.DelayMinutes,
                     HandoverCompleted = t.HandoverCompleted,
+                    PickupCheckpointId = t.PickupCheckpointId,
+                    DropoffCheckpointId = t.DropoffCheckpointId,
+                    EstimatedDeliveryAt = t.EstimatedDeliveryAt,
                     Checkpoints = t.Checkpoints.Select(c => new TrackingCheckpointResponse
                     {
                         CheckpointId = c.CheckpointId,
@@ -111,7 +114,10 @@ namespace RacehorseTransport.API.Mappers
                         ActualArrivalTime = c.ActualArrivalTime,
                         ActualDepartureTime = c.ActualDepartureTime,
                         Status = c.Status,
-                        DelayMinutes = c.DelayMinutes
+                        DelayMinutes = c.DelayMinutes,
+                        IsOtherBookingStop = c.IsOtherBookingStop,
+                        IsMyPickup = c.IsMyPickup,
+                        IsMyDropoff = c.IsMyDropoff
                     }).ToList(),
                     Horses = t.Horses.Select(h => new TrackingHorseResponse
                     {
@@ -119,6 +125,11 @@ namespace RacehorseTransport.API.Mappers
                         HorseId = h.HorseId,
                         HorseName = h.HorseName,
                         StallSlotNumber = h.StallSlotNumber,
+                        Status = h.Status,
+                        PickedUpAt = h.PickedUpAt,
+                        DeliveredAt = h.DeliveredAt,
+                        OffloadedAt = h.OffloadedAt,
+                        OffloadReason = h.OffloadReason,
                         LatestLog = h.LatestLog?.ToResponse(),
                         Logs = h.Logs.Select(l => l.ToResponse()).ToList()
                     }).ToList()

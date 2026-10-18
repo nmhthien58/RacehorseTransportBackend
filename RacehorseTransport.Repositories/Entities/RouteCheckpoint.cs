@@ -18,7 +18,11 @@ namespace RacehorseTransport.Repositories.Entities
         public string Status { get; set; } = CheckpointStatuses.Pending;
         public bool IsActive { get; set; } = true; // false = mốc đã bị nắn tuyến
 
+        // Chỉ mốc PickUp / DropOff: đơn được đón / trả ở mốc này (R-04)
+        public int? BookingId { get; set; }
+
         // Navigation properties
         public virtual Trip? Trip { get; set; }
+        public virtual BookingRequest? Booking { get; set; }
     }
 }

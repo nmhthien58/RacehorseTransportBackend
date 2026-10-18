@@ -108,6 +108,13 @@ namespace RacehorseTransport.Services.Implementations
             var customerIds = await GetCustomerIdsAsync(tripId);
             var now = DateTimeOffset.UtcNow;
 
+            // R-05: ngựa của các đơn không có mốc PickUp riêng lên xe ở điểm xuất phát
+            var bookingIdsWithPickup = ActiveRoute(trip)
+                .Where(c => c.CheckpointType == CheckpointTypes.PickUp)
+                .Select(c => c.BookingId!.Value)
+                .ToHashSet();
+            var horseBookingIds = await GetHorseBookingIdsAsync(tripId);
+
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 trip.OverallStatus = TripStatuses.InTransit;
@@ -116,6 +123,13 @@ namespace RacehorseTransport.Services.Implementations
                 origin.ActualArrivalTime ??= now;
                 origin.ActualDepartureTime = now;
                 origin.Status = CheckpointStatuses.Departed;
+
+                foreach (var tripHorse in trip.TripHorses.Where(th => th.Status == TripHorseStatuses.Planned
+                    && !bookingIdsWithPickup.Contains(horseBookingIds[th.TripHorseId])))
+                {
+                    tripHorse.Status = TripHorseStatuses.InTransit;
+                    tripHorse.PickedUpAt = now;
+                }
 
                 var vehicle = await _assetRepo.GetByIdAsync(trip.VehicleId);
                 if (vehicle != null)
@@ -160,10 +174,23 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             bool isDestination = checkpoint.CheckpointType == CheckpointTypes.Destination;
-            var customerIds = await GetCustomerIdsAsync(trip.TripId);
-            var bookingRecipients = isDestination
-                ? await _tripHorseRepo.GetQueryable().GetBookingRecipientsAsync(trip.TripId)
-                : new List<TripBookingRecipient>();
+            bool isDropOff = checkpoint.CheckpointType == CheckpointTypes.DropOff;
+            bool isBookingStop = CheckpointTypes.BookingStops.Contains(checkpoint.CheckpointType);
+
+            // Báo tin: mốc đón / trả của một đơn chỉ báo cho khách của đơn đó (không lộ điểm của khách khác);
+            // mốc chung báo cho khách còn ngựa trên xe. Email "ngựa đã tới" gửi cho đơn được trả ở mốc này.
+            var onBoardBookingIds = await GetOnBoardBookingIdsAsync(trip.TripId);
+            var routeNow = ActiveRoute(trip);
+            var recipientsAll = await _tripHorseRepo.GetQueryable().GetBookingRecipientsAsync(trip.TripId);
+            var dropHere = recipientsAll
+                .Where(r => (isDropOff && checkpoint.BookingId == r.BookingId)
+                    || (isDestination && !routeNow.Any(c => c.CheckpointType == CheckpointTypes.DropOff && c.BookingId == r.BookingId)))
+                .Where(r => onBoardBookingIds.Contains(r.BookingId))
+                .ToList();
+            var customerIds = isBookingStop
+                ? recipientsAll.Where(r => r.BookingId == checkpoint.BookingId).Select(r => r.CustomerUserId).Distinct().ToList()
+                : recipientsAll.Where(r => onBoardBookingIds.Contains(r.BookingId)).Select(r => r.CustomerUserId).Distinct().ToList();
+            var bookingRecipients = dropHere;
             var now = DateTimeOffset.UtcNow;
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
@@ -179,16 +206,17 @@ namespace RacehorseTransport.Services.Implementations
 
                 await _tripRepo.UpdateAsync(trip);
 
+                bool isHandoverStop = isDestination || isDropOff;
                 await _notificationService.SendToUsersAsync(
-                    isDestination ? WithPlanner(customerIds, trip) : customerIds,
-                    isDestination ? $"Trip {trip.TripCode} has reached the destination" : $"Trip {trip.TripCode} arrived at {checkpoint.CheckpointName}",
-                    isDestination
+                    isHandoverStop ? WithPlanner(customerIds, trip) : customerIds,
+                    isHandoverStop ? $"Trip {trip.TripCode} has reached {checkpoint.CheckpointName}" : $"Trip {trip.TripCode} arrived at {checkpoint.CheckpointName}",
+                    isHandoverStop
                         ? $"The horses have arrived at {checkpoint.CheckpointName} and are ready for handover."
                         : $"The transport reached {checkpoint.CheckpointName} ({checkpoint.CheckpointType}).",
                     NotificationReferenceTypes.Trip,
                     trip.TripId);
 
-                // Chỉ tới điểm giao mới gửi email (bookingRecipients rỗng với mốc khác)
+                // Chỉ tới điểm giao (DropOff / Destination) mới gửi email cho các đơn được trả ở đây
                 foreach (var recipient in bookingRecipients)
                 {
                     await _notificationService.EmailCustomerAsync(
@@ -272,12 +300,114 @@ namespace RacehorseTransport.Services.Implementations
                     $"The horses must rest {checkpoint.MandatoryRestMinutes} minutes at '{checkpoint.CheckpointName}'; {remaining} minute(s) remaining.");
             }
 
+            var horseBookingIds = await GetHorseBookingIdsAsync(trip.TripId);
+            var bookingHorses = trip.TripHorses
+                .Where(th => checkpoint.BookingId != null && horseBookingIds[th.TripHorseId] == checkpoint.BookingId)
+                .ToList();
+
+            // R-04: chưa ký biên bản bàn giao cho đơn được trả ở mốc này thì xe chưa được đi tiếp
+            if (checkpoint.CheckpointType == CheckpointTypes.DropOff
+                && bookingHorses.Any(th => TripHorseStatuses.OnBoard.Contains(th.Status)))
+            {
+                throw new BusinessException($"Record the handover (e-POD) of the horses dropped off at '{checkpoint.CheckpointName}' before leaving.");
+            }
+
             checkpoint.Status = CheckpointStatuses.Departed;
             checkpoint.ActualDepartureTime = now;
+
+            // R-05: rời mốc đón của một đơn = ngựa của đơn đó đã lên xe
+            if (checkpoint.CheckpointType == CheckpointTypes.PickUp)
+            {
+                foreach (var tripHorse in bookingHorses.Where(th => th.Status == TripHorseStatuses.Planned))
+                {
+                    tripHorse.Status = TripHorseStatuses.InTransit;
+                    tripHorse.PickedUpAt = now;
+                }
+            }
+
             await _checkpointRepo.UpdateAsync(checkpoint);
 
             await _trackingService.InvalidateTripAsync(trip.TripId);
             return await _tripService.GetTripByIdAsync(trip.TripId, currentUser);
+        }
+
+        // =============================================================================================
+        // Ngựa rớt lại giữa đường (R-05): sự cố / thú y, chuyến vẫn đi tiếp
+        // =============================================================================================
+
+        public async Task<TripDetailModel> OffloadHorseAsync(int tripId, int tripHorseId, OffloadHorseModel model, CurrentUser currentUser)
+        {
+            var trip = await _tripRepo.GetQueryable()
+                .Include(t => t.Crew)
+                .Include(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Horse)
+                .Include(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Booking)
+                .FirstOrDefaultAsync(t => t.TripId == tripId)
+                ?? throw new NotFoundException($"Trip with ID {tripId} was not found.");
+
+            // Đoàn xe của chuyến, hoặc điều phối / quản lý
+            bool isCrew = trip.Crew.Any(c => c.UserId == currentUser.UserId);
+            if (!isCrew && !currentUser.IsInRole(UserRoles.FleetCoordinator, UserRoles.LogisticsManager, UserRoles.Admin))
+            {
+                throw new ForbiddenException("Only the trip crew, a coordinator or a manager can offload a horse.");
+            }
+
+            if (!OnTheRoadStatuses.Contains(trip.OverallStatus) && trip.OverallStatus != TripStatuses.ArrivedDestination)
+            {
+                throw new BusinessException($"A horse can only be offloaded while the trip is under way (current status: {trip.OverallStatus}).");
+            }
+
+            var tripHorse = trip.TripHorses.FirstOrDefault(th => th.TripHorseId == tripHorseId)
+                ?? throw new NotFoundException($"Trip horse with ID {tripHorseId} is not on trip {trip.TripCode}.");
+
+            if (!TripHorseStatuses.OnBoard.Contains(tripHorse.Status))
+            {
+                throw new BusinessException($"{tripHorse.BookingHorse!.Horse!.Name} cannot be offloaded (status: {tripHorse.Status}).");
+            }
+
+            string reason = model.Reason.Trim();
+            if (reason.Length == 0)
+            {
+                throw new BusinessException("Reason is required.");
+            }
+
+            var booking = tripHorse.BookingHorse!.Booking!;
+            string horseName = tripHorse.BookingHorse.Horse!.Name;
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                tripHorse.Status = TripHorseStatuses.Offloaded;
+                tripHorse.OffloadedAt = DateTimeOffset.UtcNow;
+                tripHorse.OffloadReason = reason;
+                await _tripRepo.UpdateAsync(trip);
+
+                await _notificationService.SendAsync(
+                    booking.CustomerUserId,
+                    $"{horseName} was taken off trip {trip.TripCode}",
+                    $"Reason: {reason}. Our team will arrange the rest of the transport and contact you.",
+                    NotificationReferenceTypes.Booking,
+                    booking.BookingId,
+                    emailCustomers: true);
+
+                await _notificationService.SendToRoleAsync(
+                    UserRoles.LogisticsManager,
+                    $"{horseName} offloaded from trip {trip.TripCode}",
+                    $"Booking {booking.BookingCode}. Reason: {reason}. The horse is back in the planning queue.",
+                    NotificationReferenceTypes.Trip,
+                    trip.TripId);
+
+                if (trip.PlannedByUserId.HasValue)
+                {
+                    await _notificationService.SendAsync(
+                        trip.PlannedByUserId.Value,
+                        $"{horseName} offloaded from trip {trip.TripCode}",
+                        $"Booking {booking.BookingCode}. Reason: {reason}. Plan another trip for this horse.",
+                        NotificationReferenceTypes.Trip,
+                        trip.TripId);
+                }
+            });
+
+            await _trackingService.InvalidateTripAsync(tripId);
+            return await _tripService.GetTripByIdAsync(tripId, currentUser);
         }
 
         // =============================================================================================
@@ -302,9 +432,14 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"StressLevel '{model.StressLevel}' is invalid. Allowed values: {string.Join(", ", StressLevels.All)}.");
             }
 
-            if (!trip.TripHorses.Any(th => th.TripHorseId == model.TripHorseId))
+            var loggedHorse = trip.TripHorses.FirstOrDefault(th => th.TripHorseId == model.TripHorseId);
+            if (loggedHorse == null)
             {
                 throw new BusinessException($"Trip horse with ID {model.TripHorseId} is not on trip {trip.TripCode}.");
+            }
+            if (loggedHorse.Status != TripHorseStatuses.InTransit)
+            {
+                throw new BusinessException($"Welfare logs are recorded while the horse is on board (horse status: {loggedHorse.Status}).");
             }
             if (model.CheckpointId.HasValue && !trip.Checkpoints.Any(c => c.CheckpointId == model.CheckpointId.Value))
             {
@@ -443,6 +578,26 @@ namespace RacehorseTransport.Services.Implementations
         private static List<RouteCheckpoint> ActiveRoute(Trip trip)
         {
             return trip.Checkpoints.Where(c => c.IsActive).OrderBy(c => c.SequenceOrder).ToList();
+        }
+
+        // TripHorseId -> BookingId của các con ngựa trên chuyến
+        private async Task<Dictionary<int, int>> GetHorseBookingIdsAsync(int tripId)
+        {
+            return await _tripHorseRepo.GetQueryable()
+                .Where(th => th.TripId == tripId)
+                .Select(th => new { th.TripHorseId, th.BookingHorse!.BookingId })
+                .ToDictionaryAsync(x => x.TripHorseId, x => x.BookingId);
+        }
+
+        // Đơn còn ngựa chưa giao trên chuyến (đơn đã giao xong hoặc ngựa đã rớt lại thì không báo tin hành trình nữa)
+        private async Task<HashSet<int>> GetOnBoardBookingIdsAsync(int tripId)
+        {
+            var ids = await _tripHorseRepo.GetQueryable()
+                .Where(th => th.TripId == tripId && TripHorseStatuses.OnBoard.Contains(th.Status))
+                .Select(th => th.BookingHorse!.BookingId)
+                .Distinct()
+                .ToListAsync();
+            return ids.ToHashSet();
         }
 
         private async Task<List<int>> GetCustomerIdsAsync(int tripId)

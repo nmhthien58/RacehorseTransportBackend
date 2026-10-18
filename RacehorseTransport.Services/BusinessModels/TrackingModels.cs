@@ -62,6 +62,11 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset? ActualEndDate { get; set; }
         public int DelayMinutes { get; set; }
         public bool HandoverCompleted { get; set; }
+
+        // Mốc đón / trả của đơn này trên chuyến (R-04) và giờ dự kiến tới mốc trả
+        public int? PickupCheckpointId { get; set; }
+        public int? DropoffCheckpointId { get; set; }
+        public DateTimeOffset? EstimatedDeliveryAt { get; set; }
         public List<TrackingCheckpointModel> Checkpoints { get; set; } = new();
         public List<TrackingHorseModel> Horses { get; set; } = new();
     }
@@ -78,6 +83,11 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset? ActualDepartureTime { get; set; }
         public string Status { get; set; } = string.Empty;
         public int? DelayMinutes { get; set; } // null = chưa tới mốc này
+
+        // Điểm đón / trả của khách khác đi chung chuyến: ẩn tên và địa chỉ (CheckpointName / Address để trống)
+        public bool IsOtherBookingStop { get; set; }
+        public bool IsMyPickup { get; set; }
+        public bool IsMyDropoff { get; set; }
     }
 
     public class TrackingHorseModel
@@ -86,6 +96,11 @@ namespace RacehorseTransport.Services.BusinessModels
         public int HorseId { get; set; }
         public string HorseName { get; set; } = string.Empty;
         public int StallSlotNumber { get; set; }
+        public string Status { get; set; } = string.Empty;   // trạng thái của con ngựa trên chuyến (R-05)
+        public DateTimeOffset? PickedUpAt { get; set; }
+        public DateTimeOffset? DeliveredAt { get; set; }
+        public DateTimeOffset? OffloadedAt { get; set; }
+        public string? OffloadReason { get; set; }
         public WelfareLogModel? LatestLog { get; set; }
         public List<WelfareLogModel> Logs { get; set; } = new();
     }

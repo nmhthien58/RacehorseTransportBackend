@@ -5,6 +5,7 @@ using RacehorseTransport.API.Mappers;
 using RacehorseTransport.API.RequestModels;
 using RacehorseTransport.API.ResponseModels;
 using RacehorseTransport.Repositories.Constants;
+using RacehorseTransport.Services.BusinessModels;
 using RacehorseTransport.Services.Implementations;
 using RacehorseTransport.Services.Interfaces;
 
@@ -32,6 +33,20 @@ namespace RacehorseTransport.API.Controllers
             _tripService = tripService;
             _planningService = planningService;
             _executionService = executionService;
+        }
+
+        /// <summary>
+        /// Suggest a route for the chosen horses (one or several bookings): pick-up / drop-off order, border gates,
+        /// planned times, each booking's ETA against its delivery deadline, and warnings about combining the bookings.
+        /// </summary>
+        [HttpPost("suggest-route")]
+        [Authorize(Roles = PlanWriteRoles)]
+        [ProducesResponseType(typeof(ApiResponse<RouteSuggestionResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> SuggestRoute([FromBody] SuggestRouteRequest request)
+        {
+            var suggestion = await _planningService.SuggestRouteAsync(request.ToBusinessModel());
+            return Ok(ApiResponse<RouteSuggestionResponse>.SuccessResult(suggestion.ToResponse(), "Route suggested successfully"));
         }
 
         /// <summary>
@@ -274,6 +289,21 @@ namespace RacehorseTransport.API.Controllers
         {
             var trip = await _executionService.StartTripAsync(id, User.ToCurrentUser());
             return Ok(ApiResponse<TripDetailResponse>.SuccessResult(trip.ToResponse(), "Trip departed successfully"));
+        }
+
+        /// <summary>
+        /// Take one horse off the trip on the way (vet / incident). The trip goes on; the horse returns to the planning queue.
+        /// </summary>
+        [HttpPost("{id:int}/horses/{tripHorseId:int}/offload")]
+        [Authorize(Roles = UserRoles.DriverEscort + "," + PlanningRoles)]
+        [ProducesResponseType(typeof(ApiResponse<TripDetailResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> OffloadHorse(int id, int tripHorseId, [FromBody] OffloadHorseRequest request)
+        {
+            var trip = await _executionService.OffloadHorseAsync(id, tripHorseId, new OffloadHorseModel { Reason = request.Reason }, User.ToCurrentUser());
+            return Ok(ApiResponse<TripDetailResponse>.SuccessResult(trip.ToResponse(), "Horse offloaded successfully"));
         }
 
         /// <summary>

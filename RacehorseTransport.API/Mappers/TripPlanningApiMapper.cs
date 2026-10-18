@@ -40,7 +40,61 @@ namespace RacehorseTransport.API.Mappers
                 Address = request.Address.Trim(),
                 PlannedTime = request.PlannedTime!.Value,
                 MandatoryRestMinutes = request.MandatoryRestMinutes,
+                BookingId = request.BookingId,
                 Position = request.Position
+            };
+        }
+
+        public static RouteSuggestionRequestModel ToBusinessModel(this SuggestRouteRequest request)
+        {
+            return new RouteSuggestionRequestModel
+            {
+                BookingHorseIds = request.BookingHorseIds,
+                PlannedStartDate = request.PlannedStartDate!.Value,
+                DriverCount = request.DriverCount
+            };
+        }
+
+        public static RouteSuggestionResponse ToResponse(this RouteSuggestionModel model)
+        {
+            return new RouteSuggestionResponse
+            {
+                TransportMode = model.TransportMode,
+                PlannedStartDate = model.PlannedStartDate,
+                SuggestedEndDate = model.SuggestedEndDate,
+                TotalDistanceKm = model.TotalDistanceKm,
+                TotalHours = model.TotalHours,
+                Checkpoints = model.Checkpoints.Select(c => new SuggestedCheckpointResponse
+                {
+                    CheckpointName = c.CheckpointName,
+                    CheckpointType = c.CheckpointType,
+                    Address = c.Address,
+                    PlannedTime = c.PlannedTime,
+                    MandatoryRestMinutes = c.MandatoryRestMinutes,
+                    BookingId = c.BookingId,
+                    BookingCode = c.BookingCode,
+                    LegDistanceKm = c.LegDistanceKm
+                }).ToList(),
+                Bookings = model.Bookings.Select(b => new RouteBookingEtaResponse
+                {
+                    BookingId = b.BookingId,
+                    BookingCode = b.BookingCode,
+                    PickupAt = b.PickupAt,
+                    EstimatedDeliveryAt = b.EstimatedDeliveryAt,
+                    DeliveryDeadline = b.DeliveryDeadline,
+                    OnTime = b.OnTime,
+                    RouteDistanceKm = b.RouteDistanceKm,
+                    DirectDistanceKm = b.DirectDistanceKm,
+                    DetourRatio = b.DetourRatio
+                }).ToList(),
+                Warnings = model.Warnings.Select(w => new PlanWarningResponse
+                {
+                    Code = w.Code,
+                    Severity = w.Severity,
+                    Message = w.Message,
+                    BookingCode = w.BookingCode,
+                    Params = w.Params
+                }).ToList()
             };
         }
 

@@ -12,6 +12,9 @@ namespace RacehorseTransport.Services.Interfaces
         Task<IReadOnlyList<AvailableVehicleModel>> GetAvailableVehiclesAsync(DateTimeOffset from, DateTimeOffset to, string? transportMode);
         Task<IReadOnlyList<UserModel>> GetAvailableCrewAsync(DateTimeOffset from, DateTimeOffset to);
 
+        // Gợi ý lộ trình cho các con ngựa đã chọn (R-04): thứ tự đón / trả, cửa khẩu, giờ dự kiến, cảnh báo khi ghép đơn
+        Task<RouteSuggestionModel> SuggestRouteAsync(RouteSuggestionRequestModel request);
+
         // Bản nháp kế hoạch chuyến
         Task<TripDetailModel> CreateTripAsync(TripPlanModel plan, CurrentUser currentUser);
         Task<TripDetailModel> UpdateTripAsync(int tripId, TripPlanModel plan, CurrentUser currentUser);

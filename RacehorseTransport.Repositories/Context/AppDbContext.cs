@@ -210,6 +210,8 @@ namespace RacehorseTransport.Repositories.Context
                 entity.HasOne(e => e.BookingHorse)
                       .WithMany(bh => bh.TripHorses)
                       .HasForeignKey(e => e.BookingHorseId);
+
+                entity.HasOne(e => e.Handover).WithMany().HasForeignKey(e => e.HandoverId);
             });
 
             modelBuilder.Entity<RouteCheckpoint>(entity =>
@@ -220,6 +222,8 @@ namespace RacehorseTransport.Repositories.Context
                 entity.HasOne(e => e.Trip)
                       .WithMany(t => t.Checkpoints)
                       .HasForeignKey(e => e.TripId);
+
+                entity.HasOne(e => e.Booking).WithMany().HasForeignKey(e => e.BookingId);
             });
 
             // ---------- tracking ----------
@@ -267,6 +271,8 @@ namespace RacehorseTransport.Repositories.Context
                 entity.HasOne(e => e.Booking).WithMany().HasForeignKey(e => e.BookingId);
 
                 entity.HasOne(e => e.Driver).WithMany().HasForeignKey(e => e.DriverUserId);
+
+                entity.HasOne(e => e.Checkpoint).WithMany().HasForeignKey(e => e.CheckpointId);
             });
 
             // ---------- common ----------

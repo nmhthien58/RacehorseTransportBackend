@@ -1,3 +1,4 @@
+using RacehorseTransport.Repositories.Constants;
 using RacehorseTransport.Repositories.Entities;
 using RacehorseTransport.Services.BusinessModels;
 
@@ -17,6 +18,13 @@ namespace RacehorseTransport.Services.Mappers
         // TripHorses -> BookingHorse -> Horse / Dossier / Booking -> Customer
         public static TripDetailModel ToDetailModel(this Trip entity)
         {
+            var activeRoute = entity.Checkpoints.Where(c => c.IsActive).OrderBy(c => c.SequenceOrder).ToList();
+            var bookingCodes = entity.TripHorses
+                .Where(th => th.BookingHorse?.Booking != null)
+                .Select(th => th.BookingHorse!.Booking!)
+                .DistinctBy(b => b.BookingId)
+                .ToDictionary(b => b.BookingId, b => b.BookingCode);
+
             var model = new TripDetailModel
             {
                 VehicleCapacity = entity.Vehicle?.CapacityHorses,
@@ -45,7 +53,12 @@ namespace RacehorseTransport.Services.Mappers
                     .OrderBy(c => c.SequenceOrder)
                     .ThenByDescending(c => c.IsActive)
                     .ThenBy(c => c.CheckpointId)
-                    .Select(c => c.ToBusinessModel())
+                    .Select(c =>
+                    {
+                        var checkpoint = c.ToBusinessModel();
+                        checkpoint.BookingCode = c.BookingId.HasValue && bookingCodes.TryGetValue(c.BookingId.Value, out var code) ? code : null;
+                        return checkpoint;
+                    })
                     .ToList(),
                 Bookings = entity.TripHorses
                     .Where(th => th.BookingHorse?.Booking != null)
@@ -53,8 +66,18 @@ namespace RacehorseTransport.Services.Mappers
                     .Select(g =>
                     {
                         var booking = g.First().BookingHorse!.Booking!;
+                        var pickup = activeRoute.FirstOrDefault(c => c.CheckpointType == CheckpointTypes.PickUp && c.BookingId == booking.BookingId)
+                            ?? activeRoute.FirstOrDefault(c => c.CheckpointType == CheckpointTypes.Origin);
+                        var dropoff = activeRoute.FirstOrDefault(c => c.CheckpointType == CheckpointTypes.DropOff && c.BookingId == booking.BookingId)
+                            ?? activeRoute.FirstOrDefault(c => c.CheckpointType == CheckpointTypes.Destination);
                         return new TripBookingModel
                         {
+                            PickupCheckpointId = pickup?.CheckpointId,
+                            DropoffCheckpointId = dropoff?.CheckpointId,
+                            EstimatedDeliveryAt = dropoff?.PlannedTime,
+                            DeliveryDeadline = booking.DeliveryDeadline,
+                            DeliveredHorseCount = g.Count(th => th.Status == TripHorseStatuses.Delivered),
+                            OffloadedHorseCount = g.Count(th => th.Status == TripHorseStatuses.Offloaded),
                             BookingId = booking.BookingId,
                             BookingCode = booking.BookingCode,
                             CustomerName = booking.Customer?.FullName,
@@ -94,7 +117,12 @@ namespace RacehorseTransport.Services.Mappers
                 SpecialCareRequirements = horse?.SpecialCareRequirements,
                 PhotoUrl = horse?.PhotoUrl,
                 StallClass = bookingHorse?.StallClass ?? string.Empty,
-                DossierStatus = bookingHorse?.Dossier?.Status
+                DossierStatus = bookingHorse?.Dossier?.Status,
+                Status = entity.Status,
+                PickedUpAt = entity.PickedUpAt,
+                DeliveredAt = entity.DeliveredAt,
+                OffloadedAt = entity.OffloadedAt,
+                OffloadReason = entity.OffloadReason
             };
         }
 
@@ -112,7 +140,8 @@ namespace RacehorseTransport.Services.Mappers
                 ActualArrivalTime = entity.ActualArrivalTime,
                 ActualDepartureTime = entity.ActualDepartureTime,
                 Status = entity.Status,
-                IsActive = entity.IsActive
+                IsActive = entity.IsActive,
+                BookingId = entity.BookingId
             };
         }
 

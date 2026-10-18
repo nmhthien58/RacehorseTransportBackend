@@ -111,8 +111,10 @@ namespace RacehorseTransport.Services.BusinessModels
         public int TripId { get; set; }
         public string TripCode { get; set; } = string.Empty;
         public string TripStatus { get; set; } = string.Empty;
+        public string HorseStatus { get; set; } = string.Empty; // trạng thái của con ngựa trên chuyến (R-05)
         public int StallSlotNumber { get; set; }
         public DateTimeOffset PlannedStartDate { get; set; }
         public DateTimeOffset PlannedEndDate { get; set; }
+        public DateTimeOffset? DeliveredAt { get; set; }
     }
 }

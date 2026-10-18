@@ -198,9 +198,11 @@ namespace RacehorseTransport.API.Mappers
                         TripId = t.TripId,
                         TripCode = t.TripCode,
                         TripStatus = t.TripStatus,
+                        HorseStatus = t.HorseStatus,
                         StallSlotNumber = t.StallSlotNumber,
                         PlannedStartDate = t.PlannedStartDate,
-                        PlannedEndDate = t.PlannedEndDate
+                        PlannedEndDate = t.PlannedEndDate,
+                        DeliveredAt = t.DeliveredAt
                     }).ToList()
                 }).ToList()
             };

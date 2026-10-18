@@ -67,6 +67,11 @@ namespace RacehorseTransport.API.ResponseModels
         public string? PhotoUrl { get; set; }
         public string StallClass { get; set; } = string.Empty;
         public string? DossierStatus { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public DateTimeOffset? PickedUpAt { get; set; }
+        public DateTimeOffset? DeliveredAt { get; set; }
+        public DateTimeOffset? OffloadedAt { get; set; }
+        public string? OffloadReason { get; set; }
     }
 
     public class TripCheckpointResponse
@@ -82,6 +87,8 @@ namespace RacehorseTransport.API.ResponseModels
         public DateTimeOffset? ActualDepartureTime { get; set; }
         public string Status { get; set; } = string.Empty;
         public bool IsActive { get; set; }
+        public int? BookingId { get; set; }
+        public string? BookingCode { get; set; }
     }
 
     public class TripBookingResponse
@@ -94,5 +101,59 @@ namespace RacehorseTransport.API.ResponseModels
         public string DropoffAddress { get; set; } = string.Empty;
         public int HorseCountOnTrip { get; set; }
         public bool HandoverCompleted { get; set; }
+        public int? PickupCheckpointId { get; set; }
+        public int? DropoffCheckpointId { get; set; }
+        public DateTimeOffset? EstimatedDeliveryAt { get; set; }
+        public DateTimeOffset DeliveryDeadline { get; set; }
+        public int DeliveredHorseCount { get; set; }
+        public int OffloadedHorseCount { get; set; }
+    }
+
+    // ---------- Gợi ý lộ trình (R-04) ----------
+
+    public class RouteSuggestionResponse
+    {
+        public string TransportMode { get; set; } = string.Empty;
+        public DateTimeOffset PlannedStartDate { get; set; }
+        public DateTimeOffset SuggestedEndDate { get; set; }
+        public int TotalDistanceKm { get; set; }
+        public decimal TotalHours { get; set; }
+        public List<SuggestedCheckpointResponse> Checkpoints { get; set; } = new();
+        public List<RouteBookingEtaResponse> Bookings { get; set; } = new();
+        public List<PlanWarningResponse> Warnings { get; set; } = new();
+    }
+
+    public class SuggestedCheckpointResponse
+    {
+        public string CheckpointName { get; set; } = string.Empty;
+        public string CheckpointType { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public DateTimeOffset PlannedTime { get; set; }
+        public int MandatoryRestMinutes { get; set; }
+        public int? BookingId { get; set; }
+        public string? BookingCode { get; set; }
+        public int LegDistanceKm { get; set; }
+    }
+
+    public class RouteBookingEtaResponse
+    {
+        public int BookingId { get; set; }
+        public string BookingCode { get; set; } = string.Empty;
+        public DateTimeOffset PickupAt { get; set; }
+        public DateTimeOffset EstimatedDeliveryAt { get; set; }
+        public DateTimeOffset DeliveryDeadline { get; set; }
+        public bool OnTime { get; set; }
+        public int RouteDistanceKm { get; set; }
+        public int? DirectDistanceKm { get; set; }
+        public decimal? DetourRatio { get; set; }
+    }
+
+    public class PlanWarningResponse
+    {
+        public string Code { get; set; } = string.Empty;
+        public string Severity { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string? BookingCode { get; set; }
+        public Dictionary<string, string> Params { get; set; } = new();
     }
 }

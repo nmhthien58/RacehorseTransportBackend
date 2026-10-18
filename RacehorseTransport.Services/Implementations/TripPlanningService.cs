@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RacehorseTransport.Repositories.Constants;
 using RacehorseTransport.Repositories.Entities;
 using RacehorseTransport.Repositories.Interfaces;
@@ -6,6 +7,7 @@ using RacehorseTransport.Services.BusinessModels;
 using RacehorseTransport.Services.Exceptions;
 using RacehorseTransport.Services.Interfaces;
 using RacehorseTransport.Services.Mappers;
+using RacehorseTransport.Services.Options;
 
 namespace RacehorseTransport.Services.Implementations
 {
@@ -26,6 +28,9 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ICodeGenerator _codeGenerator;
         private readonly INotificationService _notificationService;
         private readonly ISystemSettingService _settingService;
+        private readonly IDistanceService _distanceService;
+        private readonly ITransitTimeEstimator _transitEstimator;
+        private readonly TransitOptions _transitOptions;
         private readonly IUnitOfWork _unitOfWork;
 
         public TripPlanningService(
@@ -40,6 +45,9 @@ namespace RacehorseTransport.Services.Implementations
             ICodeGenerator codeGenerator,
             INotificationService notificationService,
             ISystemSettingService settingService,
+            IDistanceService distanceService,
+            ITransitTimeEstimator transitEstimator,
+            IOptions<TransitOptions> transitOptions,
             IUnitOfWork unitOfWork)
         {
             _bookingHorseRepo = bookingHorseRepo;
@@ -53,6 +61,9 @@ namespace RacehorseTransport.Services.Implementations
             _codeGenerator = codeGenerator;
             _notificationService = notificationService;
             _settingService = settingService;
+            _distanceService = distanceService;
+            _transitEstimator = transitEstimator;
+            _transitOptions = transitOptions.Value;
             _unitOfWork = unitOfWork;
         }
 
@@ -61,8 +72,10 @@ namespace RacehorseTransport.Services.Implementations
             var query = _bookingHorseRepo.GetQueryable().AsNoTracking()
                 .Where(bh => bh.Status != BookingHorseStatuses.Cancelled
                     && bh.Booking!.Status == BookingStatuses.Approved
-                    // Ngựa trên chuyến đã hủy được coi là chưa xếp; trên chuyến đã hoàn tất thì đã đi rồi
-                    && !bh.TripHorses.Any(th => th.Trip!.OverallStatus != TripStatuses.Cancelled));
+                    // Ngựa trên chuyến đã hủy, hoặc bị rớt lại giữa đường (Offloaded), được coi là chưa xếp;
+                    // đã giao (Delivered) thì đã đi rồi
+                    && !bh.TripHorses.Any(th => th.Trip!.OverallStatus != TripStatuses.Cancelled
+                        && TripHorseStatuses.Holding.Contains(th.Status)));
 
             if (!string.IsNullOrWhiteSpace(transportMode))
             {

@@ -301,6 +301,14 @@ CREATE TABLE fleet.trip_horses (
     booking_horse_id   integer NOT NULL REFERENCES booking.booking_horses (booking_horse_id),
     stall_slot_number  integer NOT NULL,
     notes              varchar(200),
+    -- Trạng thái riêng của từng con trên chuyến (R-05); trạng thái chuyến là trạng thái của xe
+    status             varchar(20) NOT NULL DEFAULT 'Planned'
+        CONSTRAINT ck_trip_horses_status CHECK (status IN ('Planned', 'InTransit', 'Delivered', 'Offloaded', 'Cancelled')),
+    picked_up_at       timestamptz,   -- lúc xe rời điểm đón của con ngựa
+    delivered_at       timestamptz,   -- lúc ký biên bản bàn giao
+    handover_id        integer,       -- biên bản e-POD (khóa ngoại thêm sau khi tạo bảng handover_acceptances)
+    offloaded_at       timestamptz,   -- rớt lại giữa đường (sự cố / thú y), quay về hàng chờ xếp chuyến
+    offload_reason     varchar(300),
     CONSTRAINT uq_trip_horses UNIQUE (trip_id, booking_horse_id),
     CONSTRAINT uq_trip_horses_stall UNIQUE (trip_id, stall_slot_number) -- Hai ngựa không chung một ô chuồng
 );
@@ -312,7 +320,7 @@ CREATE TABLE fleet.route_checkpoints (
     sequence_order          integer      NOT NULL,
     checkpoint_name         varchar(100) NOT NULL,
     checkpoint_type         varchar(30)  NOT NULL
-        CONSTRAINT ck_route_checkpoints_type CHECK (checkpoint_type IN ('Origin', 'RestStop', 'BorderGate', 'Destination')),
+        CONSTRAINT ck_route_checkpoints_type CHECK (checkpoint_type IN ('Origin', 'PickUp', 'RestStop', 'BorderGate', 'DropOff', 'Destination')),
     address                 varchar(255) NOT NULL,
     planned_time            timestamptz  NOT NULL,
     mandatory_rest_minutes  integer      NOT NULL DEFAULT 0,
@@ -320,7 +328,11 @@ CREATE TABLE fleet.route_checkpoints (
     actual_departure_time   timestamptz,
     status                  varchar(20)  NOT NULL DEFAULT 'Pending'
         CONSTRAINT ck_route_checkpoints_status CHECK (status IN ('Pending', 'Arrived', 'Cleared', 'Departed', 'Cancelled')),
-    is_active               boolean      NOT NULL DEFAULT true -- false = mốc đã bị nắn tuyến
+    is_active               boolean      NOT NULL DEFAULT true, -- false = mốc đã bị nắn tuyến
+    -- Mốc PickUp / DropOff là nơi đón / trả ngựa của một đơn (R-04, ghép nhiều đơn vào một chuyến).
+    -- Đơn không có PickUp thì lên xe ở mốc Origin; không có DropOff thì giao ở mốc Destination.
+    booking_id              integer REFERENCES booking.booking_requests (booking_id),
+    CONSTRAINT ck_route_checkpoints_booking CHECK ((checkpoint_type IN ('PickUp', 'DropOff')) = (booking_id IS NOT NULL))
 );
 
 -- Thứ tự mốc không trùng trong các mốc còn hiệu lực
@@ -396,8 +408,12 @@ CREATE TABLE acceptance.handover_acceptances (
         CONSTRAINT ck_handover_acceptances_condition CHECK (overall_condition IN ('Excellent', 'NormalFatigue', 'Injured')),
     remarks                text,
     driver_user_id         integer      NOT NULL REFERENCES identity.users (user_id),
+    checkpoint_id          integer REFERENCES fleet.route_checkpoints (checkpoint_id), -- mốc ký nhận (DropOff của đơn hoặc Destination)
     CONSTRAINT uq_handover_acceptances_trip_booking UNIQUE (trip_id, booking_id)
 );
+
+ALTER TABLE fleet.trip_horses ADD CONSTRAINT fk_trip_horses_handover
+    FOREIGN KEY (handover_id) REFERENCES acceptance.handover_acceptances (handover_id);
 
 -- =====================================================================================
 -- 9. COMMON

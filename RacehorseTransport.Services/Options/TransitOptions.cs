@@ -42,6 +42,13 @@ namespace RacehorseTransport.Services.Options
         // Kiểm tra thú y + hải quan ở sân bay đến
         public decimal AirArrivalInspectionHours { get; set; } = 4;
 
+        // ---------- Ghép nhiều đơn vào một chuyến (R-04): ngưỡng cảnh báo khi gợi ý lộ trình ----------
+        // Điểm đón của một đơn cách điểm xuất phát quá bấy nhiêu km thì cảnh báo
+        public int MaxPickupSpreadKm { get; set; } = 150;
+
+        // Quãng đường đơn phải đi trên tuyến ghép / quãng đường đi thẳng vượt hệ số này thì cảnh báo đi vòng
+        public decimal MaxDetourRatio { get; set; } = 1.3m;
+
         // ---------- Chung ----------
         // Biên an toàn cộng thêm để ra mốc "chậm nhất" của khoảng thời gian dự kiến
         public decimal BufferPercent { get; set; } = 15;
