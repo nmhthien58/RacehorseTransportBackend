@@ -12,8 +12,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public string PickupCountryCode { get; set; } = string.Empty;
         public string DropoffAddress { get; set; } = string.Empty;
         public string DropoffCountryCode { get; set; } = string.Empty;
-        public DateTimeOffset DepartureDate { get; set; }
-        public DateTimeOffset DeliveryDate { get; set; }
+        public DateTimeOffset PickupWindowStart { get; set; }
+        public DateTimeOffset PickupWindowEnd { get; set; }
+        public DateTimeOffset DeliveryDeadline { get; set; }
         public bool RequiresClimateControl { get; set; }
         public int HorseId { get; set; }
         public string HorseName { get; set; } = string.Empty;

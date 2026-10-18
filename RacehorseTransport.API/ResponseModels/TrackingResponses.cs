@@ -52,8 +52,9 @@ namespace RacehorseTransport.API.ResponseModels
         public string Status { get; set; } = string.Empty;
         public string PickupAddress { get; set; } = string.Empty;
         public string DropoffAddress { get; set; } = string.Empty;
-        public DateTimeOffset DepartureDate { get; set; }
-        public DateTimeOffset DeliveryDate { get; set; }
+        public DateTimeOffset PickupWindowStart { get; set; }
+        public DateTimeOffset PickupWindowEnd { get; set; }
+        public DateTimeOffset DeliveryDeadline { get; set; }
         public List<TrackingTripResponse> Trips { get; set; } = new();
         public List<string> HorsesAwaitingPlanning { get; set; } = new();
         public DateTimeOffset GeneratedAt { get; set; }

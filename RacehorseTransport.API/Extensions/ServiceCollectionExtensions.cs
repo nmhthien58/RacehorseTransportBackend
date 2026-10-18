@@ -67,6 +67,7 @@ namespace RacehorseTransport.API.Extensions
         public static IServiceCollection AddBusinessServices(this IServiceCollection services, IConfiguration configuration)
         {
             services.Configure<BookingOptions>(configuration.GetSection(BookingOptions.SectionName));
+            services.Configure<TransitOptions>(configuration.GetSection(TransitOptions.SectionName));
             services.Configure<SupabaseOptions>(configuration.GetSection(SupabaseOptions.SectionName));
             services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
             services.Configure<GoogleOptions>(configuration.GetSection(GoogleOptions.SectionName));
@@ -106,6 +107,7 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IHorseService, HorseService>();
             services.AddScoped<IHorseDocumentService, HorseDocumentService>();
+            services.AddSingleton<ITransitTimeEstimator, TransitTimeEstimator>();
             services.AddScoped<IPricingService, PricingService>();
             services.AddScoped<IPriceItemService, PriceItemService>();
             services.AddScoped<IBookingService, BookingService>();

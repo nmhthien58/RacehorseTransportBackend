@@ -4,8 +4,9 @@ namespace RacehorseTransport.Services.BusinessModels
     {
         public string? Status { get; set; }
         public int? CustomerUserId { get; set; } // chỉ nhân sự dùng được
-        public DateTimeOffset? DepartureFrom { get; set; }
-        public DateTimeOffset? DepartureTo { get; set; }
+        // Lọc theo ngày bắt đầu khoảng pickup
+        public DateTimeOffset? PickupFrom { get; set; }
+        public DateTimeOffset? PickupTo { get; set; }
     }
 
     public class CreateBookingModel
@@ -16,8 +17,11 @@ namespace RacehorseTransport.Services.BusinessModels
         public string DropoffAddress { get; set; } = string.Empty;
         public string? DropoffCity { get; set; }
         public string DropoffCountryCode { get; set; } = string.Empty;
-        public DateTimeOffset DepartureDate { get; set; }
-        public DateTimeOffset DeliveryDate { get; set; }
+
+        // Khoảng ngày ngựa sẵn sàng được đón + hạn giao trễ nhất (ngày chạy thật do Coordinator chốt)
+        public DateTimeOffset PickupWindowStart { get; set; }
+        public DateTimeOffset PickupWindowEnd { get; set; }
+        public DateTimeOffset DeliveryDeadline { get; set; }
         public string TransportMode { get; set; } = string.Empty;
         public int? DistanceKm { get; set; }
         public bool RequiresClimateControl { get; set; }
@@ -44,8 +48,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public string PickupCountryCode { get; set; } = string.Empty;
         public string DropoffAddress { get; set; } = string.Empty;
         public string DropoffCountryCode { get; set; } = string.Empty;
-        public DateTimeOffset DepartureDate { get; set; }
-        public DateTimeOffset DeliveryDate { get; set; }
+        public DateTimeOffset PickupWindowStart { get; set; }
+        public DateTimeOffset PickupWindowEnd { get; set; }
+        public DateTimeOffset DeliveryDeadline { get; set; }
         public string TransportMode { get; set; } = string.Empty;
         public int TotalHorses { get; set; }
         public decimal EstimatedCost { get; set; }
@@ -63,6 +68,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? CustomerPhone { get; set; }
         public string? SpecialInstructions { get; set; }
         public int? DistanceKm { get; set; }
+        public decimal? EstimatedTransitHours { get; set; }
         public bool IsExpress { get; set; }
         public bool RequiresClimateControl { get; set; }
         public decimal? DeclaredValue { get; set; }

@@ -30,7 +30,8 @@ namespace RacehorseTransport.Services.BusinessModels
         public string MicrochipNumber { get; set; } = string.Empty;
         public string PickupCountryCode { get; set; } = string.Empty;
         public string DropoffCountryCode { get; set; } = string.Empty;
-        public DateTimeOffset DepartureDate { get; set; }
+        public DateTimeOffset PickupWindowStart { get; set; }
+        public DateTimeOffset PickupWindowEnd { get; set; }
         public int SpecialistUserId { get; set; }
         public string? SpecialistName { get; set; }
         public string? ClearanceNumber { get; set; }

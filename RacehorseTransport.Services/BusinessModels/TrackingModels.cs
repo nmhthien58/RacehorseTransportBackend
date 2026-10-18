@@ -39,8 +39,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public string Status { get; set; } = string.Empty;
         public string PickupAddress { get; set; } = string.Empty;
         public string DropoffAddress { get; set; } = string.Empty;
-        public DateTimeOffset DepartureDate { get; set; }
-        public DateTimeOffset DeliveryDate { get; set; }
+        public DateTimeOffset PickupWindowStart { get; set; }
+        public DateTimeOffset PickupWindowEnd { get; set; }
+        public DateTimeOffset DeliveryDeadline { get; set; }
         public List<TrackingTripModel> Trips { get; set; } = new();
 
         // Ngựa của đơn chưa được xếp lên chuyến nào

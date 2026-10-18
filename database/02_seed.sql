@@ -226,10 +226,10 @@ INSERT INTO racehorse.horses (horse_id, owner_user_id, name, breed, gender, date
 -- Luồng 1: Jane Smith đặt chuyến 2 ngựa sang Quảng Châu; Quản lý hậu cần Bảo duyệt và giao Mai phụ trách hồ sơ.
 -- Không phân điều phối viên theo đơn; Nam trở thành người phụ trách khi tạo chuyến ở Luồng 3.
 INSERT INTO booking.booking_requests (booking_id, booking_code, customer_user_id, pickup_address, pickup_country_code, dropoff_address, dropoff_country_code,
-                                      departure_date, delivery_date, total_horses, transport_mode, distance_km, estimated_cost, status,
+                                      pickup_window_start, pickup_window_end, delivery_deadline, total_horses, transport_mode, distance_km, estimated_cost, status,
                                       reviewed_by_user_id, reviewed_at, assigned_specialist_id, created_at) VALUES
 (1, 'BKG-2026-0001', 5, 'Trang trại Yên Bài, Ba Vì, Hà Nội', 'VN', 'Trường đua Tùng Hóa, TP. Quảng Châu', 'CN',
- '2026-10-01 06:00:00+07', '2026-10-02 18:00:00+08', 2, 'Ground', 1100, 7500.00, 'Completed',
+ '2026-09-30 00:00:00+07', '2026-10-03 00:00:00+07', '2026-10-04 18:00:00+08', 2, 'Ground', 1100, 7500.00, 'Completed',
  1, '2026-09-20 09:00:00+07', 2, '2026-09-19 14:00:00+07');
 
 INSERT INTO booking.booking_horses (booking_horse_id, booking_id, horse_id, notes, status) VALUES

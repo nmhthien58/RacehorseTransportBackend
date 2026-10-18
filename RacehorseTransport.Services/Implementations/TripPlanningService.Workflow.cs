@@ -379,6 +379,23 @@ namespace RacehorseTransport.Services.Implementations
                     $"Horse '{notPlannable.Horse!.Name}' cannot be planned: booking {notPlannable.Booking!.BookingCode} is {notPlannable.Booking.Status}. Only horses of approved bookings can be placed on a trip.");
             }
 
+            // Ngày chạy phải nằm trong khoảng pickup của mọi đơn trên chuyến (ngày cuối khoảng tính trọn ngày),
+            // và chuyến phải kết thúc trước hạn giao của mọi đơn.
+            // TODO(R-04): khi có mốc trả hàng riêng từng đơn, so hạn giao với giờ tới mốc trả của đơn đó thay vì cuối chuyến.
+            foreach (var booking in bookingHorses.Select(bh => bh.Booking!).DistinctBy(b => b.BookingId))
+            {
+                if (startUtc < booking.PickupWindowStart || startUtc >= booking.PickupWindowEnd.AddDays(1))
+                {
+                    throw new BusinessException(
+                        $"Booking {booking.BookingCode} can only be picked up between {booking.PickupWindowStart:yyyy-MM-dd} and {booking.PickupWindowEnd:yyyy-MM-dd}; PlannedStartDate is outside this window.");
+                }
+                if (endUtc > booking.DeliveryDeadline)
+                {
+                    throw new BusinessException(
+                        $"Booking {booking.BookingCode} must be delivered by {booking.DeliveryDeadline:yyyy-MM-dd HH:mm zzz}; PlannedEndDate is later than that.");
+                }
+            }
+
             var modes = bookingHorses.Select(bh => bh.Booking!.TransportMode).Distinct().ToList();
             if (modes.Count > 1)
             {

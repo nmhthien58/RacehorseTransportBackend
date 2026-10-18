@@ -183,8 +183,9 @@ namespace RacehorseTransport.Services.Implementations
                 Status = booking.Status,
                 PickupAddress = booking.PickupAddress,
                 DropoffAddress = booking.DropoffAddress,
-                DepartureDate = booking.DepartureDate,
-                DeliveryDate = booking.DeliveryDate,
+                PickupWindowStart = booking.PickupWindowStart,
+                PickupWindowEnd = booking.PickupWindowEnd,
+                DeliveryDeadline = booking.DeliveryDeadline,
                 GeneratedAt = DateTimeOffset.UtcNow,
                 HorsesAwaitingPlanning = activeBookingHorses
                     .Where(bh => !bh.TripHorses.Any(th => liveTripIds.Contains(th.TripId)))

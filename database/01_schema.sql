@@ -87,8 +87,11 @@ CREATE TABLE booking.booking_requests (
     pickup_country_code      char(2)       NOT NULL,
     dropoff_address          varchar(255)  NOT NULL,
     dropoff_country_code     char(2)       NOT NULL,
-    departure_date           timestamptz   NOT NULL,
-    delivery_date            timestamptz   NOT NULL,
+    -- Khách không chọn ngày chạy: chỉ cho biết ngựa sẵn sàng được đón trong khoảng nào và hạn giao trễ nhất.
+    -- Ngày chạy thật do Coordinator chốt khi lập chuyến (fleet.trips.planned_start_date).
+    pickup_window_start      timestamptz   NOT NULL,
+    pickup_window_end        timestamptz   NOT NULL,
+    delivery_deadline        timestamptz   NOT NULL,
     total_horses             integer       NOT NULL CONSTRAINT ck_booking_requests_total CHECK (total_horses > 0),
     special_instructions     text,
     estimated_cost           numeric(18,2) NOT NULL DEFAULT 0,
@@ -110,7 +113,8 @@ CREATE TABLE booking.booking_requests (
     requires_climate_control boolean       NOT NULL DEFAULT false,
     declared_value           numeric(18,2), -- NULL = khách không mua bảo hiểm
     quote_breakdown          jsonb,         -- Chi tiết các dòng báo giá
-    CONSTRAINT ck_booking_requests_dates CHECK (delivery_date > departure_date)
+    estimated_transit_hours  numeric(7,1),  -- Thời gian vận chuyển hệ thống ước tính lúc báo giá
+    CONSTRAINT ck_booking_requests_dates CHECK (pickup_window_end >= pickup_window_start AND delivery_deadline > pickup_window_start)
 );
 
 -- Bảng 4: Ngựa trong đơn (nhiều - nhiều giữa đơn và ngựa)
