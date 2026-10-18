@@ -74,6 +74,70 @@ namespace RacehorseTransport.Services.Implementations
             return BuildSummary(booking, await _settingService.GetPaymentSettingsAsync());
         }
 
+        public async Task<CustomerBillingModel> GetMyBillingAsync(CurrentUser currentUser)
+        {
+            if (!currentUser.IsCustomer)
+            {
+                throw new ForbiddenException("Only customers have a billing page.");
+            }
+
+            var bookings = await _bookingRepo.GetQueryable()
+                .AsNoTracking()
+                .AsSplitQuery()
+                .Include(b => b.Payments).ThenInclude(p => p.CreatedBy)
+                .Include(b => b.BookingHorses).ThenInclude(bh => bh.TripHorses).ThenInclude(th => th.Trip)
+                .Where(b => b.CustomerUserId == currentUser.UserId
+                    && (b.DepositPercent != null || b.ExtraCharges > 0 || b.Payments.Any()))
+                .OrderByDescending(b => b.CreatedAt)
+                .ToListAsync();
+
+            return BuildCustomerBilling(bookings, await _settingService.GetPaymentSettingsAsync());
+        }
+
+        public CustomerBillingModel BuildCustomerBilling(IEnumerable<BookingRequest> bookings, PaymentSettingsModel settings)
+        {
+            var billing = new CustomerBillingModel { UsdVndRate = settings.UsdVndRate };
+
+            foreach (var booking in bookings)
+            {
+                var summary = BuildSummary(booking, settings);
+                billing.Payments.AddRange(summary.Payments);
+                summary.Payments = new List<PaymentModel>();
+
+                billing.Bookings.Add(new CustomerBillingBookingModel
+                {
+                    BookingId = booking.BookingId,
+                    BookingCode = booking.BookingCode,
+                    Status = booking.Status,
+                    PickupCountryCode = booking.PickupCountryCode,
+                    DropoffCountryCode = booking.DropoffCountryCode,
+                    PickupAddress = booking.PickupAddress,
+                    DropoffAddress = booking.DropoffAddress,
+                    TotalHorses = booking.TotalHorses,
+                    CreatedAt = booking.CreatedAt,
+                    Summary = summary
+                });
+
+                billing.TotalPaid += summary.TotalPaid;
+                billing.TotalRefunded += summary.RefundedAmount;
+                billing.TotalOutstanding += summary.Outstanding;
+                if (summary.NextPaymentType != null)
+                {
+                    billing.PayableNowCount++;
+                    billing.TotalPayableNow += summary.NextPaymentAmount ?? 0;
+                    billing.TotalPayableNowVnd += summary.NextPaymentAmountVnd ?? 0;
+                }
+                if (summary.ExtraOverdue)
+                {
+                    billing.OverdueCount++;
+                }
+            }
+
+            billing.TotalOutstandingVnd = ToVnd(billing.TotalOutstanding, settings.UsdVndRate);
+            billing.Payments = billing.Payments.OrderByDescending(p => p.CreatedAt).ToList();
+            return billing;
+        }
+
         public BookingPaymentSummaryModel BuildSummary(BookingRequest booking, PaymentSettingsModel settings)
         {
             var payments = booking.Payments.ToList();
@@ -98,6 +162,7 @@ namespace RacehorseTransport.Services.Implementations
                 RefundedAmount = Paid(PaymentTypes.Refund),
                 Payments = payments.OrderByDescending(p => p.CreatedAt).Select(ToModel).ToList()
             };
+            summary.Payments.ForEach(p => p.BookingCode = booking.BookingCode);
 
             // Hạn trả phần còn lại: trước ngày xuất phát của chuyến sớm nhất còn hiệu lực chở ngựa của đơn
             var firstDeparture = booking.BookingHorses
@@ -723,6 +788,7 @@ namespace RacehorseTransport.Services.Implementations
             PaymentId = p.PaymentId,
             PaymentCode = p.PaymentCode,
             BookingId = p.BookingId,
+            BookingCode = p.Booking?.BookingCode,
             PaymentType = p.PaymentType,
             Provider = p.Provider,
             Status = p.Status,

@@ -184,4 +184,27 @@ public class PaymentSummaryTests
 
         Assert.Equal(departure.AddDays(-2), summary.BalanceDueAt);
     }
+
+    [Fact]
+    public void CustomerBilling_SumsBookingsAndFlattensPayments()
+    {
+        var awaitingDeposit = Booking(BookingStatuses.AwaitingDeposit);
+        awaitingDeposit.BookingCode = "BKG-1";
+        var cancelled = Booking(BookingStatuses.Cancelled, Paid(PaymentTypes.Deposit, 3000), Paid(PaymentTypes.Refund, 1500));
+        cancelled.BookingId = 2;
+        cancelled.BookingCode = "BKG-2";
+
+        var billing = CreateService().BuildCustomerBilling(new[] { awaitingDeposit, cancelled }, Settings);
+
+        Assert.Equal(2, billing.Bookings.Count);
+        Assert.Equal(10000, billing.TotalOutstanding);  // đơn đã hủy không tính nợ
+        Assert.Equal(3000, billing.TotalPayableNow);    // trả được ngay: chỉ khoản cọc
+        Assert.Equal(78000000, billing.TotalPayableNowVnd);
+        Assert.Equal(3000, billing.TotalPaid);
+        Assert.Equal(1500, billing.TotalRefunded);
+        Assert.Equal(1, billing.PayableNowCount);
+        Assert.Equal(2, billing.Payments.Count);
+        Assert.All(billing.Payments, p => Assert.Equal("BKG-2", p.BookingCode));
+        Assert.All(billing.Bookings, b => Assert.Empty(b.Summary.Payments));
+    }
 }

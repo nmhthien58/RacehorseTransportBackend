@@ -13,6 +13,7 @@ namespace RacehorseTransport.API.Mappers
                 PaymentId = model.PaymentId,
                 PaymentCode = model.PaymentCode,
                 BookingId = model.BookingId,
+                BookingCode = model.BookingCode,
                 PaymentType = model.PaymentType,
                 Provider = model.Provider,
                 Status = model.Status,
@@ -56,6 +57,37 @@ namespace RacehorseTransport.API.Mappers
                 NextPaymentType = model.NextPaymentType,
                 NextPaymentAmount = model.NextPaymentAmount,
                 NextPaymentAmountVnd = model.NextPaymentAmountVnd,
+                Payments = model.Payments.Select(p => p.ToResponse()).ToList()
+            };
+        }
+
+        public static CustomerBillingResponse ToResponse(this CustomerBillingModel model)
+        {
+            return new CustomerBillingResponse
+            {
+                CurrencyCode = model.CurrencyCode,
+                UsdVndRate = model.UsdVndRate,
+                TotalPaid = model.TotalPaid,
+                TotalRefunded = model.TotalRefunded,
+                TotalOutstanding = model.TotalOutstanding,
+                TotalOutstandingVnd = model.TotalOutstandingVnd,
+                TotalPayableNow = model.TotalPayableNow,
+                TotalPayableNowVnd = model.TotalPayableNowVnd,
+                PayableNowCount = model.PayableNowCount,
+                OverdueCount = model.OverdueCount,
+                Bookings = model.Bookings.Select(b => new CustomerBillingBookingResponse
+                {
+                    BookingId = b.BookingId,
+                    BookingCode = b.BookingCode,
+                    Status = b.Status,
+                    PickupCountryCode = b.PickupCountryCode,
+                    DropoffCountryCode = b.DropoffCountryCode,
+                    PickupAddress = b.PickupAddress,
+                    DropoffAddress = b.DropoffAddress,
+                    TotalHorses = b.TotalHorses,
+                    CreatedAt = b.CreatedAt,
+                    Summary = b.Summary.ToResponse()
+                }).ToList(),
                 Payments = model.Payments.Select(p => p.ToResponse()).ToList()
             };
         }
