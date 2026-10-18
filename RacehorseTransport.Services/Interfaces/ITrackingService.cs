@@ -12,5 +12,8 @@ namespace RacehorseTransport.Services.Interfaces
 
         // Gọi sau mỗi lần cập nhật hành trình để màn hình theo dõi không hiện dữ liệu cũ
         Task InvalidateTripAsync(int tripId);
+
+        // Sau mỗi lần check-in: báo khách (một lần mỗi đơn) khi giờ giao dự kiến vượt hạn giao (R-08)
+        Task NotifyLateDeliveriesAsync(int tripId);
     }
 }

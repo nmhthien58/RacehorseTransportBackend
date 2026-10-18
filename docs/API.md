@@ -3943,6 +3943,8 @@ Response `200` — phần `data`:
     "lastCheckpointStatus": "Departed",
     "nextCheckpointName": "Trạm nghỉ Nam Ninh",
     "nextCheckpointPlannedTime": "2026-11-08T02:00:00+00:00",
+    "nextCheckpointEstimatedTime": "2026-11-08T02:00:00+00:00",
+    "estimatedEndAt": "2026-11-09T11:00:00+00:00",
     "delayMinutes": 0,
     "isBehindSchedule": false,
     "openIncidentCount": 0,
@@ -3956,9 +3958,21 @@ Response `200` — phần `data`:
 | `leadDriverName`, `leadDriverPhone` | Tài xế trưởng, để gọi điện khi cần |
 | `checkpointsTotal`, `checkpointsReached` | Tổng số mốc và số mốc đã tới. Dùng làm thanh tiến độ |
 | `lastCheckpointName`, `lastCheckpointStatus` | Mốc gần nhất đã tới và trạng thái của nó |
-| `nextCheckpointName`, `nextCheckpointPlannedTime` | Mốc sắp tới và giờ dự kiến |
-| `delayMinutes` | Số phút đang trễ so với kế hoạch (0 là đúng giờ) |
-| `isBehindSchedule` | `true` khi đang trễ; nên tô màu cảnh báo |
+| `nextCheckpointName`, `nextCheckpointPlannedTime` | Mốc sắp tới và giờ dự kiến theo kế hoạch |
+| `nextCheckpointEstimatedTime` | Giờ dự kiến tới mốc sắp tới, đã cộng độ trễ hiện tại (xem "Giờ dự kiến theo check-in" bên dưới) |
+| `estimatedEndAt` | Giờ dự kiến tới mốc cuối, đã cộng độ trễ hiện tại; đã tới thì là giờ tới thực tế |
+| `delayMinutes` | Số phút đang trễ so với kế hoạch theo check-in thực tế (0 là đúng giờ) |
+| `isBehindSchedule` | `true` khi đang trễ (`delayMinutes` > 0); nên tô màu cảnh báo |
+
+**Giờ dự kiến theo check-in.** Server tính lại giờ dự kiến mỗi lần được hỏi, từ mốc gần nhất xe đã chạm tới:
+
+- Đã rời mốc: độ trễ = giờ rời thực tế − (giờ dự kiến tới + số phút nghỉ bắt buộc của mốc).
+- Đang dừng ở mốc: tính như thể xe rời ở thời điểm sớm nhất có thể (bây giờ, hoặc khi nghỉ đủ). Xe dừng càng lâu thì độ trễ càng tăng.
+- Đang chạy mà đã quá giờ dự kiến của mốc kế tiếp: coi như xe tới mốc đó ngay bây giờ.
+- Chưa xuất phát mà đã quá giờ khởi hành: độ trễ = bây giờ − giờ dự kiến của mốc đầu.
+- Tới sớm không làm giờ dự kiến sớm lên, vì xe vẫn chạy theo lịch.
+
+Mốc chưa tới có giờ dự kiến = giờ kế hoạch + độ trễ. Mỗi lần tài xế xuất phát, tới hoặc rời một mốc, server kiểm tra từng đơn còn ngựa trên xe. Nếu giờ dự kiến tới điểm trả của đơn đã sau hạn giao, khách nhận thông báo + email "Booking BKG-... may arrive late" và điều phối viên lập chuyến cũng nhận thông báo. Mỗi đơn chỉ báo một lần.
 | `openIncidentCount` | Số sự cố chưa xử lý xong |
 | `welfareAlertCount` | Số nhật ký cần chú ý (ngựa bỏ ăn hoặc kích động) |
 
@@ -3999,6 +4013,9 @@ Response `200` — phần `data`:
       "actualEndDate": null,
       "delayMinutes": 0,
       "handoverCompleted": false,
+      "estimatedDeliveryAt": "2026-11-09T11:00:00+00:00",
+      "liveEstimatedDeliveryAt": "2026-11-09T11:00:00+00:00",
+      "deliveryAtRisk": false,
       "checkpoints": [
         {
           "checkpointId": 9,
@@ -4010,7 +4027,8 @@ Response `200` — phần `data`:
           "actualArrivalTime": "2026-10-08T07:24:31+00:00",
           "actualDepartureTime": "2026-10-08T07:24:31+00:00",
           "status": "Departed",
-          "delayMinutes": 0
+          "delayMinutes": 0,
+          "estimatedArrivalTime": "2026-10-08T07:24:31+00:00"
         },
         {
           "checkpointId": 10,
@@ -4088,7 +4106,10 @@ Response `200` — phần `data`:
 | `trips[].checkpoints[]` | Dòng thời gian. `actualArrivalTime` là `null` nghĩa là chưa tới; `delayMinutes` của mốc là `null` khi chưa tới |
 | `trips[].horses[]` | Chỉ gồm ngựa **của đơn này**, kể cả khi chuyến chở chung ngựa của khách khác |
 | `trips[].pickupCheckpointId`, `dropoffCheckpointId` | Mốc đón / mốc trả của đơn này trên chuyến |
-| `trips[].estimatedDeliveryAt` | Giờ dự kiến tới mốc trả của đơn này (không phải giờ kết thúc cả chuyến) |
+| `trips[].estimatedDeliveryAt` | Giờ tới mốc trả của đơn này **theo kế hoạch** (không phải giờ kết thúc cả chuyến) |
+| `trips[].liveEstimatedDeliveryAt` | Giờ dự kiến tới mốc trả của đơn này, **cập nhật theo check-in thực tế** (xem "Giờ dự kiến theo check-in" ở `GET /api/tracking/trips`). Nên hiện giờ này, kèm giờ kế hoạch nếu khác |
+| `trips[].deliveryAtRisk` | `true` khi giờ dự kiến mới đã sau hạn giao của đơn (và đơn chưa được bàn giao); nên hiện cảnh báo "Có thể giao trễ hạn" |
+| `checkpoints[].estimatedArrivalTime` | Mốc đã tới: giờ tới thực tế. Mốc chưa tới: giờ kế hoạch cộng độ trễ hiện tại |
 | `checkpoints[].isMyPickup`, `isMyDropoff` | Mốc đón / trả của đơn này, để tô nổi |
 | `checkpoints[].isOtherBookingStop` | `true` là điểm đón / trả của **khách khác** đi chung chuyến: `checkpointName` và `address` để trống, frontend hiện "Điểm dừng của đơn khác" |
 | `horses[].status`, `deliveredAt`, `offloadedAt`, `offloadReason` | Trạng thái của từng con ngựa trên chuyến (mục 3) |

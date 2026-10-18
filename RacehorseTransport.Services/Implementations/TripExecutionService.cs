@@ -148,6 +148,7 @@ namespace RacehorseTransport.Services.Implementations
             });
 
             await _trackingService.InvalidateTripAsync(tripId);
+            await _trackingService.NotifyLateDeliveriesAsync(tripId);
             return await _tripService.GetTripByIdAsync(tripId, currentUser);
         }
 
@@ -233,6 +234,7 @@ namespace RacehorseTransport.Services.Implementations
             });
 
             await _trackingService.InvalidateTripAsync(trip.TripId);
+            await _trackingService.NotifyLateDeliveriesAsync(trip.TripId);
             return await _tripService.GetTripByIdAsync(trip.TripId, currentUser);
         }
 
@@ -328,6 +330,7 @@ namespace RacehorseTransport.Services.Implementations
             await _checkpointRepo.UpdateAsync(checkpoint);
 
             await _trackingService.InvalidateTripAsync(trip.TripId);
+            await _trackingService.NotifyLateDeliveriesAsync(trip.TripId);
             return await _tripService.GetTripByIdAsync(trip.TripId, currentUser);
         }
 

@@ -22,6 +22,8 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? LastCheckpointStatus { get; set; }
         public string? NextCheckpointName { get; set; }
         public DateTimeOffset? NextCheckpointPlannedTime { get; set; }
+        public DateTimeOffset? NextCheckpointEstimatedTime { get; set; } // cập nhật theo check-in thực tế (R-08)
+        public DateTimeOffset? EstimatedEndAt { get; set; }             // giờ tới mốc cuối dự kiến theo check-in thực tế
 
         // Trễ so với kế hoạch tại mốc gần nhất đã tới (phút)
         public int DelayMinutes { get; set; }
@@ -66,7 +68,11 @@ namespace RacehorseTransport.Services.BusinessModels
         // Mốc đón / trả của đơn này trên chuyến (R-04) và giờ dự kiến tới mốc trả
         public int? PickupCheckpointId { get; set; }
         public int? DropoffCheckpointId { get; set; }
-        public DateTimeOffset? EstimatedDeliveryAt { get; set; }
+        public DateTimeOffset? EstimatedDeliveryAt { get; set; }      // giờ tới mốc trả theo kế hoạch
+
+        // Cập nhật theo check-in thực tế (R-08): trễ ở mốc trước thì các mốc sau lùi theo
+        public DateTimeOffset? LiveEstimatedDeliveryAt { get; set; }
+        public bool DeliveryAtRisk { get; set; }                       // dự kiến tới mốc trả sau hạn giao của đơn
         public List<TrackingCheckpointModel> Checkpoints { get; set; } = new();
         public List<TrackingHorseModel> Horses { get; set; } = new();
     }
@@ -83,6 +89,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset? ActualDepartureTime { get; set; }
         public string Status { get; set; } = string.Empty;
         public int? DelayMinutes { get; set; } // null = chưa tới mốc này
+        public DateTimeOffset EstimatedArrivalTime { get; set; } // giờ tới thực tế, hoặc giờ dự kiến đã cộng độ trễ hiện tại
 
         // Điểm đón / trả của khách khác đi chung chuyến: ẩn tên và địa chỉ (CheckpointName / Address để trống)
         public bool IsOtherBookingStop { get; set; }

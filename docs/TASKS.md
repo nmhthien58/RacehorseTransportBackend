@@ -247,6 +247,10 @@ Không task nào của Tú chặn việc của Thiên. Chiều ngược lại:
 
 28. **Khách theo dõi theo đơn, không theo chuyến:** `customerStage` (suy ra, không lưu DB, `CustomerStageRules`) = `PendingReview → AwaitingDeposit → PreparingDossier → AwaitingTrip → Scheduled / AwaitingPayment → InTransit → AwaitingHandover → Completed`, nhánh `Closed`. `GET /api/bookings?stage=` lọc theo giai đoạn. Màn "Đơn vận chuyển" của khách có tab theo giai đoạn; chi tiết đơn có timeline dọc và tab "Hành trình" (lộ trình, sự cố, nhật ký chỉ ngựa của khách) thay cho menu "Theo dõi chuyến" riêng. Nhân sự vẫn dùng màn chuyến.
 
+**Giờ dự kiến theo check-in thực tế (phần còn lại của R-08, Thiên, 19/10/2026)**
+
+29. `LiveEtaCalculator`: độ trễ lấy ở mốc gần nhất xe đã chạm tới (đã rời: so giờ rời với giờ dự kiến + nghỉ bắt buộc; đang dừng: rời sớm nhất có thể; đang chạy quá giờ mốc kế tiếp: coi như tới bây giờ; tới sớm không kéo sớm lên), cộng vào giờ kế hoạch của các mốc sau. Màn theo dõi của khách và bảng điều phối hiện giờ dự kiến mới; đơn có giờ giao dự kiến vượt hạn giao được báo khách (thông báo + email) và điều phối một lần, kiểm tra sau mỗi lần xuất phát / tới / rời mốc.
+
 ---
 
 ## Phụ lục: công thức nghiệp vụ (chuyển từ stored procedure của bản SQL Server)

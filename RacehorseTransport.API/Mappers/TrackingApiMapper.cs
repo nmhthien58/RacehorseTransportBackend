@@ -66,6 +66,8 @@ namespace RacehorseTransport.API.Mappers
                 LastCheckpointStatus = model.LastCheckpointStatus,
                 NextCheckpointName = model.NextCheckpointName,
                 NextCheckpointPlannedTime = model.NextCheckpointPlannedTime,
+                NextCheckpointEstimatedTime = model.NextCheckpointEstimatedTime,
+                EstimatedEndAt = model.EstimatedEndAt,
                 DelayMinutes = model.DelayMinutes,
                 IsBehindSchedule = model.IsBehindSchedule,
                 OpenIncidentCount = model.OpenIncidentCount,
@@ -103,6 +105,8 @@ namespace RacehorseTransport.API.Mappers
                     PickupCheckpointId = t.PickupCheckpointId,
                     DropoffCheckpointId = t.DropoffCheckpointId,
                     EstimatedDeliveryAt = t.EstimatedDeliveryAt,
+                    LiveEstimatedDeliveryAt = t.LiveEstimatedDeliveryAt,
+                    DeliveryAtRisk = t.DeliveryAtRisk,
                     Checkpoints = t.Checkpoints.Select(c => new TrackingCheckpointResponse
                     {
                         CheckpointId = c.CheckpointId,
@@ -115,6 +119,7 @@ namespace RacehorseTransport.API.Mappers
                         ActualDepartureTime = c.ActualDepartureTime,
                         Status = c.Status,
                         DelayMinutes = c.DelayMinutes,
+                        EstimatedArrivalTime = c.EstimatedArrivalTime,
                         IsOtherBookingStop = c.IsOtherBookingStop,
                         IsMyPickup = c.IsMyPickup,
                         IsMyDropoff = c.IsMyDropoff
