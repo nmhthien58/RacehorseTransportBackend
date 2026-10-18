@@ -30,6 +30,8 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IRepository<HorseWelfareLog> _welfareLogRepo;
         private readonly ICacheService _cache;
         private readonly IFileStorageService _fileStorage;
+        private readonly IRepository<SystemNotification> _notificationRepo;
+        private readonly INotificationService _notificationService;
 
         public TrackingService(
             IRepository<Trip> tripRepo,
@@ -37,8 +39,12 @@ namespace RacehorseTransport.Services.Implementations
             IRepository<TripHorse> tripHorseRepo,
             IRepository<HorseWelfareLog> welfareLogRepo,
             ICacheService cache,
-            IFileStorageService fileStorage)
+            IFileStorageService fileStorage,
+            IRepository<SystemNotification> notificationRepo,
+            INotificationService notificationService)
         {
+            _notificationRepo = notificationRepo;
+            _notificationService = notificationService;
             _fileStorage = fileStorage;
             _tripRepo = tripRepo;
             _bookingRepo = bookingRepo;
@@ -196,11 +202,16 @@ namespace RacehorseTransport.Services.Implementations
                     var route = ActiveRoute(trip);
                     var myPickup = TripRouteRules.PickupCheckpoint(route, bookingId);
                     var myDropoff = TripRouteRules.DropoffCheckpoint(route, bookingId);
+                    var eta = LiveEtaCalculator.Calculate(route, trip.OverallStatus, DateTimeOffset.UtcNow);
+                    DateTimeOffset? liveDelivery = myDropoff == null ? null : eta.EstimatedArrivals[myDropoff.CheckpointId];
                     return new TrackingTripModel
                     {
                         PickupCheckpointId = myPickup?.CheckpointId,
                         DropoffCheckpointId = myDropoff?.CheckpointId,
                         EstimatedDeliveryAt = myDropoff?.PlannedTime,
+                        LiveEstimatedDeliveryAt = liveDelivery,
+                        DeliveryAtRisk = liveDelivery.HasValue && liveDelivery.Value > booking.DeliveryDeadline
+                            && !trip.Handovers.Any(h => h.BookingId == bookingId),
                         TripId = trip.TripId,
                         TripCode = trip.TripCode,
                         OverallStatus = trip.OverallStatus,
@@ -210,7 +221,7 @@ namespace RacehorseTransport.Services.Implementations
                         PlannedEndDate = trip.PlannedEndDate,
                         ActualStartDate = trip.ActualStartDate,
                         ActualEndDate = trip.ActualEndDate,
-                        DelayMinutes = CurrentDelay(route),
+                        DelayMinutes = eta.DelayMinutes,
                         HandoverCompleted = trip.Handovers.Any(h => h.BookingId == bookingId),
                         Checkpoints = route.Select(c =>
                         {
@@ -228,6 +239,7 @@ namespace RacehorseTransport.Services.Implementations
                                 ActualDepartureTime = c.ActualDepartureTime,
                                 Status = c.Status,
                                 DelayMinutes = Delay(c),
+                                EstimatedArrivalTime = eta.EstimatedArrivals[c.CheckpointId],
                                 IsOtherBookingStop = otherStop,
                                 IsMyPickup = c.CheckpointId == myPickup?.CheckpointId,
                                 IsMyDropoff = c.CheckpointId == myDropoff?.CheckpointId
@@ -272,7 +284,8 @@ namespace RacehorseTransport.Services.Implementations
             var lastReached = route.LastOrDefault(c => c.ActualArrivalTime != null);
             var next = route.FirstOrDefault(c => c.ActualArrivalTime == null);
             var leadDriver = LeadDriver(trip);
-            int delay = CurrentDelay(route);
+            var eta = LiveEtaCalculator.Calculate(route, trip.OverallStatus, now);
+            int delay = eta.DelayMinutes;
 
             return new TripProgressModel
             {
@@ -293,10 +306,11 @@ namespace RacehorseTransport.Services.Implementations
                 LastCheckpointStatus = lastReached?.Status,
                 NextCheckpointName = next?.CheckpointName,
                 NextCheckpointPlannedTime = next?.PlannedTime,
+                NextCheckpointEstimatedTime = next == null ? null : eta.EstimatedArrivals[next.CheckpointId],
+                EstimatedEndAt = route.Count == 0 ? null : eta.EstimatedArrivals[route[^1].CheckpointId],
                 DelayMinutes = delay,
-                // Trễ nếu đã tới mốc gần nhất muộn hơn kế hoạch, hoặc đang trên đường mà đã quá giờ dự kiến của mốc kế tiếp
-                IsBehindSchedule = delay > 0
-                    || (OnTheRoadStatuses.Contains(trip.OverallStatus) && next != null && next.PlannedTime < now),
+                // Độ trễ theo check-in thực tế (LiveEtaCalculator): đã tính cả trường hợp đang trên đường mà quá giờ mốc kế tiếp
+                IsBehindSchedule = delay > 0,
                 OpenIncidentCount = trip.Incidents.Count(i => i.Status != IncidentStatuses.Resolved),
                 WelfareAlertCount = welfareAlertCount
             };
@@ -325,10 +339,64 @@ namespace RacehorseTransport.Services.Implementations
             return Math.Max(0, (int)Math.Round((checkpoint.ActualArrivalTime.Value - checkpoint.PlannedTime).TotalMinutes));
         }
 
-        private static int CurrentDelay(List<RouteCheckpoint> route)
+        // Sau mỗi lần check-in: đơn nào còn ngựa trên xe mà giờ tới điểm trả dự kiến đã vượt hạn giao thì báo khách
+        // (thông báo + email) và điều phối viên. Mỗi đơn chỉ báo một lần: đã có thông báo cùng tiêu đề thì bỏ qua.
+        public async Task NotifyLateDeliveriesAsync(int tripId)
         {
-            var lastReached = route.LastOrDefault(c => c.ActualArrivalTime != null);
-            return lastReached == null ? 0 : Delay(lastReached) ?? 0;
+            var trip = await _tripRepo.GetQueryable()
+                .AsNoTracking()
+                .AsSplitQuery()
+                .Include(t => t.Checkpoints)
+                .Include(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Booking)
+                .FirstOrDefaultAsync(t => t.TripId == tripId);
+            if (trip == null)
+            {
+                return;
+            }
+
+            var route = ActiveRoute(trip);
+            var eta = LiveEtaCalculator.Calculate(route, trip.OverallStatus, DateTimeOffset.UtcNow);
+            var bookings = trip.TripHorses
+                .Where(th => TripHorseStatuses.OnBoard.Contains(th.Status))
+                .Select(th => th.BookingHorse!.Booking!)
+                .DistinctBy(b => b.BookingId)
+                .ToList();
+
+            foreach (var booking in bookings)
+            {
+                var dropoff = TripRouteRules.DropoffCheckpoint(route, booking.BookingId);
+                if (dropoff == null || dropoff.ActualArrivalTime != null)
+                {
+                    continue;
+                }
+                var expected = eta.EstimatedArrivals[dropoff.CheckpointId];
+                if (expected <= booking.DeliveryDeadline)
+                {
+                    continue;
+                }
+
+                string title = $"Booking {booking.BookingCode} may arrive late";
+                bool alreadySent = await _notificationRepo.GetQueryable()
+                    .AnyAsync(n => n.RecipientUserId == booking.CustomerUserId
+                        && n.ReferenceType == NotificationReferenceTypes.Booking
+                        && n.ReferenceId == booking.BookingId
+                        && n.Title == title);
+                if (alreadySent)
+                {
+                    continue;
+                }
+
+                string message = $"Trip {trip.TripCode} is running {eta.DelayMinutes} minute(s) behind schedule. "
+                    + $"Expected arrival at {dropoff.CheckpointName}: {expected:yyyy-MM-dd HH:mm} UTC, "
+                    + $"later than the delivery deadline {booking.DeliveryDeadline:yyyy-MM-dd HH:mm} UTC. Our team will keep you updated.";
+                await _notificationService.SendAsync(
+                    booking.CustomerUserId, title, message, NotificationReferenceTypes.Booking, booking.BookingId, emailCustomers: true);
+                if (trip.PlannedByUserId.HasValue)
+                {
+                    await _notificationService.SendAsync(
+                        trip.PlannedByUserId.Value, title, message, NotificationReferenceTypes.Trip, trip.TripId);
+                }
+            }
         }
 
         private static WelfareLogModel ToLogModel(HorseWelfareLog log, Horse horse)

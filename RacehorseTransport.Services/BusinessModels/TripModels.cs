@@ -27,6 +27,9 @@ namespace RacehorseTransport.Services.BusinessModels
     public class TripDetailModel : TripSummaryModel
     {
         public int? VehicleCapacity { get; set; }
+
+        // Số phút đang trễ theo check-in thực tế (R-08); khác DelayMinutes là kết quả chốt khi đóng chuyến
+        public int LiveDelayMinutes { get; set; }
         public decimal PlannedCost { get; set; }
         public decimal ActualCost { get; set; }
 
@@ -113,6 +116,9 @@ namespace RacehorseTransport.Services.BusinessModels
         // Mốc PickUp / DropOff: đơn được đón / trả ở đây (R-04)
         public int? BookingId { get; set; }
         public string? BookingCode { get; set; }
+
+        // Giờ tới thực tế, hoặc giờ dự kiến đã cộng độ trễ hiện tại (R-08); null với mốc đã bị thay khi nắn tuyến
+        public DateTimeOffset? EstimatedArrivalTime { get; set; }
     }
 
     // Một đơn có ngựa trên chuyến này (chuyến có thể ghép nhiều đơn, mỗi đơn bàn giao riêng)
@@ -130,7 +136,8 @@ namespace RacehorseTransport.Services.BusinessModels
         // Mốc đón / trả của đơn trên chuyến (R-04): PickUp / DropOff riêng, không có thì Origin / Destination
         public int? PickupCheckpointId { get; set; }
         public int? DropoffCheckpointId { get; set; }
-        public DateTimeOffset? EstimatedDeliveryAt { get; set; } // giờ dự kiến tới mốc trả
+        public DateTimeOffset? EstimatedDeliveryAt { get; set; }
+        public DateTimeOffset? LiveEstimatedDeliveryAt { get; set; } // theo check-in thực tế (R-08) // giờ dự kiến tới mốc trả
         public DateTimeOffset DeliveryDeadline { get; set; }
         public int DeliveredHorseCount { get; set; }
         public int OffloadedHorseCount { get; set; }

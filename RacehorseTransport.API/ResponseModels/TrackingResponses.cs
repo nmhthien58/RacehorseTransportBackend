@@ -39,6 +39,8 @@ namespace RacehorseTransport.API.ResponseModels
         public string? LastCheckpointStatus { get; set; }
         public string? NextCheckpointName { get; set; }
         public DateTimeOffset? NextCheckpointPlannedTime { get; set; }
+        public DateTimeOffset? NextCheckpointEstimatedTime { get; set; }
+        public DateTimeOffset? EstimatedEndAt { get; set; }
         public int DelayMinutes { get; set; }
         public bool IsBehindSchedule { get; set; }
         public int OpenIncidentCount { get; set; }
@@ -76,6 +78,8 @@ namespace RacehorseTransport.API.ResponseModels
         public int? PickupCheckpointId { get; set; }
         public int? DropoffCheckpointId { get; set; }
         public DateTimeOffset? EstimatedDeliveryAt { get; set; }
+        public DateTimeOffset? LiveEstimatedDeliveryAt { get; set; }
+        public bool DeliveryAtRisk { get; set; }
         public List<TrackingCheckpointResponse> Checkpoints { get; set; } = new();
         public List<TrackingHorseResponse> Horses { get; set; } = new();
     }
@@ -92,6 +96,7 @@ namespace RacehorseTransport.API.ResponseModels
         public DateTimeOffset? ActualDepartureTime { get; set; }
         public string Status { get; set; } = string.Empty;
         public int? DelayMinutes { get; set; }
+        public DateTimeOffset EstimatedArrivalTime { get; set; }
         public bool IsOtherBookingStop { get; set; }
         public bool IsMyPickup { get; set; }
         public bool IsMyDropoff { get; set; }
