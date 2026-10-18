@@ -185,12 +185,12 @@ namespace RacehorseTransport.Services.Implementations
             var (dossier, document) = await GetDocumentForReviewAsync(documentId, currentUser);
             var booking = dossier.BookingHorse!.Booking!;
 
-            // Giấy phải còn hiệu lực tới ngày khởi hành
-            var departureDay = DateOnly.FromDateTime(booking.DepartureDate.UtcDateTime);
-            if (document.ExpiryDate.HasValue && document.ExpiryDate.Value < departureDay)
+            // Giấy phải còn hiệu lực tới ngày cuối của khoảng pickup (chưa biết chuyến chạy ngày nào trong khoảng)
+            var latestPickupDay = DateOnly.FromDateTime(booking.PickupWindowEnd.UtcDateTime);
+            if (document.ExpiryDate.HasValue && document.ExpiryDate.Value < latestPickupDay)
             {
                 throw new BusinessException(
-                    $"'{document.DocumentType!.Name}' expires on {document.ExpiryDate:yyyy-MM-dd}, before the departure date {departureDay:yyyy-MM-dd}. Reject it and ask for a valid document.");
+                    $"'{document.DocumentType!.Name}' expires on {document.ExpiryDate:yyyy-MM-dd}, before the end of the pickup window {latestPickupDay:yyyy-MM-dd}. Reject it and ask for a valid document.");
             }
 
             document.Status = DocumentStatuses.Approved;

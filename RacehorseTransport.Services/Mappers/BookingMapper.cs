@@ -21,6 +21,7 @@ namespace RacehorseTransport.Services.Mappers
                 CustomerPhone = entity.Customer?.PhoneNumber,
                 SpecialInstructions = entity.SpecialInstructions,
                 DistanceKm = entity.DistanceKm,
+                EstimatedTransitHours = entity.EstimatedTransitHours,
                 IsExpress = entity.IsExpress,
                 RequiresClimateControl = entity.RequiresClimateControl,
                 DeclaredValue = entity.DeclaredValue,
@@ -79,8 +80,9 @@ namespace RacehorseTransport.Services.Mappers
             model.PickupCountryCode = entity.PickupCountryCode;
             model.DropoffAddress = entity.DropoffAddress;
             model.DropoffCountryCode = entity.DropoffCountryCode;
-            model.DepartureDate = entity.DepartureDate;
-            model.DeliveryDate = entity.DeliveryDate;
+            model.PickupWindowStart = entity.PickupWindowStart;
+            model.PickupWindowEnd = entity.PickupWindowEnd;
+            model.DeliveryDeadline = entity.DeliveryDeadline;
             model.TransportMode = entity.TransportMode;
             model.TotalHorses = entity.TotalHorses;
             model.EstimatedCost = entity.EstimatedCost;

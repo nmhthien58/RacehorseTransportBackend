@@ -84,6 +84,7 @@ namespace RacehorseTransport.Repositories.Context
                 entity.HasKey(e => e.BookingId);
                 entity.Property(e => e.EstimatedCost).HasPrecision(18, 2);
                 entity.Property(e => e.DeclaredValue).HasPrecision(18, 2);
+                entity.Property(e => e.EstimatedTransitHours).HasPrecision(7, 1);
                 entity.Property(e => e.QuoteBreakdown).HasColumnType("jsonb");
 
                 entity.HasOne(e => e.Customer).WithMany().HasForeignKey(e => e.CustomerUserId);

@@ -19,8 +19,30 @@ namespace RacehorseTransport.API.ResponseModels
         public int TransitDays { get; set; }
         public bool IsExpress { get; set; }
         public int? DistanceKm { get; set; }
-        public decimal? EstimatedHours { get; set; }
+        public decimal? EstimatedHours { get; set; } // tổng thời gian vận chuyển dự kiến
         public string? RouteSummary { get; set; }
+
+        // Lịch cho form tạo đơn: khóa các ngày pickup trước EarliestPickupDate;
+        // pickup trước ExpressUntilDate thì có phụ phí Express; hạn giao phải từ EarliestDeliveryDeadline trở đi.
+        public int LeadTimeDays { get; set; }
+        public DateOnly EarliestPickupDate { get; set; }
+        public DateOnly ExpressUntilDate { get; set; }
+        public DateTimeOffset EarliestDeliveryDeadline { get; set; }
+        public TransitEstimateResponse Transit { get; set; } = new();
+    }
+
+    // Thời gian vận chuyển ước tính, tách theo thành phần (giờ)
+    public class TransitEstimateResponse
+    {
+        public decimal DrivingHours { get; set; }
+        public decimal RestHours { get; set; }
+        public int OvernightStops { get; set; }
+        public decimal BorderHours { get; set; }
+        public decimal HandlingHours { get; set; }
+        public decimal FlightHours { get; set; }
+        public decimal TotalHours { get; set; }
+        public decimal MaxHours { get; set; }
+        public int TransitDays { get; set; }
     }
 
     public class DistanceEstimateResponse
@@ -41,8 +63,9 @@ namespace RacehorseTransport.API.ResponseModels
         public string PickupCountryCode { get; set; } = string.Empty;
         public string DropoffAddress { get; set; } = string.Empty;
         public string DropoffCountryCode { get; set; } = string.Empty;
-        public DateTimeOffset DepartureDate { get; set; }
-        public DateTimeOffset DeliveryDate { get; set; }
+        public DateTimeOffset PickupWindowStart { get; set; }
+        public DateTimeOffset PickupWindowEnd { get; set; }
+        public DateTimeOffset DeliveryDeadline { get; set; }
         public string TransportMode { get; set; } = string.Empty;
         public int TotalHorses { get; set; }
         public decimal EstimatedCost { get; set; }
@@ -59,6 +82,7 @@ namespace RacehorseTransport.API.ResponseModels
         public string? CustomerPhone { get; set; }
         public string? SpecialInstructions { get; set; }
         public int? DistanceKm { get; set; }
+        public decimal? EstimatedTransitHours { get; set; }
         public bool IsExpress { get; set; }
         public bool RequiresClimateControl { get; set; }
         public decimal? DeclaredValue { get; set; }

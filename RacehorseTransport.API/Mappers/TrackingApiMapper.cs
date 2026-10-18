@@ -82,8 +82,9 @@ namespace RacehorseTransport.API.Mappers
                 Status = model.Status,
                 PickupAddress = model.PickupAddress,
                 DropoffAddress = model.DropoffAddress,
-                DepartureDate = model.DepartureDate,
-                DeliveryDate = model.DeliveryDate,
+                PickupWindowStart = model.PickupWindowStart,
+                PickupWindowEnd = model.PickupWindowEnd,
+                DeliveryDeadline = model.DeliveryDeadline,
                 HorsesAwaitingPlanning = model.HorsesAwaitingPlanning,
                 GeneratedAt = model.GeneratedAt,
                 Trips = model.Trips.Select(t => new TrackingTripResponse

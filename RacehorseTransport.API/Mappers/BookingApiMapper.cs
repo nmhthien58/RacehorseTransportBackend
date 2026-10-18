@@ -16,8 +16,8 @@ namespace RacehorseTransport.API.Mappers
                 Size = request.Size,
                 Status = request.Status,
                 CustomerUserId = request.CustomerUserId,
-                DepartureFrom = request.DepartureFrom,
-                DepartureTo = request.DepartureTo
+                PickupFrom = request.PickupFrom,
+                PickupTo = request.PickupTo
             };
         }
 
@@ -31,8 +31,9 @@ namespace RacehorseTransport.API.Mappers
                 DropoffAddress = FormatAddress(request.DropoffAddress, request.DropoffCity),
                 DropoffCity = request.DropoffCity?.Trim(),
                 DropoffCountryCode = request.DropoffCountryCode.Trim().ToUpperInvariant(),
-                DepartureDate = request.DepartureDate!.Value,
-                DeliveryDate = request.DeliveryDate!.Value,
+                PickupWindowStart = request.PickupWindowStart!.Value,
+                PickupWindowEnd = request.PickupWindowEnd!.Value,
+                DeliveryDeadline = request.DeliveryDeadline!.Value,
                 TransportMode = request.TransportMode.Trim(),
                 DistanceKm = request.DistanceKm,
                 RequiresClimateControl = request.RequiresClimateControl,
@@ -61,8 +62,9 @@ namespace RacehorseTransport.API.Mappers
                 DistanceKm = request.DistanceKm,
                 RequiresClimateControl = request.RequiresClimateControl,
                 DeclaredValue = request.DeclaredValue,
-                DepartureDate = request.DepartureDate!.Value,
-                DeliveryDate = request.DeliveryDate!.Value,
+                PickupWindowStart = request.PickupWindowStart,
+                PickupWindowEnd = request.PickupWindowEnd,
+                DeliveryDeadline = request.DeliveryDeadline,
                 StallClasses = request.Horses.Select(h => h.StallClass.Trim()).ToList()
             };
         }
@@ -116,7 +118,28 @@ namespace RacehorseTransport.API.Mappers
                 IsExpress = model.IsExpress,
                 DistanceKm = model.DistanceKm,
                 EstimatedHours = model.EstimatedHours,
-                RouteSummary = model.RouteSummary
+                RouteSummary = model.RouteSummary,
+                LeadTimeDays = model.LeadTimeDays,
+                EarliestPickupDate = model.EarliestPickupDate,
+                ExpressUntilDate = model.ExpressUntilDate,
+                EarliestDeliveryDeadline = model.EarliestDeliveryDeadline,
+                Transit = model.Transit.ToResponse()
+            };
+        }
+
+        public static TransitEstimateResponse ToResponse(this TransitEstimateModel model)
+        {
+            return new TransitEstimateResponse
+            {
+                DrivingHours = model.DrivingHours,
+                RestHours = model.RestHours,
+                OvernightStops = model.OvernightStops,
+                BorderHours = model.BorderHours,
+                HandlingHours = model.HandlingHours,
+                FlightHours = model.FlightHours,
+                TotalHours = model.TotalHours,
+                MaxHours = model.MaxHours,
+                TransitDays = model.TransitDays
             };
         }
 
@@ -144,6 +167,7 @@ namespace RacehorseTransport.API.Mappers
                 CustomerPhone = model.CustomerPhone,
                 SpecialInstructions = model.SpecialInstructions,
                 DistanceKm = model.DistanceKm,
+                EstimatedTransitHours = model.EstimatedTransitHours,
                 IsExpress = model.IsExpress,
                 RequiresClimateControl = model.RequiresClimateControl,
                 DeclaredValue = model.DeclaredValue,
@@ -190,8 +214,9 @@ namespace RacehorseTransport.API.Mappers
             response.PickupCountryCode = model.PickupCountryCode;
             response.DropoffAddress = model.DropoffAddress;
             response.DropoffCountryCode = model.DropoffCountryCode;
-            response.DepartureDate = model.DepartureDate;
-            response.DeliveryDate = model.DeliveryDate;
+            response.PickupWindowStart = model.PickupWindowStart;
+            response.PickupWindowEnd = model.PickupWindowEnd;
+            response.DeliveryDeadline = model.DeliveryDeadline;
             response.TransportMode = model.TransportMode;
             response.TotalHorses = model.TotalHorses;
             response.EstimatedCost = model.EstimatedCost;

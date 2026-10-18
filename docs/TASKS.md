@@ -133,7 +133,7 @@ Làm sau khi T-05 và T-26 xong. Tạo project `RacehorseTransport.Tests` (xUnit
 ### M2 – Flow 1: Tạo & duyệt yêu cầu vận chuyển · REQUIRED
 
 - [x] **T-05 · Báo giá** — `IPricingService` tính giá bằng C# từ bảng `pricing.price_items` (công thức ở phụ lục cuối file); `POST /api/bookings/quote-preview` cho khách xem giá trước khi gửi (không ghi DB); lưu các dòng báo giá vào `QuoteBreakdown` (jsonb). Cache bảng giá, xóa cache khi B-03 sửa giá.
-- [x] **T-06 · Tạo đơn** — `POST /api/bookings` (Customer): kiểm tra ngựa thuộc về khách, ngựa chưa nằm trong đơn khác trùng thời gian, `DeliveryDate > DepartureDate`, đơn đường bộ phải có `DistanceKm`, `IsExpress` khi khởi hành dưới 7 ngày. Tạo `BookingHorses`, tính giá, báo cho Manager.
+- [x] **T-06 · Tạo đơn** — `POST /api/bookings` (Customer): kiểm tra ngựa thuộc về khách, ngựa chưa nằm trong đơn khác trùng thời gian, khoảng pickup đủ xa (thời gian đặt trước tối thiểu) và hạn giao đủ thời gian vận chuyển, đơn đường bộ phải có `DistanceKm` (hoặc server tự tính), `IsExpress` theo quy tắc ở phụ lục "Báo giá". Tạo `BookingHorses`, tính giá, báo cho Manager. *(Sửa ngày 18/10/2026: khoảng pickup + hạn giao thay cho ngày đi / ngày giao.)*
 - [x] **T-07 · Xem đơn** — `GET /api/bookings` (khách: đơn của mình; Specialist: đơn mình phụ trách; Manager/Coordinator: tất cả; lọc theo trạng thái, ngày), `GET /api/bookings/{id}` trả đủ ngựa, báo giá, Specialist phụ trách, tiến độ hồ sơ, và **từng con ngựa đang ở chuyến nào** (một đơn có thể đi nhiều chuyến).
 - [x] **T-08 · Duyệt đơn** — `POST /api/bookings/{id}/approve` (Manager, **bắt buộc chọn Specialist phụ trách** ngay trong thao tác duyệt → `Approved`, tự tạo `DigitalDossier` cho từng ngựa), `/reject` (bắt buộc lý do), `/reassign-specialist` (Manager đổi người), `/cancel` (khách, chỉ khi `Submitted`). Không phân công Coordinator theo đơn. Mỗi bước gửi thông báo.
 - [x] **T-09 · Tự hết hạn** — `BackgroundService` chuyển đơn `Submitted` quá 48 giờ sang `Expired`.
@@ -216,6 +216,12 @@ Không task nào của Tú chặn việc của Thiên. Chiều ngược lại:
 11. **File lưu trên Supabase Storage**, cùng project Supabase mới của nhóm với database.
 12. **Thông báo của API bằng tiếng Anh.**
 
+**Lịch của đơn (Thiên, 18/10/2026)**
+
+13. **Khách không chọn ngày khởi hành / ngày giao.** Khách nhập khoảng ngày ngựa sẵn sàng được đón (`pickup_window_start` → `pickup_window_end`, dài tối đa 30 ngày) và hạn giao trễ nhất (`delivery_deadline`). Ngày chạy thật do Coordinator chốt khi lập chuyến; chuyến phải khởi hành trong khoảng pickup và kết thúc trước hạn giao của mọi đơn trên chuyến.
+14. **Thời gian đặt trước tối thiểu:** ngày pickup sớm nhất = hôm nay + 2 ngày duyệt + 2 ngày đặt cọc + 14 ngày làm hồ sơ + 3 ngày xếp chuyến (= 21 ngày, chỉnh trong section `Booking`). Manager không duyệt được đơn mà khoảng pickup không còn đủ 2 + 14 + 3 ngày.
+15. **Thời gian vận chuyển do hệ thống ước tính** từ quãng đường và phương thức (`TransitTimeEstimator`, tham số ở section `Transit`), dùng cho phí áp tải theo ngày và kiểm tra hạn giao.
+
 ---
 
 ## Phụ lục: công thức nghiệp vụ (chuyển từ stored procedure của bản SQL Server)
@@ -229,12 +235,20 @@ Mọi mức giá đọc từ `pricing.price_items` (`is_active = true`). Với m
 | Cước một ngựa | Đường bay: giá `FREIGHT` · Đường bộ: `DistanceKm` × giá `FREIGHT` |
 | 1. Cước gốc | Tổng từng ngựa chưa hủy: cước một ngựa × hệ số hạng chuồng (`STALL_SHARED` / `STALL_COMFORT` / `STALL_PRIVATE`). Mỗi hạng chuồng một dòng báo giá |
 | 2. Chiết khấu số lượng | Bậc `Discount` cao nhất có `min_horses` ≤ số ngựa: cước gốc × % (dòng âm) |
-| 3. Phụ phí | Tính trên cước sau chiết khấu: `SUR_FUEL` luôn có; `SUR_CLIMATE` khi `RequiresClimateControl`; `SUR_EXPRESS` khi `IsExpress` |
+| 3. Phụ phí | Tính trên cước sau chiết khấu: `SUR_FUEL` luôn có; `SUR_CLIMATE` khi `RequiresClimateControl`; `SUR_EXPRESS` khi `IsExpress` = đầu khoảng pickup trước (ngày pickup sớm nhất + 7 ngày) **hoặc** hạn giao dư dưới 24 giờ so với (đầu khoảng pickup + thời gian vận chuyển chậm nhất) |
 | 4. Phí thủ tục | Các dòng `Clearance` có giá > 0: `PerHorse` × số ngựa, `PerBooking` × 1 |
-| 5. Phí áp tải | Số groom = làm tròn lên (số ngựa ÷ 3). `PerGroom`: × đơn giá · `PerGroomDay`: × đơn giá × số ngày (làm tròn lên số giờ ÷ 24 từ ngày đi tới ngày giao) |
+| 5. Phí áp tải | Số groom = làm tròn lên (số ngựa ÷ 3). `PerGroom`: × đơn giá · `PerGroomDay`: × đơn giá × số ngày vận chuyển **do hệ thống ước tính** (làm tròn lên tổng giờ ÷ 24) |
 | 6. Bảo hiểm | Chỉ khi có `DeclaredValue`: giá trị khai báo × % `INS_TRANSIT` |
 
 `EstimatedCost` = tổng các dòng. Mỗi dòng lưu `{ code, name, qty, unitPrice, amount }`, làm tròn 2 chữ số. Báo lỗi nếu tuyến chưa có giá `FREIGHT`, hoặc đơn đường bộ thiếu `DistanceKm`.
+
+### Ước tính thời gian vận chuyển (R-08, `TransitTimeEstimator`)
+
+| Phương thức | Cách tính (tham số mặc định, section `Transit`) |
+|---|---|
+| Đường bộ | Giờ lái = km ÷ 55. Cứ lái 4,5 giờ nghỉ 45 phút; 1 tài xế lái tối đa 9 giờ/ngày (≥ 2 tài xế: 18 giờ), hết giờ thì nghỉ đêm 10 giờ. + 6 giờ mỗi cửa khẩu (khác nước = 1 cửa khẩu) + 1 giờ xếp / dỡ ở mỗi điểm đón, trả |
+| Đường bay | 2 × 4 giờ xe ra / vào sân bay + có mặt trước 6 giờ + giờ bay (km ÷ 800, không có km thì 8 giờ) + kiểm tra ở nơi đến 4 giờ + xếp / dỡ |
+| Kết quả | Tổng giờ dự kiến; mốc chậm nhất = tổng × 1,15; số ngày = làm tròn lên tổng ÷ 24 |
 
 ### Đóng chuyến và chốt KPI (T-26)
 

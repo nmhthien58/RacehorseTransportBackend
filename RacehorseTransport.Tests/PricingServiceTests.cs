@@ -3,8 +3,10 @@ using RacehorseTransport.Repositories.Constants;
 using RacehorseTransport.Repositories.Entities;
 using RacehorseTransport.Repositories.Interfaces;
 using RacehorseTransport.Services.BusinessModels;
+using RacehorseTransport.Services.Exceptions;
 using RacehorseTransport.Services.Implementations;
 using RacehorseTransport.Services.Interfaces;
+using RacehorseTransport.Services.Options;
 using Xunit;
 
 namespace RacehorseTransport.Tests;
@@ -69,13 +71,14 @@ public class PricingServiceTests
         bool requiresClimateControl)
     {
         var service = CreateService();
-        DateTimeOffset departure = isExpress
-            ? DateTimeOffset.UtcNow.AddHours(12)
-            : DateTimeOffset.UtcNow.AddDays(30);
+        // Express khi pickup nằm trong ExpressWindowDays ngày tính từ ngày pickup sớm nhất được phép
+        DateTimeOffset pickup = isExpress
+            ? EarliestPickup()
+            : EarliestPickup().AddDays(Options.ExpressWindowDays + 3);
 
         var input = CreateInput(
             new[] { StallClasses.Shared },
-            departure,
+            pickup,
             requiresClimateControl: requiresClimateControl);
 
         var quote = await service.CalculateQuoteAsync(input);
@@ -125,6 +128,65 @@ public class PricingServiceTests
         }
     }
 
+    [Fact]
+    public async Task CalculateQuote_RejectsPickupBeforeLeadTime()
+    {
+        var service = CreateService();
+        var input = CreateInput(new[] { StallClasses.Shared }, EarliestPickup().AddDays(-1));
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => service.CalculateQuoteAsync(input));
+        Assert.Contains("PickupWindowStart", ex.Message);
+    }
+
+    [Fact]
+    public async Task CalculateQuote_RejectsDeadlineShorterThanTransitTime()
+    {
+        var service = CreateService();
+        var input = CreateInput(new[] { StallClasses.Shared }, EarliestPickup().AddDays(10));
+        input.DeliveryDeadline = input.PickupWindowStart!.Value.AddHours(5); // bay mất ~ 32 giờ
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => service.CalculateQuoteAsync(input));
+        Assert.Contains("DeliveryDeadline", ex.Message);
+    }
+
+    [Fact]
+    public async Task CalculateQuote_TightDeadlineIsExpress()
+    {
+        var service = CreateService();
+        var input = CreateInput(new[] { StallClasses.Shared }, EarliestPickup().AddDays(20));
+
+        var relaxed = await service.CalculateQuoteAsync(input);
+        Assert.False(relaxed.IsExpress);
+
+        input.DeliveryDeadline = relaxed.EarliestDeliveryDeadline.AddHours(2);
+        var tight = await service.CalculateQuoteAsync(input);
+        Assert.True(tight.IsExpress);
+    }
+
+    [Fact]
+    public async Task CalculateQuote_WithoutDates_ReturnsEarliestPickupAndIsNotExpress()
+    {
+        var service = CreateService();
+        var input = CreateInput(new[] { StallClasses.Shared });
+        input.PickupWindowStart = null;
+        input.PickupWindowEnd = null;
+        input.DeliveryDeadline = null;
+
+        var quote = await service.CalculateQuoteAsync(input);
+
+        Assert.False(quote.IsExpress);
+        Assert.Equal(DateOnly.FromDateTime(EarliestPickup().UtcDateTime), quote.EarliestPickupDate);
+        Assert.Equal(quote.EarliestPickupDate.AddDays(Options.ExpressWindowDays), quote.ExpressUntilDate);
+        Assert.True(quote.Transit.TotalHours > 0);
+    }
+
+    private static readonly BookingOptions Options = new();
+
+    private static DateTimeOffset EarliestPickup()
+    {
+        return new DateTimeOffset(DateTime.UtcNow.Date.AddDays(Options.LeadTimeDays), TimeSpan.Zero);
+    }
+
     private static PricingService CreateService()
     {
         var prices = new List<PriceItem>
@@ -150,22 +212,26 @@ public class PricingServiceTests
         return new PricingService(
             new UnusedRepository<PriceItem>(),
             new SeededPriceCache(prices),
-            new UnusedDistanceService());
+            new UnusedDistanceService(),
+            new TransitTimeEstimator(Microsoft.Extensions.Options.Options.Create(new TransitOptions())),
+            Microsoft.Extensions.Options.Options.Create(Options));
     }
 
+    // Mặc định: pickup xa hơn mốc Express, hạn giao rộng rãi
     private static QuoteInputModel CreateInput(
         IEnumerable<string> stallClasses,
-        DateTimeOffset? departure = null,
+        DateTimeOffset? pickup = null,
         bool requiresClimateControl = false)
     {
-        DateTimeOffset departureDate = departure ?? DateTimeOffset.UtcNow.AddDays(30);
+        DateTimeOffset pickupStart = pickup ?? EarliestPickup().AddDays(Options.ExpressWindowDays + 10);
 
         return new QuoteInputModel
         {
             TransportMode = TransportModes.Air,
             DropoffCountryCode = "TH",
-            DepartureDate = departureDate,
-            DeliveryDate = departureDate.AddDays(1),
+            PickupWindowStart = pickupStart,
+            PickupWindowEnd = pickupStart.AddDays(3),
+            DeliveryDeadline = pickupStart.AddDays(10),
             RequiresClimateControl = requiresClimateControl,
             StallClasses = stallClasses.ToList()
         };

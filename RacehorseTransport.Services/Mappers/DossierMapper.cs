@@ -70,7 +70,8 @@ namespace RacehorseTransport.Services.Mappers
             model.MicrochipNumber = horse?.MicrochipNumber ?? string.Empty;
             model.PickupCountryCode = booking?.PickupCountryCode ?? string.Empty;
             model.DropoffCountryCode = booking?.DropoffCountryCode ?? string.Empty;
-            model.DepartureDate = booking?.DepartureDate ?? default;
+            model.PickupWindowStart = booking?.PickupWindowStart ?? default;
+            model.PickupWindowEnd = booking?.PickupWindowEnd ?? default;
             model.SpecialistUserId = entity.SpecialistUserId;
             model.SpecialistName = entity.Specialist?.FullName;
             model.ClearanceNumber = entity.ClearanceNumber;

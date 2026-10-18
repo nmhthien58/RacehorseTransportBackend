@@ -79,16 +79,16 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             // Tham số thời gian phải đổi về UTC trước khi so với cột timestamptz
-            if (options.DepartureFrom.HasValue)
+            if (options.PickupFrom.HasValue)
             {
-                var from = options.DepartureFrom.Value.ToUniversalTime();
-                query = query.Where(b => b.DepartureDate >= from);
+                var from = options.PickupFrom.Value.ToUniversalTime();
+                query = query.Where(b => b.PickupWindowStart >= from);
             }
 
-            if (options.DepartureTo.HasValue)
+            if (options.PickupTo.HasValue)
             {
-                var to = options.DepartureTo.Value.ToUniversalTime();
-                query = query.Where(b => b.DepartureDate <= to);
+                var to = options.PickupTo.Value.ToUniversalTime();
+                query = query.Where(b => b.PickupWindowStart <= to);
             }
 
             // Searching
@@ -140,11 +140,6 @@ namespace RacehorseTransport.Services.Implementations
 
         public async Task<BookingDetailModel> CreateBookingAsync(CreateBookingModel model, CurrentUser currentUser)
         {
-            if (model.DepartureDate <= DateTimeOffset.UtcNow)
-            {
-                throw new BusinessException("DepartureDate must be in the future.");
-            }
-
             var horseIds = model.Horses.Select(h => h.HorseId).ToList();
             if (horseIds.Count != horseIds.Distinct().Count())
             {
@@ -163,26 +158,8 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Horse(s) with ID {string.Join(", ", missingIds)} were not found among your active horses.");
             }
 
-            // Một con ngựa không thể nằm trong hai đơn đang chạy có thời gian giao nhau
-            var departureUtc = model.DepartureDate.ToUniversalTime();
-            var deliveryUtc = model.DeliveryDate.ToUniversalTime();
-
-            var busyHorseNames = await _bookingHorseRepo.GetQueryable()
-                .Where(bh => horseIds.Contains(bh.HorseId)
-                    && bh.Status != BookingHorseStatuses.Cancelled
-                    && OpenStatuses.Contains(bh.Booking!.Status)
-                    && bh.Booking.DepartureDate < deliveryUtc
-                    && bh.Booking.DeliveryDate > departureUtc)
-                .Select(bh => bh.Horse!.Name)
-                .Distinct()
-                .ToListAsync();
-
-            if (busyHorseNames.Count > 0)
-            {
-                throw new BusinessException($"These horses are already in another booking for an overlapping period: {string.Join(", ", busyHorseNames)}.");
-            }
-
-            // Báo giá (đồng thời kiểm tra phương thức, hạng chuồng, tuyến có giá, DistanceKm, ngày giao > ngày đi)
+            // Báo giá trước: đồng thời kiểm tra phương thức, hạng chuồng, tuyến có giá, DistanceKm,
+            // khoảng pickup (đủ xa, không quá dài) và hạn giao (đủ thời gian vận chuyển)
             var quote = await _pricingService.CalculateQuoteAsync(new QuoteInputModel
             {
                 TransportMode = model.TransportMode,
@@ -195,10 +172,31 @@ namespace RacehorseTransport.Services.Implementations
                 DistanceKm = model.DistanceKm,
                 RequiresClimateControl = model.RequiresClimateControl,
                 DeclaredValue = model.DeclaredValue,
-                DepartureDate = model.DepartureDate,
-                DeliveryDate = model.DeliveryDate,
+                PickupWindowStart = model.PickupWindowStart,
+                PickupWindowEnd = model.PickupWindowEnd,
+                DeliveryDeadline = model.DeliveryDeadline,
                 StallClasses = model.Horses.Select(h => h.StallClass).ToList()
             });
+
+            // Một con ngựa không thể nằm trong hai đơn đang chạy có thời gian giao nhau
+            // (thời gian của đơn: từ đầu khoảng pickup tới hạn giao)
+            var startUtc = model.PickupWindowStart.ToUniversalTime();
+            var deadlineUtc = model.DeliveryDeadline.ToUniversalTime();
+
+            var busyHorseNames = await _bookingHorseRepo.GetQueryable()
+                .Where(bh => horseIds.Contains(bh.HorseId)
+                    && bh.Status != BookingHorseStatuses.Cancelled
+                    && OpenStatuses.Contains(bh.Booking!.Status)
+                    && bh.Booking.PickupWindowStart < deadlineUtc
+                    && bh.Booking.DeliveryDeadline > startUtc)
+                .Select(bh => bh.Horse!.Name)
+                .Distinct()
+                .ToListAsync();
+
+            if (busyHorseNames.Count > 0)
+            {
+                throw new BusinessException($"These horses are already in another booking for an overlapping period: {string.Join(", ", busyHorseNames)}.");
+            }
 
             int bookingId = await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
@@ -210,8 +208,10 @@ namespace RacehorseTransport.Services.Implementations
                     PickupCountryCode = model.PickupCountryCode,
                     DropoffAddress = model.DropoffAddress,
                     DropoffCountryCode = model.DropoffCountryCode,
-                    DepartureDate = model.DepartureDate,
-                    DeliveryDate = model.DeliveryDate,
+                    PickupWindowStart = model.PickupWindowStart,
+                    PickupWindowEnd = model.PickupWindowEnd,
+                    DeliveryDeadline = model.DeliveryDeadline,
+                    EstimatedTransitHours = quote.EstimatedHours,
                     TotalHorses = model.Horses.Count,
                     SpecialInstructions = model.SpecialInstructions,
                     TransportMode = model.TransportMode,
@@ -252,6 +252,16 @@ namespace RacehorseTransport.Services.Implementations
         {
             var booking = await GetTrackedBookingAsync(id);
             EnsureStatus(booking, BookingStatuses.Submitted, "approved");
+
+            // Duyệt chậm thì khoảng pickup có thể không còn đủ thời gian cho đặt cọc, hồ sơ và xếp chuyến
+            var latestPickupDay = DateOnly.FromDateTime(booking.PickupWindowEnd.UtcDateTime);
+            var neededDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(_options.ApprovalLeadDays);
+            if (latestPickupDay < neededDay)
+            {
+                throw new BusinessException(
+                    $"This booking can no longer be approved: its pickup window ends on {latestPickupDay:yyyy-MM-dd}, but deposit, quarantine clearance and trip planning need about {_options.ApprovalLeadDays} days (until {neededDay:yyyy-MM-dd}). Reject it and ask the customer to book a later pickup window.");
+            }
+
             var specialist = await GetActiveSpecialistAsync(specialistUserId);
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>

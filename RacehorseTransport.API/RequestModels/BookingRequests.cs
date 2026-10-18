@@ -12,11 +12,12 @@ namespace RacehorseTransport.API.RequestModels
         [FromQuery(Name = "customerUserId")]
         public int? CustomerUserId { get; set; }
 
-        [FromQuery(Name = "departureFrom")]
-        public DateTimeOffset? DepartureFrom { get; set; }
+        // Lọc theo ngày bắt đầu khoảng pickup
+        [FromQuery(Name = "pickupFrom")]
+        public DateTimeOffset? PickupFrom { get; set; }
 
-        [FromQuery(Name = "departureTo")]
-        public DateTimeOffset? DepartureTo { get; set; }
+        [FromQuery(Name = "pickupTo")]
+        public DateTimeOffset? PickupTo { get; set; }
     }
 
     public class CreateBookingRequest
@@ -43,11 +44,15 @@ namespace RacehorseTransport.API.RequestModels
         [RegularExpression("^[A-Za-z]{2}$", ErrorMessage = "DropoffCountryCode must be a 2-letter country code.")]
         public string DropoffCountryCode { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "DepartureDate is required.")]
-        public DateTimeOffset? DepartureDate { get; set; }
+        // Khoảng ngày ngựa sẵn sàng được đón (không phải ngày khởi hành) và hạn giao trễ nhất
+        [Required(ErrorMessage = "PickupWindowStart is required.")]
+        public DateTimeOffset? PickupWindowStart { get; set; }
 
-        [Required(ErrorMessage = "DeliveryDate is required.")]
-        public DateTimeOffset? DeliveryDate { get; set; }
+        [Required(ErrorMessage = "PickupWindowEnd is required.")]
+        public DateTimeOffset? PickupWindowEnd { get; set; }
+
+        [Required(ErrorMessage = "DeliveryDeadline is required.")]
+        public DateTimeOffset? DeliveryDeadline { get; set; }
 
         [Required(ErrorMessage = "TransportMode is required.")]
         public string TransportMode { get; set; } = string.Empty;
@@ -119,11 +124,10 @@ namespace RacehorseTransport.API.RequestModels
         [Range(0, 1000000000, ErrorMessage = "DeclaredValue must be between 0 and 1,000,000,000.")]
         public decimal? DeclaredValue { get; set; }
 
-        [Required(ErrorMessage = "DepartureDate is required.")]
-        public DateTimeOffset? DepartureDate { get; set; }
-
-        [Required(ErrorMessage = "DeliveryDate is required.")]
-        public DateTimeOffset? DeliveryDate { get; set; }
+        // Có thể để trống khi khách chưa chọn ngày: kết quả vẫn có ngày pickup sớm nhất và thời gian vận chuyển
+        public DateTimeOffset? PickupWindowStart { get; set; }
+        public DateTimeOffset? PickupWindowEnd { get; set; }
+        public DateTimeOffset? DeliveryDeadline { get; set; }
 
         [Required(ErrorMessage = "Horses is required.")]
         [MinLength(1, ErrorMessage = "At least one horse is required.")]

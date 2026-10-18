@@ -72,9 +72,9 @@ namespace RacehorseTransport.Services.Implementations
                 query = query.Where(bh => bh.BookingId == bookingId.Value);
             }
 
-            // Đơn khởi hành sớm nhất lên đầu
+            // Đơn có khoảng pickup sớm nhất lên đầu
             return await query
-                .OrderBy(bh => bh.Booking!.DepartureDate)
+                .OrderBy(bh => bh.Booking!.PickupWindowStart)
                 .ThenBy(bh => bh.BookingId)
                 .ThenBy(bh => bh.BookingHorseId)
                 .Select(bh => new UnplannedHorseModel
@@ -88,8 +88,9 @@ namespace RacehorseTransport.Services.Implementations
                     PickupCountryCode = bh.Booking.PickupCountryCode,
                     DropoffAddress = bh.Booking.DropoffAddress,
                     DropoffCountryCode = bh.Booking.DropoffCountryCode,
-                    DepartureDate = bh.Booking.DepartureDate,
-                    DeliveryDate = bh.Booking.DeliveryDate,
+                    PickupWindowStart = bh.Booking.PickupWindowStart,
+                    PickupWindowEnd = bh.Booking.PickupWindowEnd,
+                    DeliveryDeadline = bh.Booking.DeliveryDeadline,
                     RequiresClimateControl = bh.Booking.RequiresClimateControl,
                     HorseId = bh.HorseId,
                     HorseName = bh.Horse!.Name,

@@ -1511,6 +1511,13 @@ Response `200` — phần `data`:
 
 Tính giá cho một đơn dự kiến. Không lưu gì vào hệ thống, gọi bao nhiêu lần cũng được. Nếu không gửi `distanceKm` cho đơn đường bộ, server tự động tính quãng đường dựa trên điểm đón và trả.
 
+**Khách không chọn ngày khởi hành.** Khách chỉ cho biết ngựa sẵn sàng được đón trong khoảng ngày nào (`pickupWindowStart` → `pickupWindowEnd`) và hạn giao trễ nhất (`deliveryDeadline`). Ngày chạy thật do điều phối viên chốt khi lập chuyến.
+
+- **Ngày pickup sớm nhất:** hôm nay + khoảng `leadTimeDays` ngày (mặc định 21 ngày = 2 ngày duyệt + 2 ngày đặt cọc + 14 ngày làm hồ sơ kiểm dịch + 3 ngày xếp chuyến). Server trả về `earliestPickupDate`; form nên khóa các ngày sớm hơn.
+- **Thời gian vận chuyển** do server ước tính từ quãng đường và phương thức (`transit`), không lấy từ ngày khách nhập. Hạn giao phải từ `earliestDeliveryDeadline` trở đi (= đầu khoảng pickup + thời gian vận chuyển chậm nhất).
+- **Phụ phí gấp (Express):** khi đầu khoảng pickup trước `expressUntilDate` (sát ngày sớm nhất, phải làm hồ sơ gấp) hoặc hạn giao dư ít hơn 24 giờ so với `earliestDeliveryDeadline`.
+- Chưa chọn ngày thì cứ bỏ trống 3 trường ngày: server vẫn trả về `earliestPickupDate`, `expressUntilDate` và thời gian vận chuyển để form hiển thị gợi ý.
+
 - **Ai gọi được:** Mọi người đã đăng nhập
 - **Dữ liệu gửi lên:** JSON
 
@@ -1527,9 +1534,12 @@ Các trường gửi lên:
 | `distanceKm` | số nguyên | Không | Quãng đường (km). Nếu bỏ trống với `Ground`, server sẽ tự động tính |
 | `requiresClimateControl` | true / false | Không | Cần khoang điều hòa (có phụ phí) |
 | `declaredValue` | số | Không | Giá trị khai báo để mua bảo hiểm. Bỏ trống hoặc `null` là không mua |
-| `departureDate` | ngày giờ | Có | Ngày khởi hành, phải ở tương lai |
-| `deliveryDate` | ngày giờ | Có | Ngày giao, phải sau ngày khởi hành |
+| `pickupWindowStart` | ngày giờ | Không | Ngày đầu của khoảng ngựa sẵn sàng được đón; không sớm hơn `earliestPickupDate` |
+| `pickupWindowEnd` | ngày giờ | Không | Ngày cuối của khoảng đón; không trước `pickupWindowStart`, khoảng dài tối đa 30 ngày. Bỏ trống thì bằng `pickupWindowStart` |
+| `deliveryDeadline` | ngày giờ | Không | Hạn giao trễ nhất; không sớm hơn `earliestDeliveryDeadline` |
 | `horses` | mảng | Có | Mỗi phần tử là một con ngựa, chỉ cần `stallClass`: `Shared`, `Comfort` hoặc `Private` |
+
+Gửi `pickupWindowEnd` hoặc `deliveryDeadline` thì phải gửi kèm `pickupWindowStart`.
 
 Ví dụ request:
 
@@ -1540,8 +1550,9 @@ Ví dụ request:
   "distanceKm": 900,
   "requiresClimateControl": true,
   "declaredValue": 50000,
-  "departureDate": "2026-11-07T06:00:00+07:00",
-  "deliveryDate": "2026-11-09T18:00:00+07:00",
+  "pickupWindowStart": "2026-11-20T00:00:00+07:00",
+  "pickupWindowEnd": "2026-11-25T00:00:00+07:00",
+  "deliveryDeadline": "2026-12-01T00:00:00+07:00",
   "horses": [
     {
       "stallClass": "Shared"
@@ -1591,8 +1602,26 @@ Response `200` — phần `data`:
   "currencyCode": "USD",
   "horseCount": 2,
   "groomCount": 1,
-  "transitDays": 3,
-  "isExpress": false
+  "transitDays": 2,
+  "isExpress": false,
+  "distanceKm": 900,
+  "estimatedHours": 35.9,
+  "routeSummary": null,
+  "leadTimeDays": 21,
+  "earliestPickupDate": "2026-11-08",
+  "expressUntilDate": "2026-11-15",
+  "earliestDeliveryDeadline": "2026-11-20T10:18:00+00:00",
+  "transit": {
+    "drivingHours": 16.4,
+    "restHours": 11.5,
+    "overnightStops": 1,
+    "borderHours": 6,
+    "handlingHours": 2,
+    "flightHours": 0,
+    "totalHours": 35.9,
+    "maxHours": 41.3,
+    "transitDays": 2
+  }
 }
 ```
 
@@ -1604,8 +1633,20 @@ Response `200` — phần `data`:
 | `total` | Tổng tiền |
 | `currencyCode` | Đơn vị tiền (`USD`) |
 | `horseCount`, `groomCount` | Số ngựa và số người áp tải được tính |
-| `transitDays` | Số ngày vận chuyển |
-| `isExpress` | `true` nếu khởi hành trong vòng 7 ngày tới (có phụ phí gấp). Server tự xác định |
+| `transitDays` | Số ngày vận chuyển ước tính (dùng tính phí áp tải theo ngày) |
+| `isExpress` | `true` nếu có phụ phí gấp (xem đầu mục). Server tự xác định |
+| `distanceKm`, `routeSummary` | Quãng đường đường bộ và mô tả tuyến khi server tự tính |
+| `estimatedHours` | Tổng thời gian vận chuyển dự kiến (giờ), bằng `transit.totalHours` |
+| `leadTimeDays` | Số ngày cần từ hôm nay tới ngày pickup sớm nhất |
+| `earliestPickupDate` | Ngày pickup sớm nhất được chọn (dạng `yyyy-MM-dd`) |
+| `expressUntilDate` | Pickup trước ngày này thì có phụ phí gấp |
+| `earliestDeliveryDeadline` | Hạn giao sớm nhất được chọn, tính từ `pickupWindowStart` (hoặc từ `earliestPickupDate` khi chưa chọn ngày) |
+| `transit` | Thời gian vận chuyển tách theo thành phần (giờ): `drivingHours` lái xe, `restHours` nghỉ giữa chặng + nghỉ đêm (`overnightStops` số đêm), `borderHours` qua cửa khẩu, `handlingHours` xếp / dỡ ngựa, `flightHours` phần bay (có mặt trước giờ bay + bay + kiểm tra ở nơi đến), `totalHours` dự kiến, `maxHours` chậm nhất (đã cộng 15% dự phòng), `transitDays` số ngày |
+
+Cách server ước tính thời gian (tham số chỉnh trong `appsettings.json`, section `Transit`):
+
+- **Đường bộ:** giờ lái = km ÷ 55 km/h; cứ lái 4,5 giờ nghỉ 45 phút; một tài xế lái tối đa 9 giờ/ngày, hết giờ thì nghỉ đêm 10 giờ; mỗi cửa khẩu 6 giờ; xếp và dỡ ngựa 1 giờ mỗi đầu.
+- **Đường bay:** 4 giờ xe ra sân bay + có mặt trước giờ bay 6 giờ + giờ bay (km ÷ 800 km/h, không có khoảng cách thì 8 giờ) + kiểm tra thú y / hải quan 4 giờ + 4 giờ xe tới nơi nhận + xếp / dỡ 2 giờ.
 
 Lỗi thường gặp:
 
@@ -1613,6 +1654,11 @@ Lỗi thường gặp:
 |---|---|---|
 | 400 | `No freight rate is configured ...` | Tuyến này chưa có trong bảng giá |
 | 400 | `Validation failed` | Thiếu trường, mã nước không phải 2 chữ cái, không có con ngựa nào |
+| 400 | `PickupWindowStart must be on or after 2026-11-08: a booking needs about 21 days ...` | Chọn ngày pickup quá gần |
+| 400 | `PickupWindowEnd must be on or after PickupWindowStart.` | Ngày cuối khoảng trước ngày đầu |
+| 400 | `The pickup window cannot be longer than 30 days.` | Khoảng pickup quá dài |
+| 400 | `DeliveryDeadline must be on or after ...: this route is estimated to take up to 41.3 hours ...` | Hạn giao không đủ thời gian vận chuyển |
+| 400 | `PickupWindowStart is required when PickupWindowEnd or DeliveryDeadline is given.` | Gửi ngày cuối / hạn giao mà thiếu ngày đầu |
 
 ### POST /api/bookings — Gửi đơn vận chuyển
 
@@ -1635,8 +1681,9 @@ Các trường gửi lên:
 | `distanceKm` | số nguyên | Không | Quãng đường (km). Bỏ trống thì server tự động tính toán |
 | `requiresClimateControl` | true / false | Không | Cần khoang điều hòa (có phụ phí) |
 | `declaredValue` | số | Không | Giá trị khai báo để mua bảo hiểm. Bỏ trống hoặc `null` là không mua |
-| `departureDate` | ngày giờ | Có | Ngày khởi hành, phải ở tương lai |
-| `deliveryDate` | ngày giờ | Có | Ngày giao, phải sau ngày khởi hành |
+| `pickupWindowStart` | ngày giờ | Có | Ngày đầu của khoảng ngựa sẵn sàng được đón (không phải ngày khởi hành); không sớm hơn `earliestPickupDate` của xem giá |
+| `pickupWindowEnd` | ngày giờ | Có | Ngày cuối của khoảng đón; từ `pickupWindowStart` trở đi, khoảng dài tối đa 30 ngày |
+| `deliveryDeadline` | ngày giờ | Có | Hạn giao trễ nhất; không sớm hơn `earliestDeliveryDeadline` của xem giá |
 | `specialInstructions` | chuỗi | Không | Ghi chú cho công ty, tối đa 2000 ký tự |
 | `horses` | mảng | Có | Ít nhất 1 phần tử, xem bảng dưới |
 
@@ -1656,8 +1703,9 @@ Ví dụ request:
   "pickupCountryCode": "VN",
   "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
   "dropoffCountryCode": "CN",
-  "departureDate": "2026-11-07T06:00:00+07:00",
-  "deliveryDate": "2026-11-09T18:00:00+07:00",
+  "pickupWindowStart": "2026-11-20T00:00:00+07:00",
+  "pickupWindowEnd": "2026-11-25T00:00:00+07:00",
+  "deliveryDeadline": "2026-12-01T00:00:00+07:00",
   "transportMode": "Ground",
   "distanceKm": 900,
   "requiresClimateControl": true,
@@ -1689,8 +1737,9 @@ Response `201` — phần `data`:
   "pickupCountryCode": "VN",
   "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
   "dropoffCountryCode": "CN",
-  "departureDate": "2026-11-06T23:00:00+00:00",
-  "deliveryDate": "2026-11-09T11:00:00+00:00",
+  "pickupWindowStart": "2026-11-19T17:00:00+00:00",
+  "pickupWindowEnd": "2026-11-24T17:00:00+00:00",
+  "deliveryDeadline": "2026-11-30T17:00:00+00:00",
   "transportMode": "Ground",
   "totalHorses": 2,
   "estimatedCost": 6788.48,
@@ -1703,6 +1752,7 @@ Response `201` — phần `data`:
   "customerPhone": "+84988111222",
   "specialInstructions": "Giữ cabin 17 độ",
   "distanceKm": 900,
+  "estimatedTransitHours": 35.9,
   "isExpress": false,
   "requiresClimateControl": true,
   "declaredValue": 50000,
@@ -1743,7 +1793,9 @@ Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
-| 400 | `DepartureDate must be in the future.` | Ngày khởi hành ở quá khứ |
+| 400 | `PickupWindowStart must be on or after ...` | Chọn ngày pickup quá gần (xem mục xem giá) |
+| 400 | `DeliveryDeadline must be on or after ...` | Hạn giao không đủ thời gian vận chuyển |
+| 400 | `The pickup window cannot be longer than 30 days.` | Khoảng pickup quá dài |
 | 400 | `Horse(s) with ID 9 were not found among your active horses.` | Ngựa không phải của khách, hoặc đã xóa |
 | 400 | `These horses are already in another booking for an overlapping period: ...` | Ngựa đang nằm trong một đơn khác trùng thời gian |
 | 400 | `The same horse appears more than once in this booking.` | Chọn trùng một con ngựa |
@@ -1760,8 +1812,8 @@ Tham số query (gắn sau dấu `?`):
 | Tham số | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
 | `status` | chuỗi | Không | Lọc theo trạng thái, ví dụ `Submitted` |
-| `departureFrom` | ngày giờ | Không | Chỉ lấy đơn khởi hành từ thời điểm này |
-| `departureTo` | ngày giờ | Không | Chỉ lấy đơn khởi hành tới thời điểm này |
+| `pickupFrom` | ngày giờ | Không | Chỉ lấy đơn có `pickupWindowStart` từ thời điểm này |
+| `pickupTo` | ngày giờ | Không | Chỉ lấy đơn có `pickupWindowStart` tới thời điểm này |
 | `customerUserId` | số | Không | Chỉ có tác dụng với nhân sự: lọc theo khách hàng |
 | `search` | chuỗi | Không | Từ khóa tìm kiếm |
 | `sort` | chuỗi | Không | Trường sắp xếp, thêm `-` phía trước để giảm dần |
@@ -1783,8 +1835,9 @@ Response `200` — phần `data`:
     "pickupCountryCode": "VN",
     "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
     "dropoffCountryCode": "CN",
-    "departureDate": "2026-11-06T23:00:00+00:00",
-    "deliveryDate": "2026-11-09T11:00:00+00:00",
+    "pickupWindowStart": "2026-11-19T17:00:00+00:00",
+    "pickupWindowEnd": "2026-11-24T17:00:00+00:00",
+    "deliveryDeadline": "2026-11-30T17:00:00+00:00",
     "transportMode": "Ground",
     "totalHorses": 2,
     "estimatedCost": 6788.48,
@@ -1802,7 +1855,8 @@ Response `200` — phần `data`:
 | `bookingId`, `bookingCode` | Mã đơn (số) và mã hiển thị (`BKG-2026-0002`) |
 | `customerUserId`, `customerName` | Khách đặt đơn |
 | `pickupAddress`, `dropoffAddress` | Điểm nhận và điểm giao |
-| `departureDate`, `deliveryDate` | Ngày đi và ngày giao (giờ UTC) |
+| `pickupWindowStart`, `pickupWindowEnd` | Khoảng ngày ngựa sẵn sàng được đón (giờ UTC). Ngày chạy thật xem ở `horses[].trips[].plannedStartDate` của chi tiết đơn |
+| `deliveryDeadline` | Hạn giao trễ nhất (giờ UTC) |
 | `totalHorses` | Số ngựa trong đơn |
 | `estimatedCost`, `currencyCode` | Giá đã tính lúc gửi đơn |
 | `status` | Trạng thái đơn (mục 3) |
@@ -1832,8 +1886,9 @@ Response `200` — phần `data`:
   "pickupCountryCode": "VN",
   "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
   "dropoffCountryCode": "CN",
-  "departureDate": "2026-11-06T23:00:00+00:00",
-  "deliveryDate": "2026-11-09T11:00:00+00:00",
+  "pickupWindowStart": "2026-11-19T17:00:00+00:00",
+  "pickupWindowEnd": "2026-11-24T17:00:00+00:00",
+  "deliveryDeadline": "2026-11-30T17:00:00+00:00",
   "transportMode": "Ground",
   "totalHorses": 2,
   "estimatedCost": 6788.48,
@@ -1846,6 +1901,7 @@ Response `200` — phần `data`:
   "customerPhone": "+84988111222",
   "specialInstructions": "Giữ cabin 17 độ",
   "distanceKm": 900,
+  "estimatedTransitHours": 35.9,
   "isExpress": false,
   "requiresClimateControl": true,
   "declaredValue": 50000,
@@ -1895,6 +1951,7 @@ Ngoài các trường của danh sách, chi tiết có thêm:
 |---|---|
 | `customerEmail`, `customerPhone` | Liên hệ của khách |
 | `specialInstructions`, `distanceKm`, `requiresClimateControl`, `declaredValue`, `isExpress` | Thông tin khách đã khai |
+| `estimatedTransitHours` | Thời gian vận chuyển server ước tính lúc gửi đơn (giờ); `null` với đơn tạo trước khi có tính năng này |
 | `rejectionReason` | Lý do bị từ chối (chỉ có khi `status` là `Rejected`) |
 | `reviewedByName`, `reviewedAt` | Ai duyệt / từ chối và lúc nào |
 | `quoteLines[]` | Các dòng báo giá đã lưu, dạng giống `lines` của xem giá |
@@ -2104,7 +2161,8 @@ Response `200` — phần `data`:
     "microchipNumber": "982000412345672",
     "pickupCountryCode": "VN",
     "dropoffCountryCode": "CN",
-    "departureDate": "2026-11-06T23:00:00+00:00",
+    "pickupWindowStart": "2026-11-19T17:00:00+00:00",
+  "pickupWindowEnd": "2026-11-24T17:00:00+00:00",
     "specialistUserId": 2,
     "specialistName": "Nguyễn Thị Mai",
     "clearanceNumber": null,
@@ -2142,7 +2200,8 @@ Response `200` — phần `data`:
   "microchipNumber": "982000412345672",
   "pickupCountryCode": "VN",
   "dropoffCountryCode": "CN",
-  "departureDate": "2026-11-06T23:00:00+00:00",
+  "pickupWindowStart": "2026-11-19T17:00:00+00:00",
+  "pickupWindowEnd": "2026-11-24T17:00:00+00:00",
   "specialistUserId": 2,
   "specialistName": "Nguyễn Thị Mai",
   "clearanceNumber": null,
@@ -2349,7 +2408,7 @@ Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
-| 400 | `'...' expires on 2026-11-01, before the departure date 2026-11-07. Reject it and ask for a valid document.` | Giấy hết hạn trước ngày khởi hành |
+| 400 | `'...' expires on 2026-11-01, before the end of the pickup window 2026-11-25. Reject it and ask for a valid document.` | Giấy hết hạn trước ngày cuối của khoảng pickup |
 | 400 | `Only a pending document can be reviewed (current status: Approved).` | Giấy đã được xử lý rồi |
 
 ### POST /api/documents/{id}/reject — Từ chối một giấy tờ
@@ -2526,8 +2585,9 @@ Response `200` — phần `data`:
     "pickupCountryCode": "VN",
     "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
     "dropoffCountryCode": "CN",
-    "departureDate": "2026-11-06T23:00:00+00:00",
-    "deliveryDate": "2026-11-09T11:00:00+00:00",
+    "pickupWindowStart": "2026-11-19T17:00:00+00:00",
+    "pickupWindowEnd": "2026-11-24T17:00:00+00:00",
+    "deliveryDeadline": "2026-11-30T17:00:00+00:00",
     "requiresClimateControl": true,
     "horseId": 1,
     "horseName": "Red Flash (Tia Chớp Đỏ)",
@@ -2718,6 +2778,8 @@ Lỗi thường gặp:
 | HTTP | `message` | Khi nào |
 |---|---|---|
 | 400 | `PlannedStartDate must be in the future.` | Giờ khởi hành ở quá khứ |
+| 400 | `Booking BKG-... can only be picked up between ... and ...; PlannedStartDate is outside this window.` | Ngày chạy nằm ngoài khoảng pickup của một đơn trên chuyến (ngày cuối khoảng được tính trọn ngày) |
+| 400 | `Booking BKG-... must be delivered by ...; PlannedEndDate is later than that.` | Chuyến kết thúc sau hạn giao của một đơn trên chuyến |
 | 400 | `These horses are already on another trip: ...` | Ngựa đã được xếp vào chuyến khác |
 | 400 | `Ground and air bookings cannot be combined on the same trip.` | Trộn ngựa của đơn đường bộ và đơn hàng không |
 | 400 | `Vehicle 29B-888.99 carries at most 6 horse(s); this plan has 7.` | Quá sức chứa của xe |
@@ -3489,8 +3551,9 @@ Response `200` — phần `data`:
   "status": "Approved",
   "pickupAddress": "Trang trại Yên Bài, Ba Vì, Hà Nội",
   "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
-  "departureDate": "2026-11-06T23:00:00+00:00",
-  "deliveryDate": "2026-11-09T11:00:00+00:00",
+  "pickupWindowStart": "2026-11-19T17:00:00+00:00",
+  "pickupWindowEnd": "2026-11-24T17:00:00+00:00",
+  "deliveryDeadline": "2026-11-30T17:00:00+00:00",
   "trips": [
     {
       "tripId": 3,
