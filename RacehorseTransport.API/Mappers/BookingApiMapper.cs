@@ -15,6 +15,7 @@ namespace RacehorseTransport.API.Mappers
                 Page = request.Page,
                 Size = request.Size,
                 Status = request.Status,
+                Stage = request.Stage,
                 CustomerUserId = request.CustomerUserId,
                 PickupFrom = request.PickupFrom,
                 PickupTo = request.PickupTo
@@ -202,6 +203,7 @@ namespace RacehorseTransport.API.Mappers
                         StallSlotNumber = t.StallSlotNumber,
                         PlannedStartDate = t.PlannedStartDate,
                         PlannedEndDate = t.PlannedEndDate,
+                        PickedUpAt = t.PickedUpAt,
                         DeliveredAt = t.DeliveredAt
                     }).ToList()
                 }).ToList()
@@ -230,6 +232,7 @@ namespace RacehorseTransport.API.Mappers
             response.EstimatedCost = model.EstimatedCost;
             response.CurrencyCode = model.CurrencyCode;
             response.Status = model.Status;
+            response.CustomerStage = model.CustomerStage;
             response.AssignedSpecialistId = model.AssignedSpecialistId;
             response.AssignedSpecialistName = model.AssignedSpecialistName;
             response.CreatedAt = model.CreatedAt;

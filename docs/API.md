@@ -1826,6 +1826,7 @@ Tham số query (gắn sau dấu `?`):
 | Tham số | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
 | `status` | chuỗi | Không | Lọc theo trạng thái, ví dụ `Submitted` |
+| `stage` | chuỗi | Không | Lọc theo giai đoạn theo góc nhìn khách (`customerStage`, xem bảng bên dưới), ví dụ `InTransit` |
 | `pickupFrom` | ngày giờ | Không | Chỉ lấy đơn có `pickupWindowStart` từ thời điểm này |
 | `pickupTo` | ngày giờ | Không | Chỉ lấy đơn có `pickupWindowStart` tới thời điểm này |
 | `customerUserId` | số | Không | Chỉ có tác dụng với nhân sự: lọc theo khách hàng |
@@ -1834,7 +1835,7 @@ Tham số query (gắn sau dấu `?`):
 | `page` | số | Không | Trang, bắt đầu từ 1 (mặc định 1) |
 | `size` | số | Không | Số dòng mỗi trang, 1–100 (mặc định 10) |
 
-Ví dụ: `GET /api/bookings?status=Submitted&sort=-createdAt&page=1&size=10`. `search` tìm theo mã đơn và địa chỉ.
+Ví dụ: `GET /api/bookings?status=Submitted&sort=-createdAt&page=1&size=10`. `search` tìm theo mã đơn và địa chỉ. Màn "Đơn vận chuyển" của khách: `GET /api/bookings?stage=AwaitingPayment` để mở tab "Chờ thanh toán".
 
 Response `200` — phần `data`:
 
@@ -1858,6 +1859,7 @@ Response `200` — phần `data`:
     "estimatedCost": 6788.48,
     "currencyCode": "USD",
     "status": "Submitted",
+    "customerStage": "PendingReview",
     "assignedSpecialistId": null,
     "assignedSpecialistName": null,
     "createdAt": "2026-10-08T07:24:30+00:00"
@@ -1876,7 +1878,29 @@ Response `200` — phần `data`:
 | `totalHorses` | Số ngựa trong đơn |
 | `estimatedCost`, `currencyCode` | Giá đã tính lúc gửi đơn |
 | `status` | Trạng thái đơn (mục 3) |
+| `customerStage` | Giai đoạn của đơn theo góc nhìn khách, server tự suy ra (xem bảng dưới). Dùng làm tab và nhãn trên màn "Đơn vận chuyển" của khách thay cho `status` |
 | `assignedSpecialistId`, `assignedSpecialistName` | Chuyên viên phụ trách; `null` khi đơn chưa duyệt |
+
+**Giai đoạn theo góc nhìn khách (`customerStage`).** Server gộp trạng thái đơn, thanh toán, hồ sơ và trạng thái từng con ngựa trên chuyến thành **một** giai đoạn, giống "đơn hàng" trên sàn thương mại điện tử. Không lưu trong DB nên không sửa trực tiếp được.
+
+| Giá trị | Tên gợi ý trên giao diện | Khi nào |
+|---|---|---|
+| `PendingReview` | Chờ duyệt | Đơn `Submitted` |
+| `AwaitingDeposit` | Chờ đặt cọc | Đơn `AwaitingDeposit` |
+| `PreparingDossier` | Đang làm hồ sơ | Đơn đã cọc, còn hồ sơ kiểm dịch chưa `Cleared` |
+| `AwaitingTrip` | Chờ xếp chuyến | Hồ sơ xong, ngựa chưa nằm trên chuyến nào đã được duyệt |
+| `Scheduled` | Đã xếp chuyến | Ngựa nằm trên chuyến đã duyệt, đã trả đủ phần còn lại, chờ ngày chạy |
+| `AwaitingPayment` | Chờ thanh toán | Ngựa đã có chuyến nhưng chưa trả đủ phần còn lại; hoặc sau khi giao còn chi phí phát sinh chưa trả (`AwaitingFinalPayment`) |
+| `InTransit` | Đang vận chuyển | Có con ngựa của đơn đang trên xe |
+| `AwaitingHandover` | Chờ ký nhận | Xe đã tới điểm trả của đơn, chưa ký biên bản bàn giao |
+| `Completed` | Hoàn thành | Đơn `Completed`, không còn nợ |
+| `Closed` | Đã hủy / Từ chối | Đơn `Rejected`, `Cancelled` hoặc `Expired` |
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Stage 'Nope' is invalid. Allowed values: PendingReview, AwaitingDeposit, ...` | `stage` viết sai |
 
 ### GET /api/bookings/{id} — Chi tiết đơn
 
@@ -1911,6 +1935,7 @@ Response `200` — phần `data`:
   "estimatedCost": 6788.48,
   "currencyCode": "USD",
   "status": "Approved",
+  "customerStage": "Scheduled",
   "assignedSpecialistId": 2,
   "assignedSpecialistName": "Nguyễn Thị Mai",
   "createdAt": "2026-10-08T07:24:30+00:00",
@@ -1951,10 +1976,13 @@ Response `200` — phần `data`:
         {
           "tripId": 2,
           "tripCode": "TRP-2026-0002",
-          "tripStatus": "Cancelled",
+          "tripStatus": "Scheduled",
+          "horseStatus": "Planned",
           "stallSlotNumber": 1,
           "plannedStartDate": "2026-11-06T23:00:00+00:00",
-          "plannedEndDate": "2026-11-09T11:00:00+00:00"
+          "plannedEndDate": "2026-11-09T11:00:00+00:00",
+          "pickedUpAt": null,
+          "deliveredAt": null
         }
       ]
     }
@@ -1975,7 +2003,9 @@ Ngoài các trường của danh sách, chi tiết có thêm:
 | `horses[]` | Từng con ngựa trong đơn |
 | `horses[].bookingHorseId` | Mã "ngựa trong đơn", dùng khi xếp chuyến |
 | `horses[].dossierId`, `dossierCode`, `dossierStatus` | Hồ sơ kiểm dịch của con ngựa; có sau khi đơn được duyệt |
-| `horses[].trips[]` | Các chuyến con ngựa được xếp lên, kèm `tripStatus` |
+| `horses[].trips[]` | Các chuyến con ngựa được xếp lên, kèm `tripStatus` (trạng thái xe) và `horseStatus` (trạng thái con ngựa trên chuyến) |
+| `horses[].trips[].pickedUpAt`, `deliveredAt` | Lúc con ngựa lên xe (xe rời điểm đón) và lúc ký bàn giao; dùng để vẽ timeline tiến trình đơn |
+| `customerStage` | Giai đoạn theo góc nhìn khách, xem bảng ở `GET /api/bookings` |
 | `payment` | Tóm tắt thanh toán của đơn, cùng dạng `data` của `GET /api/bookings/{id}/payments` (mục 19) |
 
 Một đơn có thể đi nhiều chuyến và một chuyến có thể chở ngựa của nhiều đơn, nên luôn đọc chuyến theo từng con ngựa.

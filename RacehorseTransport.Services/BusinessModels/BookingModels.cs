@@ -3,6 +3,7 @@ namespace RacehorseTransport.Services.BusinessModels
     public class BookingFilterOptions : BusinessQueryOptions
     {
         public string? Status { get; set; }
+        public string? Stage { get; set; }       // giai đoạn theo góc nhìn khách (R-07)
         public int? CustomerUserId { get; set; } // chỉ nhân sự dùng được
         // Lọc theo ngày bắt đầu khoảng pickup
         public DateTimeOffset? PickupFrom { get; set; }
@@ -60,6 +61,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public decimal EstimatedCost { get; set; }
         public string CurrencyCode { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        public string CustomerStage { get; set; } = string.Empty; // xem CustomerStages (R-07)
         public int? AssignedSpecialistId { get; set; }
         public string? AssignedSpecialistName { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
@@ -115,6 +117,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public int StallSlotNumber { get; set; }
         public DateTimeOffset PlannedStartDate { get; set; }
         public DateTimeOffset PlannedEndDate { get; set; }
+        public DateTimeOffset? PickedUpAt { get; set; }
         public DateTimeOffset? DeliveredAt { get; set; }
     }
 }

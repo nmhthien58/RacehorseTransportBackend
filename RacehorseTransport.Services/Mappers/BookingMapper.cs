@@ -66,6 +66,7 @@ namespace RacehorseTransport.Services.Mappers
                         StallSlotNumber = th.StallSlotNumber,
                         PlannedStartDate = th.Trip.PlannedStartDate,
                         PlannedEndDate = th.Trip.PlannedEndDate,
+                        PickedUpAt = th.PickedUpAt,
                         DeliveredAt = th.DeliveredAt
                     })
                     .ToList()

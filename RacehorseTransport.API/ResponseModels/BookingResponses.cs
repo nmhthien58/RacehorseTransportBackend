@@ -74,6 +74,7 @@ namespace RacehorseTransport.API.ResponseModels
         public decimal EstimatedCost { get; set; }
         public string CurrencyCode { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        public string CustomerStage { get; set; } = string.Empty; // giai đoạn theo góc nhìn khách (R-07)
         public int? AssignedSpecialistId { get; set; }
         public string? AssignedSpecialistName { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
@@ -124,6 +125,7 @@ namespace RacehorseTransport.API.ResponseModels
         public int StallSlotNumber { get; set; }
         public DateTimeOffset PlannedStartDate { get; set; }
         public DateTimeOffset PlannedEndDate { get; set; }
+        public DateTimeOffset? PickedUpAt { get; set; }
         public DateTimeOffset? DeliveredAt { get; set; }
     }
 }
