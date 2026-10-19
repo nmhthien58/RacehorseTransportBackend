@@ -6,6 +6,7 @@ namespace RacehorseTransport.Repositories.Implementations
     public class UnitOfWork : IUnitOfWork
     {
         private readonly AppDbContext _context;
+        private readonly List<Func<Task>> _afterCommit = new();
 
         public UnitOfWork(AppDbContext context)
         {
@@ -29,20 +30,44 @@ namespace RacehorseTransport.Repositories.Implementations
                 return await action();
             }
 
-            await using var transaction = await _context.Database.BeginTransactionAsync();
-            try
+            TResult result;
+            await using (var transaction = await _context.Database.BeginTransactionAsync())
             {
-                var result = await action();
-                await transaction.CommitAsync();
-                return result;
+                try
+                {
+                    result = await action();
+                    await transaction.CommitAsync();
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    // Bỏ các thay đổi còn treo để DbContext không ghi lại chúng ở lần SaveChanges sau.
+                    _context.ChangeTracker.Clear();
+                    _afterCommit.Clear();
+                    throw;
+                }
             }
-            catch
+
+            // Transaction đã đóng nên việc nào ở đây gọi lại RunAfterCommitAsync cũng được chạy ngay
+            var callbacks = _afterCommit.ToList();
+            _afterCommit.Clear();
+            foreach (var callback in callbacks)
             {
-                await transaction.RollbackAsync();
-                // Bỏ các thay đổi còn treo để DbContext không ghi lại chúng ở lần SaveChanges sau.
-                _context.ChangeTracker.Clear();
-                throw;
+                await callback();
             }
+
+            return result;
+        }
+
+        public async Task RunAfterCommitAsync(Func<Task> callback)
+        {
+            if (_context.Database.CurrentTransaction != null)
+            {
+                _afterCommit.Add(callback);
+                return;
+            }
+
+            await callback();
         }
     }
 }
