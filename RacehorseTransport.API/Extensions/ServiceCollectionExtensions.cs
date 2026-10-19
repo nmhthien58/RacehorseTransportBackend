@@ -2,10 +2,12 @@ using System.Reflection;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using RacehorseTransport.API.BackgroundJobs;
+using RacehorseTransport.API.Hubs;
 using RacehorseTransport.API.ResponseModels;
 using RacehorseTransport.Repositories.Context;
 using RacehorseTransport.Repositories.Implementations;
@@ -81,6 +83,11 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<ICodeGenerator, CodeGenerator>();
             services.AddScoped<INotificationService, NotificationService>();
             services.AddScoped<INotificationReadService, NotificationReadService>();
+
+            // Chuông realtime: thông báo mới được đẩy qua SignalR hub /hubs/notifications
+            services.AddSignalR();
+            services.AddSingleton<IUserIdProvider, SubClaimUserIdProvider>();
+            services.AddSingleton<INotificationPusher, SignalRNotificationPusher>();
             services.AddHttpClient<IFileStorageService, SupabaseFileStorageService>(client => client.Timeout = TimeSpan.FromSeconds(30));
 
             // Đăng nhập bằng Google: kiểm tra ID token bằng khóa công khai của Google
@@ -203,6 +210,17 @@ namespace RacehorseTransport.API.Extensions
                     // 401 / 403 cũng trả về khuôn ApiResponse để FE xử lý thống nhất
                     options.Events = new JwtBearerEvents
                     {
+                        // WebSocket của trình duyệt không gửi được header Authorization,
+                        // nên kết nối SignalR mang token trên query string ?access_token=...
+                        OnMessageReceived = context =>
+                        {
+                            string? accessToken = context.Request.Query["access_token"];
+                            if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                            {
+                                context.Token = accessToken;
+                            }
+                            return Task.CompletedTask;
+                        },
                         OnChallenge = async context =>
                         {
                             context.HandleResponse();

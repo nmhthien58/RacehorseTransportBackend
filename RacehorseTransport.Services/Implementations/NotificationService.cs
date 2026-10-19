@@ -5,6 +5,7 @@ using RacehorseTransport.Repositories.Entities;
 using RacehorseTransport.Repositories.Interfaces;
 using RacehorseTransport.Services.BusinessModels;
 using RacehorseTransport.Services.Interfaces;
+using RacehorseTransport.Services.Mappers;
 using RacehorseTransport.Services.Options;
 
 namespace RacehorseTransport.Services.Implementations
@@ -15,17 +16,23 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IRepository<User> _userRepo;
         private readonly IEmailService _emailService;
         private readonly EmailOptions _emailOptions;
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly INotificationPusher _pusher;
 
         public NotificationService(
             IRepository<SystemNotification> notificationRepo,
             IRepository<User> userRepo,
             IEmailService emailService,
-            IOptions<EmailOptions> emailOptions)
+            IOptions<EmailOptions> emailOptions,
+            IUnitOfWork unitOfWork,
+            INotificationPusher pusher)
         {
             _notificationRepo = notificationRepo;
             _userRepo = userRepo;
             _emailService = emailService;
             _emailOptions = emailOptions.Value;
+            _unitOfWork = unitOfWork;
+            _pusher = pusher;
         }
 
         public Task SendAsync(int recipientUserId, string title, string message, string? referenceType = null, int? referenceId = null, bool emailCustomers = false)
@@ -51,6 +58,16 @@ namespace RacehorseTransport.Services.Implementations
             if (notifications.Count > 0)
             {
                 await _notificationRepo.AddRangeAsync(notifications);
+
+                // Chỉ đẩy realtime khi đã commit, để không báo một sự kiện mà sau đó bị rollback
+                var pushes = notifications.Select(n => (n.RecipientUserId, Model: n.ToBusinessModel())).ToList();
+                await _unitOfWork.RunAfterCommitAsync(async () =>
+                {
+                    foreach (var (recipientUserId, model) in pushes)
+                    {
+                        await _pusher.PushAsync(recipientUserId, model);
+                    }
+                });
             }
 
             if (emailCustomers && userIds.Count > 0)

@@ -1,4 +1,5 @@
 using RacehorseTransport.API.Extensions;
+using RacehorseTransport.API.Hubs;
 using RacehorseTransport.API.Middlewares;
 using RacehorseTransport.Repositories.Context;
 
@@ -54,6 +55,7 @@ namespace RacehorseTransport.API
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
+            app.MapHub<NotificationHub>(NotificationHub.Path);
 
             await app.RunAsync();
         }

@@ -7,5 +7,10 @@ namespace RacehorseTransport.Repositories.Interfaces
     {
         Task ExecuteInTransactionAsync(Func<Task> action);
         Task<TResult> ExecuteInTransactionAsync<TResult>(Func<Task<TResult>> action);
+
+        // Việc chỉ được làm khi dữ liệu đã thật sự lưu (ví dụ đẩy thông báo realtime qua SignalR).
+        // Đang trong transaction: chờ tới khi transaction ngoài cùng commit; rollback thì bỏ.
+        // Không có transaction: chạy ngay.
+        Task RunAfterCommitAsync(Func<Task> callback);
     }
 }

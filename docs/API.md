@@ -5138,24 +5138,7 @@ Response `200`:
 }
 ```
 
-Backend chưa có cơ chế đẩy thông báo tức thời (WebSocket). Cách đơn giản là gọi lại API này định kỳ, ví dụ 30 giây một lần, và khi người dùng chuyển trang:
-
-```js
-import api from './api'; // file axios dùng chung ở mục 1
-
-export async function fetchUnreadCount() {
-  const res = await api.get('/api/notifications/unread-count');
-  return res.data.data.count;
-}
-
-// Trong component thanh menu (React):
-// useEffect(() => {
-//   const load = () => fetchUnreadCount().then(setUnread).catch(() => {});
-//   load();
-//   const timer = setInterval(load, 30000);
-//   return () => clearInterval(timer);
-// }, []);
-```
+Gọi API này **một lần** khi vừa đăng nhập / tải trang. Sau đó không cần gọi lại định kỳ: thông báo mới được backend đẩy tới ngay qua SignalR (xem mục 14.5 bên dưới), frontend chỉ việc cộng thêm 1.
 
 ### PATCH /api/notifications/{id}/read — Đánh dấu một thông báo đã đọc
 
@@ -5229,6 +5212,72 @@ Response `200`: `data` là `null`. Sau đó `unread-count` sẽ trả `0`.
   "errors": null
 }
 ```
+
+### 14.5. Nhận thông báo tức thời qua SignalR (`/hubs/notifications`)
+
+Ngay khi backend tạo một thông báo, nó **đẩy** thông báo đó tới mọi tab trình duyệt đang mở của người nhận. Nhờ vậy chuông nhảy số và hiện toast ngay lập tức, không cần F5 hay gọi API định kỳ (polling).
+
+**SignalR là gì?** Là thư viện của Microsoft giữ một kết nối mở giữa trình duyệt và server (thường là WebSocket). Server có thể chủ động gửi tin xuống trình duyệt bất cứ lúc nào. Phía frontend dùng gói npm `@microsoft/signalr`.
+
+- **Địa chỉ hub:** `https://<backend>/hubs/notifications` (lưu ý: **không** có `/api` ở đầu)
+- **Ai kết nối được:** Mọi người đã đăng nhập. Không có token hoặc token sai sẽ bị từ chối với `401`
+- **Cách gửi token:** truyền qua `accessTokenFactory`. Thư viện tự gắn token vào query `?access_token=...`, vì WebSocket của trình duyệt không gửi được header `Authorization`
+- **Sự kiện server gửi xuống:** `notificationReceived`. Payload giống hệt **một phần tử** trong `GET /api/notifications`:
+
+```json
+{
+  "notificationId": 3,
+  "title": "New booking BKG-2026-0002",
+  "message": "A transport request for 1 horse(s) from VN to TH is waiting for review.",
+  "referenceType": "Booking",
+  "referenceId": 2,
+  "isRead": false,
+  "createdAt": "2026-10-19T20:32:02.964641+00:00"
+}
+```
+
+- **Client gọi lên server:** không có method nào. Đọc danh sách và đánh dấu đã đọc vẫn dùng các API REST ở trên
+
+Những điều nên biết:
+
+| Tình huống | Hành vi |
+|---|---|
+| Một người mở nhiều tab | Tab nào cũng nhận được |
+| Thao tác bị lỗi và rollback (ví dụ duyệt đơn thất bại giữa chừng) | Không có gì được đẩy. Backend chỉ đẩy **sau khi** dữ liệu đã lưu thành công |
+| Mất mạng một lúc rồi kết nối lại | Trong lúc mất kết nối có thể lỡ vài thông báo. Sau khi kết nối lại, hãy gọi lại `GET /api/notifications` và `unread-count` |
+| Token hết hạn | Kết nối đang mở vẫn chạy tiếp. Lần kết nối lại sau sẽ cần token mới (refresh token như với REST) |
+| Server không đẩy được (lỗi mạng...) | Thông báo vẫn nằm trong database, lần gọi `GET /api/notifications` sau sẽ thấy |
+
+Ví dụ (React, dùng file axios chung ở mục 1):
+
+```js
+// npm install @microsoft/signalr
+import { HubConnectionBuilder } from '@microsoft/signalr';
+
+const BACKEND = 'https://racehorsetransportbackend-production.up.railway.app';
+
+const connection = new HubConnectionBuilder()
+  .withUrl(`${BACKEND}/hubs/notifications`, {
+    accessTokenFactory: () => localStorage.getItem('accessToken'), // token đang dùng cho REST
+    withCredentials: false, // gửi token bằng accessTokenFactory, không dùng cookie
+  })
+  .withAutomaticReconnect() // tự kết nối lại khi rớt mạng
+  .build();
+
+connection.on('notificationReceived', (n) => {
+  setUnread((count) => count + 1);
+  setItems((list) => [n, ...list]);
+  // ví dụ hiện toast: notification.open({ title: n.title, description: n.message });
+});
+
+// Kết nối lại xong thì tải lại cho chắc (có thể đã lỡ thông báo lúc mất mạng)
+connection.onreconnected(() => reloadNotifications());
+
+await connection.start();
+// Khi đăng xuất hoặc component unmount: await connection.stop();
+```
+
+Frontend của dự án đã làm sẵn phần này. Xem `src/hooks/useNotifications.js` và `src/components/layout/NotificationBell.jsx`.
 
 ---
 
@@ -6992,6 +7041,7 @@ Tổng cộng 118 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | GET | `/api/notifications/unread-count` | Số thông báo chưa đọc | Mọi người đã đăng nhập |
 | PATCH | `/api/notifications/{id}/read` | Đánh dấu một thông báo đã đọc | Người nhận thông báo đó |
 | PATCH | `/api/notifications/read-all` | Đánh dấu tất cả đã đọc | Mọi người đã đăng nhập |
+| WS (SignalR) | `/hubs/notifications` | Nhận thông báo mới tức thời (sự kiện `notificationReceived`) | Mọi người đã đăng nhập |
 
 **15. Quản lý phương tiện**
 
