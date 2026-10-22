@@ -457,7 +457,7 @@ Lưu cả hai vào `localStorage` sau khi đăng nhập. File `api.js` ở mục
 Hệ thống tự gửi email trong hai trường hợp; frontend không phải gọi gì thêm:
 
 - **Quên mật khẩu:** email chứa link `<địa chỉ frontend>/reset-password?token=...`. Frontend cần có trang `/reset-password`: đọc `token` trên URL bằng `new URLSearchParams(window.location.search).get("token")`, cho người dùng nhập mật khẩu mới, rồi gọi `POST /api/auth/reset-password`.
-- **Thông báo cho khách hàng** ở các sự kiện chính: đơn được duyệt / bị từ chối, cần bổ sung giấy tờ, giấy bị từ chối, ngựa đã thông quan, hồ sơ có vấn đề, có sự cố trên chuyến, ngựa tới điểm giao. Nhân sự không nhận email, chỉ nhận thông báo trong ứng dụng.
+- **Thông báo cho khách hàng** ở các sự kiện chính: đơn được duyệt / bị từ chối, cần bổ sung giấy tờ, giấy bị từ chối, chuyến được duyệt (nhắc trả phần còn lại), ngựa đã thông quan, hồ sơ có vấn đề, có sự cố trên chuyến, ngựa tới điểm giao. Nhân sự không nhận email, chỉ nhận thông báo trong ứng dụng.
 
 Đăng ký tài khoản **không** cần xác thực email: đăng ký xong là dùng được ngay.
 
@@ -3291,7 +3291,7 @@ Lỗi thường gặp:
 
 ### POST /api/trips/{id}/approve — Duyệt kế hoạch chuyến
 
-Duyệt một chuyến đang `PendingApproval`. Chuyến thành `Scheduled`, đoàn xe nhận thông báo.
+Duyệt một chuyến đang `PendingApproval`. Chuyến thành `Scheduled`, đoàn xe nhận thông báo. Khách của từng đơn trên chuyến nhận thông báo; đơn nào còn phần còn lại chưa trả thì khách nhận thêm email "Thanh toán phần còn lại" (số tiền USD + VND, hạn trả = ngày xuất phát - `balanceDueDaysBeforeDeparture`, nút mở trang đơn).
 
 - **Ai gọi được:** LogisticsManager, Admin
 - **Dữ liệu gửi lên:** không có (không cần body)

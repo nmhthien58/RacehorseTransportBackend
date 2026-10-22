@@ -220,6 +220,26 @@ namespace RacehorseTransport.Services.Implementations
             var paymentSettings = await _settingService.GetPaymentSettingsAsync();
             var balanceDueAt = trip.PlannedStartDate.AddDays(-paymentSettings.BalanceDueDaysBeforeDeparture);
 
+            // Phần còn lại chưa trả của từng đơn trên chuyến (đơn cũ không có DepositPercent thì không bắt trả)
+            var balances = (await _tripHorseRepo.GetQueryable()
+                .AsNoTracking()
+                .Where(th => th.TripId == tripId && th.BookingHorse!.Booking!.DepositPercent != null)
+                .Select(th => new
+                {
+                    th.BookingHorse!.Booking!.BookingId,
+                    th.BookingHorse.Booking.BookingCode,
+                    th.BookingHorse.Booking.CustomerUserId,
+                    th.BookingHorse.Booking.CurrencyCode,
+                    Remaining = th.BookingHorse.Booking.EstimatedCost - th.BookingHorse.Booking.DepositAmount
+                        - th.BookingHorse.Booking.Payments
+                            .Where(p => p.PaymentType == PaymentTypes.Balance && p.Status == PaymentStatuses.Succeeded)
+                            .Sum(p => p.Amount)
+                })
+                .Distinct()
+                .ToListAsync())
+                .Where(b => b.Remaining > 0)
+                .ToList();
+
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 CopyEscortAssignments(plan, trip);
@@ -252,6 +272,23 @@ namespace RacehorseTransport.Services.Implementations
                     $"Transport has been scheduled. Planned departure: {trip.PlannedStartDate:yyyy-MM-dd HH:mm} UTC. If your booking still has a remaining balance, please pay it before {balanceDueAt:yyyy-MM-dd}; the horses cannot depart until it is paid.",
                     NotificationReferenceTypes.Trip,
                     trip.TripId);
+
+                foreach (var b in balances)
+                {
+                    await _notificationService.EmailCustomerAsync(
+                        b.CustomerUserId,
+                        EmailTemplateNames.BalanceDue,
+                        CustomerPages.Booking(b.BookingId),
+                        new Dictionary<string, string>
+                        {
+                            ["BookingCode"] = b.BookingCode,
+                            ["TripCode"] = trip.TripCode,
+                            ["DepartureDate"] = trip.PlannedStartDate.ToString("dd/MM/yyyy"),
+                            ["Amount"] = $"{b.Remaining:N2} {b.CurrencyCode}",
+                            ["AmountVnd"] = $"{Math.Round(b.Remaining * paymentSettings.UsdVndRate, 0):N0} đ",
+                            ["DueDate"] = balanceDueAt.ToString("dd/MM/yyyy")
+                        });
+                }
             });
 
             return await _tripService.GetTripByIdAsync(tripId, currentUser);

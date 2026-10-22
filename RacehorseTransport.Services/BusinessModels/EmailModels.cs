@@ -28,5 +28,6 @@ namespace RacehorseTransport.Services.BusinessModels
         public const string DossierCleared = "DossierCleared";           // {{BookingCode}}, {{HorseName}}, {{ClearanceNumber}}
         public const string TripIncident = "TripIncident";               // {{TripCode}}, {{BookingCode}}, {{IncidentCode}}, {{Severity}}, {{IncidentDescription}}
         public const string HorseArrived = "HorseArrived";               // {{BookingCode}}, {{HorseName}}, {{Destination}}
+        public const string BalanceDue = "BalanceDue";                   // {{BookingCode}}, {{TripCode}}, {{DepartureDate}}, {{Amount}}, {{AmountVnd}}, {{DueDate}}
     }
 }
