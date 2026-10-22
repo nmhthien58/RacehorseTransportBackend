@@ -284,7 +284,7 @@ namespace RacehorseTransport.Services.Implementations
                 TxnRef = payment.TxnRef,
                 AmountVnd = amountVnd,
                 OrderInfo = $"Thanh toan {TypeLabel(paymentType)} don {booking.BookingCode}",
-                ReturnUrl = $"{_paymentOptions.PublicApiBaseUrl.TrimEnd('/')}/api/payments/vnpay-return",
+                ReturnUrl = $"{ApiOrigin()}/api/payments/vnpay-return",
                 ClientIp = string.IsNullOrWhiteSpace(clientIp) ? "127.0.0.1" : clientIp,
                 CreatedAt = now,
                 ExpiresAt = now.AddMinutes(Math.Max(5, _paymentOptions.PaymentExpireMinutes))
@@ -722,6 +722,15 @@ namespace RacehorseTransport.Services.Implementations
         // =============================================================================================
         // Hàm phụ
         // =============================================================================================
+
+        // Chỉ lấy scheme + host (+ port) của PublicApiBaseUrl: lỡ cấu hình dính cả đường dẫn
+        // (vd ".../api/payments/vnpay-ipn") thì vnp_ReturnUrl vẫn đúng
+        private string ApiOrigin()
+        {
+            return Uri.TryCreate(_paymentOptions.PublicApiBaseUrl, UriKind.Absolute, out var uri)
+                ? uri.GetLeftPart(UriPartial.Authority)
+                : _paymentOptions.PublicApiBaseUrl.TrimEnd('/');
+        }
 
         private async Task<BookingRequest> LoadBookingAsync(int bookingId, bool tracked)
         {
