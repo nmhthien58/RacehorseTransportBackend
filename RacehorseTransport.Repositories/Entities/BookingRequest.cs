@@ -10,8 +10,12 @@ namespace RacehorseTransport.Repositories.Entities
         public int CustomerUserId { get; set; }
         public string PickupAddress { get; set; } = string.Empty;
         public string PickupCountryCode { get; set; } = string.Empty;
+        public decimal? PickupLat { get; set; }
+        public decimal? PickupLng { get; set; }
         public string DropoffAddress { get; set; } = string.Empty;
         public string DropoffCountryCode { get; set; } = string.Empty;
+        public decimal? DropoffLat { get; set; }
+        public decimal? DropoffLng { get; set; }
         // Khoảng ngày ngựa sẵn sàng được đón và hạn giao trễ nhất; ngày chạy thật nằm ở chuyến
         public DateTimeOffset PickupWindowStart { get; set; }
         public DateTimeOffset PickupWindowEnd { get; set; }

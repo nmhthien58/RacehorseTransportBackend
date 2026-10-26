@@ -86,8 +86,12 @@ CREATE TABLE booking.booking_requests (
     customer_user_id         integer       NOT NULL REFERENCES identity.users (user_id),
     pickup_address           varchar(255)  NOT NULL,
     pickup_country_code      char(2)       NOT NULL,
+    pickup_lat               numeric(9,6),
+    pickup_lng               numeric(9,6),
     dropoff_address          varchar(255)  NOT NULL,
     dropoff_country_code     char(2)       NOT NULL,
+    dropoff_lat              numeric(9,6),
+    dropoff_lng              numeric(9,6),
     -- Khách không chọn ngày chạy: chỉ cho biết ngựa sẵn sàng được đón trong khoảng nào và hạn giao trễ nhất.
     -- Ngày chạy thật do Coordinator chốt khi lập chuyến (fleet.trips.planned_start_date).
     pickup_window_start      timestamptz   NOT NULL,
@@ -323,6 +327,9 @@ CREATE TABLE fleet.route_checkpoints (
     checkpoint_type         varchar(30)  NOT NULL
         CONSTRAINT ck_route_checkpoints_type CHECK (checkpoint_type IN ('Origin', 'PickUp', 'RestStop', 'BorderGate', 'DropOff', 'Destination')),
     address                 varchar(255) NOT NULL,
+    latitude                numeric(9,6),
+    longitude               numeric(9,6),
+    distance_km_from_previous numeric(10,2),
     planned_time            timestamptz  NOT NULL,
     mandatory_rest_minutes  integer      NOT NULL DEFAULT 0,
     actual_arrival_time     timestamptz,

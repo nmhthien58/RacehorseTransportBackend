@@ -65,7 +65,7 @@ Thứ tự gợi ý: **Tú** làm BE-02 → BE-19 → BE-07 → BE-14a → BE-18
 
 ## Việc của Tú
 
-### [ ] BE-02 · Schema tọa độ + script migration nền (R-11)
+### [x] BE-02 · Schema tọa độ + script migration nền (R-11)
 **Mục tiêu:** chuẩn bị các cột / bảng mà nhiều task khác cần, để Thiên không phải chờ.
 
 Làm:
