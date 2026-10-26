@@ -14,7 +14,8 @@ namespace RacehorseTransport.Services.Implementations
     // Flow 5. Vòng đời sự cố:
     //   Reported -> PlanProposed (Coordinator đề xuất) -> Approved (Manager duyệt) -> Resolved
     //                    ^------- Rejected (Manager từ chối, Coordinator đề xuất lại)
-    //   Nắn tuyến chỉ làm được khi phương án đã Approved; chuyến chuyển EmergencyRerouting cho tới khi sự cố Resolved.
+    //   Phương án = loại hành động + chỉ đạo + (tùy chọn) thay đổi tuyến. Tuyến được kiểm tra lúc đề xuất và áp vào lộ trình
+    //   khi Manager duyệt; sau đó Coordinator vẫn điều chỉnh tuyến thêm được. Tuyến đổi thì chuyến EmergencyRerouting tới khi Resolved.
     public class IncidentService : IIncidentService
     {
         // Chuyến đang trên đường (kể cả lúc đang nắn tuyến vì sự cố)
@@ -255,21 +256,43 @@ namespace RacehorseTransport.Services.Implementations
             {
                 throw new BusinessException($"A plan can only be proposed for a reported incident or after a rejection (current status: {incident.Status}).");
             }
+            if (!IncidentResponseActions.All.Contains(model.ResponseAction))
+            {
+                throw new BusinessException($"ResponseAction '{model.ResponseAction}' is invalid. Allowed values: {string.Join(", ", IncidentResponseActions.All)}.");
+            }
 
             var trip = incident.Trip!;
+
+            // Thay đổi tuyến đi kèm: kiểm tra ngay trên lộ trình hiện tại để Manager duyệt đúng tuyến sẽ đi
+            var change = model.RouteChange;
+            bool hasChange = change != null && (change.DeactivateCheckpointIds.Count > 0 || change.NewCheckpoints.Count > 0);
+            if (model.ResponseAction == IncidentResponseActions.Reroute && !hasChange)
+            {
+                throw new BusinessException("A reroute plan must remove or add at least one checkpoint.");
+            }
+
+            RoutePlan? plan = null;
+            if (hasChange)
+            {
+                EnsureOnTheRoad(trip);
+                plan = BuildRoutePlan(trip, change!);
+            }
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 incident.ProposedAction = model.ProposedAction;
+                incident.ResponseAction = model.ResponseAction;
+                incident.RouteChange = IncidentMapper.SerializeRouteChange(plan == null ? null : ToRouteChange(plan, change!.InsertAfterCheckpointId));
                 incident.RevisedRouteNotes = model.RevisedRouteNotes;
                 incident.AdditionalCost = model.AdditionalCost;
                 incident.Status = IncidentStatuses.PlanProposed;
                 await _incidentRepo.UpdateAsync(incident);
 
+                string routeText = plan == null ? string.Empty : $" Route change: {DescribeRouteChange(plan.Removed, plan.Added)}";
                 await _notificationService.SendToRoleAsync(
                     UserRoles.LogisticsManager,
                     $"Plan for incident {incident.IncidentCode} needs approval",
-                    $"Trip {trip.TripCode}: {incident.ProposedAction} (additional cost {incident.AdditionalCost:0.##}).",
+                    $"Trip {trip.TripCode}: {incident.ProposedAction} (additional cost {incident.AdditionalCost:0.##}).{routeText}",
                     NotificationReferenceTypes.Incident,
                     incident.IncidentId);
             });
@@ -278,6 +301,7 @@ namespace RacehorseTransport.Services.Implementations
             return await GetIncidentByIdAsync(incidentId, currentUser);
         }
 
+        // Duyệt phương án. Phương án có thay đổi tuyến thì tuyến được áp vào lộ trình ngay trong lần duyệt này.
         public async Task<IncidentModel> ApprovePlanAsync(int incidentId, CurrentUser currentUser)
         {
             var incident = await GetTrackedIncidentAsync(incidentId);
@@ -286,25 +310,54 @@ namespace RacehorseTransport.Services.Implementations
             var trip = incident.Trip!;
             var customerIds = await GetCustomerIdsAsync(trip.TripId);
 
+            var routeChange = IncidentMapper.ParseRouteChange(incident.RouteChange);
+            RoutePlan? plan = null;
+            if (routeChange != null && routeChange.AppliedAt == null)
+            {
+                // Đoàn xe có thể đã đi tiếp từ lúc đề xuất: tuyến không còn hợp lệ thì Manager trả về để đề xuất lại
+                try
+                {
+                    EnsureOnTheRoad(trip);
+                    plan = BuildRoutePlan(trip, ToRerouteModel(routeChange));
+                }
+                catch (BusinessException ex)
+                {
+                    throw new BusinessException($"The proposed route change no longer fits the current route: {ex.Message} Reject the plan so the coordinator can propose a new one.");
+                }
+            }
+
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 incident.Status = IncidentStatuses.Approved;
                 incident.RejectionReason = null;
                 incident.ApprovedByUserId = currentUser.UserId;
                 incident.ApprovedAt = DateTimeOffset.UtcNow;
+
+                if (plan != null)
+                {
+                    await ApplyRoutePlanAsync(trip, plan);
+                    for (int i = 0; i < plan.Added.Count; i++)
+                    {
+                        routeChange!.NewCheckpoints[i].CheckpointId = plan.Added[i].CheckpointId;
+                    }
+                    routeChange!.AppliedAt = DateTimeOffset.UtcNow;
+                    incident.RouteChange = IncidentMapper.SerializeRouteChange(routeChange);
+                }
                 await _incidentRepo.UpdateAsync(incident);
+
+                string routeText = plan == null ? string.Empty : $" Route changed: {DescribeRouteChange(plan.Removed, plan.Added)}";
 
                 await _notificationService.SendToUsersAsync(
                     WithPlanner(CrewIds(trip), trip),
                     $"Plan for incident {incident.IncidentCode} was approved",
-                    $"Trip {trip.TripCode}: {incident.ProposedAction}",
+                    $"Trip {trip.TripCode}: {incident.ProposedAction}{routeText}{(plan == null ? string.Empty : " Check the updated checkpoint list before moving on.")}",
                     NotificationReferenceTypes.Incident,
                     incident.IncidentId);
 
                 await _notificationService.SendToUsersAsync(
                     customerIds,
                     $"Update on the incident on trip {trip.TripCode}",
-                    $"A response plan has been approved: {incident.ProposedAction}",
+                    $"A response plan has been approved: {incident.ProposedAction}{routeText}",
                     NotificationReferenceTypes.Incident,
                     incident.IncidentId);
             });
@@ -350,7 +403,8 @@ namespace RacehorseTransport.Services.Implementations
         // Nắn tuyến và đóng sự cố
         // =============================================================================================
 
-        // Bỏ các mốc chưa tới (IsActive = false) và chèn mốc mới vào lộ trình. Gọi lại được nhiều lần khi phương án còn Approved.
+        // Điều chỉnh tuyến thêm sau khi phương án đã duyệt: bỏ các mốc chưa tới (IsActive = false) và chèn mốc mới.
+        // Gọi lại được nhiều lần khi phương án còn Approved; mỗi lần được ghi nối vào thay đổi tuyến của sự cố.
         public async Task<TripDetailModel> ApplyRerouteAsync(int incidentId, ApplyRerouteModel model, CurrentUser currentUser)
         {
             var incident = await GetTrackedIncidentAsync(incidentId);
@@ -360,11 +414,69 @@ namespace RacehorseTransport.Services.Implementations
             {
                 throw new BusinessException($"The route can only be changed after the plan is approved (current status: {incident.Status}).");
             }
+            EnsureOnTheRoad(trip);
+
+            var plan = BuildRoutePlan(trip, model);
+            var customerIds = await GetCustomerIdsAsync(trip.TripId);
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                await ApplyRoutePlanAsync(trip, plan);
+
+                var applied = ToRouteChange(plan, model.InsertAfterCheckpointId);
+                applied.AppliedAt = DateTimeOffset.UtcNow;
+                var existing = IncidentMapper.ParseRouteChange(incident.RouteChange);
+                if (existing != null)
+                {
+                    existing.RemovedCheckpoints.AddRange(applied.RemovedCheckpoints);
+                    existing.NewCheckpoints.AddRange(applied.NewCheckpoints);
+                    existing.AppliedAt ??= applied.AppliedAt;
+                    applied = existing;
+                }
+                incident.RouteChange = IncidentMapper.SerializeRouteChange(applied);
+                await _incidentRepo.UpdateAsync(incident);
+
+                string change = DescribeRouteChange(plan.Removed, plan.Added);
+
+                await _notificationService.SendToUsersAsync(
+                    CrewIds(trip),
+                    $"Route changed for trip {trip.TripCode}",
+                    $"Incident {incident.IncidentCode}: {change} Check the updated checkpoint list before moving on.",
+                    NotificationReferenceTypes.Trip,
+                    trip.TripId);
+
+                await _notificationService.SendToUsersAsync(
+                    customerIds,
+                    $"Trip {trip.TripCode} is being rerouted",
+                    $"Because of an incident the route has changed. {change}",
+                    NotificationReferenceTypes.Incident,
+                    incident.IncidentId);
+            });
+
+            await _trackingService.InvalidateTripAsync(trip.TripId);
+            return await _tripService.GetTripByIdAsync(trip.TripId, currentUser);
+        }
+
+        // Kết quả kiểm tra một thay đổi tuyến trên lộ trình hiện tại của chuyến
+        private sealed class RoutePlan
+        {
+            public List<RouteCheckpoint> Removed { get; init; } = new();
+            public List<RouteCheckpoint> Added { get; init; } = new();
+            public RouteCheckpoint Anchor { get; init; } = null!;
+            public List<RouteCheckpoint> NewRoute { get; init; } = new();
+        }
+
+        private static void EnsureOnTheRoad(Trip trip)
+        {
             if (!OnTheRoadStatuses.Contains(trip.OverallStatus))
             {
                 throw new BusinessException($"The route can only be changed while the trip is on the road (current status: {trip.OverallStatus}).");
             }
+        }
 
+        // Kiểm tra các mốc bỏ / thêm và dựng lộ trình mới, chưa ghi gì vào DB
+        private static RoutePlan BuildRoutePlan(Trip trip, ApplyRerouteModel model)
+        {
             var removeIds = model.DeactivateCheckpointIds.Distinct().ToList();
             if (removeIds.Count == 0 && model.NewCheckpoints.Count == 0)
             {
@@ -452,40 +564,64 @@ namespace RacehorseTransport.Services.Implementations
             var newRoute = route.Except(removed).ToList();
             newRoute.InsertRange(newRoute.IndexOf(anchor) + 1, added);
 
-            var customerIds = await GetCustomerIdsAsync(trip.TripId);
+            return new RoutePlan { Removed = removed, Added = added, Anchor = anchor, NewRoute = newRoute };
+        }
 
-            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        // Ghi thay đổi tuyến vào lộ trình (gọi trong transaction); chuyến chuyển EmergencyRerouting tới khi sự cố được đóng
+        private async Task ApplyRoutePlanAsync(Trip trip, RoutePlan plan)
+        {
+            foreach (var checkpoint in plan.Removed)
             {
-                foreach (var checkpoint in removed)
+                checkpoint.IsActive = false;
+                checkpoint.Status = CheckpointStatuses.Cancelled;
+            }
+
+            await ResequenceAsync(plan.NewRoute, plan.Added);
+
+            trip.OverallStatus = TripStatuses.EmergencyRerouting;
+            await _tripRepo.UpdateAsync(trip);
+        }
+
+        // insertAfterCheckpointId giữ nguyên lựa chọn của Coordinator (null = sau mốc gần nhất đã tới lúc áp tuyến)
+        private static IncidentRouteChangeModel ToRouteChange(RoutePlan plan, int? insertAfterCheckpointId)
+        {
+            return new IncidentRouteChangeModel
+            {
+                InsertAfterCheckpointId = insertAfterCheckpointId,
+                InsertAfterName = plan.Added.Count > 0 ? plan.Anchor.CheckpointName : null,
+                RemovedCheckpoints = plan.Removed.Select(c => new RouteChangeRemovedCheckpointModel
                 {
-                    checkpoint.IsActive = false;
-                    checkpoint.Status = CheckpointStatuses.Cancelled;
-                }
+                    CheckpointId = c.CheckpointId,
+                    CheckpointName = c.CheckpointName,
+                    PlannedTime = c.PlannedTime
+                }).ToList(),
+                NewCheckpoints = plan.Added.Select(c => new RouteChangeNewCheckpointModel
+                {
+                    CheckpointId = c.CheckpointId == 0 ? null : c.CheckpointId,
+                    CheckpointName = c.CheckpointName,
+                    CheckpointType = c.CheckpointType,
+                    Address = c.Address,
+                    PlannedTime = c.PlannedTime,
+                    MandatoryRestMinutes = c.MandatoryRestMinutes
+                }).ToList()
+            };
+        }
 
-                await ResequenceAsync(newRoute, added);
-
-                trip.OverallStatus = TripStatuses.EmergencyRerouting;
-                await _tripRepo.UpdateAsync(trip);
-
-                string change = DescribeRouteChange(removed, added);
-
-                await _notificationService.SendToUsersAsync(
-                    CrewIds(trip),
-                    $"Route changed for trip {trip.TripCode}",
-                    $"Incident {incident.IncidentCode}: {change} Check the updated checkpoint list before moving on.",
-                    NotificationReferenceTypes.Trip,
-                    trip.TripId);
-
-                await _notificationService.SendToUsersAsync(
-                    customerIds,
-                    $"Trip {trip.TripCode} is being rerouted",
-                    $"Because of an incident the route has changed. {change}",
-                    NotificationReferenceTypes.Incident,
-                    incident.IncidentId);
-            });
-
-            await _trackingService.InvalidateTripAsync(trip.TripId);
-            return await _tripService.GetTripByIdAsync(trip.TripId, currentUser);
+        private static ApplyRerouteModel ToRerouteModel(IncidentRouteChangeModel routeChange)
+        {
+            return new ApplyRerouteModel
+            {
+                InsertAfterCheckpointId = routeChange.InsertAfterCheckpointId,
+                DeactivateCheckpointIds = routeChange.RemovedCheckpoints.Select(c => c.CheckpointId).ToList(),
+                NewCheckpoints = routeChange.NewCheckpoints.Select(c => new CheckpointInputModel
+                {
+                    CheckpointName = c.CheckpointName,
+                    CheckpointType = c.CheckpointType,
+                    Address = c.Address,
+                    PlannedTime = c.PlannedTime,
+                    MandatoryRestMinutes = c.MandatoryRestMinutes
+                }).ToList()
+            };
         }
 
         public async Task<IncidentModel> ResolveIncidentAsync(int incidentId, CurrentUser currentUser)

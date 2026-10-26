@@ -295,6 +295,19 @@ namespace RacehorseTransport.Repositories.Constants
         public static readonly string[] All = { MechanicalBreakdown, BorderCongestion, EquineHealthIssue, Weather, ClimateControlFailure, CustomsHold, Other };
     }
 
+    // Loại hành động trong phương án xử lý sự cố
+    public static class IncidentResponseActions
+    {
+        public const string WaitAndContinue = "WaitAndContinue";     // chờ tại chỗ rồi đi tiếp
+        public const string RepairAndContinue = "RepairAndContinue"; // sửa xe / thiết bị rồi đi tiếp
+        public const string Reroute = "Reroute";                     // đổi tuyến: bắt buộc kèm thay đổi tuyến
+        public const string VeterinaryCare = "VeterinaryCare";       // dừng chăm sóc thú y
+        public const string OffloadHorse = "OffloadHorse";           // cho ngựa rời chuyến
+        public const string Other = "Other";
+
+        public static readonly string[] All = { WaitAndContinue, RepairAndContinue, Reroute, VeterinaryCare, OffloadHorse, Other };
+    }
+
     public static class IncidentSeverities
     {
         public const string Minor = "Minor";

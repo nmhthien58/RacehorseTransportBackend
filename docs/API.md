@@ -4274,7 +4274,7 @@ Các trường gửi lên:
 |---|---|---|---|
 | `incidentType` | chuỗi | Có | Loại sự cố (mục 3), ví dụ `MechanicalBreakdown` |
 | `severity` | chuỗi | Có | `Minor`, `Moderate`, `Major` hoặc `Critical` |
-| `location` | chuỗi | Có | Vị trí xảy ra, tối đa 255 ký tự |
+| `location` | chuỗi | Có | Vị trí xảy ra, tối đa 255 ký tự. App tài xế tự lấy từ GPS của thiết bị, dạng `"10.875115, 106.800901 (±90 m)"` (vĩ độ, kinh độ, sai số); backend lưu nguyên chuỗi |
 | `description` | chuỗi | Có | Mô tả, tối đa 2000 ký tự |
 | `affectedTripHorseId` | số | Không | Con ngựa bị ảnh hưởng, lấy từ `horses[].tripHorseId` của chuyến |
 
@@ -4362,6 +4362,8 @@ Response `200`: `data` là mảng sự cố. Khách hàng không gọi API này 
 
 Điều phối viên nhập phương án cho một sự cố đang `Reported`, hoặc đề xuất lại sau khi bị từ chối (`Rejected`). Sự cố chuyển sang `PlanProposed` và các quản lý nhận thông báo.
 
+Phương án gồm **loại hành động**, **chỉ đạo cho đoàn xe**, và (tùy chọn) **thay đổi tuyến**: bỏ các mốc chưa tới, chèn mốc mới. Thay đổi tuyến được kiểm tra ngay trên lộ trình hiện tại nhưng **chưa áp**; tuyến chỉ được áp vào lộ trình khi quản lý duyệt (`approve`). Nhờ vậy quản lý duyệt đúng tuyến sẽ đi.
+
 - **Ai gọi được:** FleetCoordinator, Admin
 - **Dữ liệu gửi lên:** JSON
 
@@ -4375,31 +4377,60 @@ Các trường gửi lên:
 
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
-| `proposedAction` | chuỗi | Có | Việc sẽ làm, tối đa 255 ký tự |
-| `revisedRouteNotes` | chuỗi | Không | Ghi chú về tuyến đường mới, tối đa 2000 ký tự |
+| `responseAction` | chuỗi | Có | Loại hành động: `WaitAndContinue` (chờ rồi đi tiếp), `RepairAndContinue` (sửa xe / thiết bị rồi đi tiếp), `Reroute` (đổi tuyến), `VeterinaryCare` (dừng chăm sóc thú y), `OffloadHorse` (cho ngựa rời chuyến), `Other` |
+| `proposedAction` | chuỗi | Có | Chỉ đạo cho đoàn xe, tối đa 255 ký tự |
+| `routeChange` | object | Không (bắt buộc khi `responseAction` là `Reroute`) | Thay đổi tuyến, cùng dạng body của `apply-reroute` bên dưới: `deactivateCheckpointIds`, `newCheckpoints`, `insertAfterCheckpointId`. Phải có ít nhất một mốc bỏ hoặc thêm. Mỗi mốc mới bắt buộc có `address` |
+| `revisedRouteNotes` | chuỗi | Không | Ghi chú thêm về tuyến đường, tối đa 2000 ký tự |
 | `additionalCost` | số | Không | Chi phí phát sinh, không âm (mặc định 0) |
 
 Ví dụ request:
 
 ```json
 {
-  "proposedAction": "Đổi xe dự phòng, nghỉ thêm tại trạm thú y Bằng Tường",
+  "responseAction": "Reroute",
+  "proposedAction": "Bỏ cửa khẩu Hữu Nghị đang tắc, đi qua Tân Thanh và nghỉ tại trạm thú y Bằng Tường",
+  "routeChange": {
+    "deactivateCheckpointIds": [12],
+    "insertAfterCheckpointId": 10,
+    "newCheckpoints": [
+      {
+        "checkpointName": "Cửa khẩu Tân Thanh",
+        "checkpointType": "BorderGate",
+        "address": "Tân Thanh, Văn Lãng, Lạng Sơn",
+        "plannedTime": "2026-11-07T14:00:00+07:00",
+        "mandatoryRestMinutes": 0
+      }
+    ]
+  },
   "revisedRouteNotes": "Đã liên hệ trạm thú y Bằng Tường",
   "additionalCost": 650
 }
 ```
 
-Response `200`: sự cố với `status` là `PlanProposed`.
+Response `200`: sự cố với `status` là `PlanProposed`, kèm `responseAction` và `routeChange` (dạng bên dưới, `appliedAt` là `null` vì chưa áp).
+
+**Trường `routeChange` trong mọi response sự cố** (`null` nếu phương án không đổi tuyến):
+
+| Trường | Kiểu | Mô tả |
+|---|---|---|
+| `insertAfterCheckpointId` | số / null | Mốc được chọn để chèn sau; `null` = sau mốc gần nhất đoàn xe đã tới lúc áp tuyến |
+| `insertAfterName` | chuỗi / null | Tên mốc chèn sau (lúc đề xuất), để hiển thị |
+| `removedCheckpoints` | mảng | `{ checkpointId, checkpointName, plannedTime }` các mốc bị bỏ |
+| `newCheckpoints` | mảng | `{ checkpointId, checkpointName, checkpointType, address, plannedTime, mandatoryRestMinutes }`; `checkpointId` có giá trị sau khi tuyến đã áp (dùng để đánh dấu mốc mới trên timeline của tài xế) |
+| `appliedAt` | thời gian / null | Lúc tuyến được áp vào lộ trình; `null` = chưa áp (đang chờ duyệt) |
 
 Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
 | 400 | `A plan can only be proposed for a reported incident or after a rejection (current status: PlanProposed).` | Đã có phương án đang chờ duyệt, hoặc sự cố đã được duyệt / đóng |
+| 400 | `ResponseAction 'X' is invalid. Allowed values: ...` | Sai loại hành động |
+| 400 | `A reroute plan must remove or add at least one checkpoint.` | Chọn `Reroute` mà không gửi thay đổi tuyến |
+| 400 | Các lỗi kiểm tra tuyến giống `apply-reroute` | Thay đổi tuyến không hợp lệ trên lộ trình hiện tại |
 
 ### POST /api/incidents/{id}/approve — Duyệt phương án
 
-Duyệt phương án đang `PlanProposed`. Đoàn xe, người lập chuyến và khách nhận thông báo.
+Duyệt phương án đang `PlanProposed`. Nếu phương án có `routeChange`, tuyến được **áp vào lộ trình ngay trong lần duyệt này** (giống `apply-reroute`): mốc bị bỏ chuyển `Cancelled`, mốc mới được chèn, chuyến chuyển `EmergencyRerouting`, `routeChange.appliedAt` và `newCheckpoints[].checkpointId` có giá trị. Đoàn xe, người lập chuyến và khách nhận thông báo (kèm mô tả tuyến đổi nếu có).
 
 - **Ai gọi được:** LogisticsManager, Admin
 - **Dữ liệu gửi lên:** không có (không cần body)
@@ -4417,6 +4448,7 @@ Lỗi thường gặp:
 | HTTP | `message` | Khi nào |
 |---|---|---|
 | 400 | `Only a proposed plan can be reviewed (current status: Reported).` | Chưa có phương án, hoặc phương án đã được xử lý |
+| 400 | `The proposed route change no longer fits the current route: ... Reject the plan so the coordinator can propose a new one.` | Từ lúc đề xuất tới lúc duyệt, đoàn xe đã đi qua mốc liên quan (hoặc chuyến không còn trên đường). Từ chối để điều phối viên đề xuất lại |
 
 ### POST /api/incidents/{id}/reject — Từ chối phương án
 
@@ -4447,9 +4479,9 @@ Ví dụ request:
 
 Response `200`: sự cố với `status` là `Rejected` và `rejectionReason` vừa nhập (xem ví dụ ở đầu mục).
 
-### POST /api/incidents/{id}/apply-reroute — Nắn tuyến
+### POST /api/incidents/{id}/apply-reroute — Điều chỉnh tuyến thêm
 
-Đổi lộ trình của chuyến sau khi phương án đã được duyệt: bỏ các mốc chưa tới và chèn các mốc mới. Chuyến chuyển sang `EmergencyRerouting`; đoàn xe và khách nhận thông báo. Gọi lại được nhiều lần khi sự cố còn `Approved`.
+Thay đổi tuyến chính nằm trong phương án (`propose` → `approve`). API này dùng khi cần **điều chỉnh thêm** sau khi phương án đã được duyệt: bỏ các mốc chưa tới và chèn các mốc mới. Chuyến chuyển sang `EmergencyRerouting`; đoàn xe và khách nhận thông báo. Mỗi lần gọi được ghi nối vào `routeChange` của sự cố. Gọi lại được nhiều lần khi sự cố còn `Approved`.
 
 - **Ai gọi được:** FleetCoordinator, Admin
 - **Dữ liệu gửi lên:** JSON

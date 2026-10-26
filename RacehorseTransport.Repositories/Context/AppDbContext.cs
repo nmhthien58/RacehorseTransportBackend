@@ -249,6 +249,7 @@ namespace RacehorseTransport.Repositories.Context
                 entity.ToTable("trip_incidents", "incident");
                 entity.HasKey(e => e.IncidentId);
                 entity.Property(e => e.AdditionalCost).HasPrecision(18, 2);
+                entity.Property(e => e.RouteChange).HasColumnType("jsonb");
 
                 entity.HasOne(e => e.Trip)
                       .WithMany(t => t.Incidents)

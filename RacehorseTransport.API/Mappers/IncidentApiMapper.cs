@@ -37,6 +37,8 @@ namespace RacehorseTransport.API.Mappers
             return new ProposeIncidentPlanModel
             {
                 ProposedAction = request.ProposedAction.Trim(),
+                ResponseAction = request.ResponseAction.Trim(),
+                RouteChange = request.RouteChange?.ToBusinessModel(),
                 RevisedRouteNotes = string.IsNullOrWhiteSpace(request.RevisedRouteNotes) ? null : request.RevisedRouteNotes.Trim(),
                 AdditionalCost = request.AdditionalCost
             };
@@ -72,6 +74,28 @@ namespace RacehorseTransport.API.Mappers
                 ReportedByName = model.ReportedByName,
                 ReportedAt = model.ReportedAt,
                 ProposedAction = model.ProposedAction,
+                ResponseAction = model.ResponseAction,
+                RouteChange = model.RouteChange == null ? null : new IncidentRouteChangeResponse
+                {
+                    InsertAfterCheckpointId = model.RouteChange.InsertAfterCheckpointId,
+                    InsertAfterName = model.RouteChange.InsertAfterName,
+                    AppliedAt = model.RouteChange.AppliedAt,
+                    RemovedCheckpoints = model.RouteChange.RemovedCheckpoints.Select(c => new RouteChangeRemovedCheckpointResponse
+                    {
+                        CheckpointId = c.CheckpointId,
+                        CheckpointName = c.CheckpointName,
+                        PlannedTime = c.PlannedTime
+                    }).ToList(),
+                    NewCheckpoints = model.RouteChange.NewCheckpoints.Select(c => new RouteChangeNewCheckpointResponse
+                    {
+                        CheckpointId = c.CheckpointId,
+                        CheckpointName = c.CheckpointName,
+                        CheckpointType = c.CheckpointType,
+                        Address = c.Address,
+                        PlannedTime = c.PlannedTime,
+                        MandatoryRestMinutes = c.MandatoryRestMinutes
+                    }).ToList()
+                },
                 RevisedRouteNotes = model.RevisedRouteNotes,
                 AdditionalCost = model.AdditionalCost,
                 RejectionReason = model.RejectionReason,

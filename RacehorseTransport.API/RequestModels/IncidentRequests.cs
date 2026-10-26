@@ -41,6 +41,13 @@ namespace RacehorseTransport.API.RequestModels
         [MaxLength(255, ErrorMessage = "ProposedAction cannot exceed 255 characters.")]
         public string ProposedAction { get; set; } = string.Empty;
 
+        // WaitAndContinue | RepairAndContinue | Reroute | VeterinaryCare | OffloadHorse | Other
+        [Required(ErrorMessage = "ResponseAction is required.")]
+        public string ResponseAction { get; set; } = string.Empty;
+
+        // Thay đổi tuyến đi kèm (bắt buộc với Reroute). Được kiểm tra ngay và áp vào lộ trình khi Manager duyệt.
+        public ApplyRerouteRequest? RouteChange { get; set; }
+
         [MaxLength(2000, ErrorMessage = "RevisedRouteNotes cannot exceed 2000 characters.")]
         public string? RevisedRouteNotes { get; set; }
 

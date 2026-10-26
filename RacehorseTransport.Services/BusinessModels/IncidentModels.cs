@@ -21,6 +21,10 @@ namespace RacehorseTransport.Services.BusinessModels
     public class ProposeIncidentPlanModel
     {
         public string ProposedAction { get; set; } = string.Empty;
+        public string ResponseAction { get; set; } = string.Empty;
+
+        // Thay đổi tuyến đi kèm phương án (bỏ trống = giữ nguyên lộ trình). Áp vào lộ trình khi Manager duyệt.
+        public ApplyRerouteModel? RouteChange { get; set; }
         public string? RevisedRouteNotes { get; set; }
         public decimal AdditionalCost { get; set; }
     }
@@ -52,6 +56,8 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? ReportedByName { get; set; }
         public DateTimeOffset ReportedAt { get; set; }
         public string? ProposedAction { get; set; }
+        public string? ResponseAction { get; set; }
+        public IncidentRouteChangeModel? RouteChange { get; set; }
         public string? RevisedRouteNotes { get; set; }
         public decimal AdditionalCost { get; set; }
         public string? RejectionReason { get; set; } // lý do của lần từ chối gần nhất; xóa khi phương án được duyệt
@@ -59,5 +65,33 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? ApprovedByName { get; set; }
         public DateTimeOffset? ApprovedAt { get; set; }
         public DateTimeOffset? ResolvedAt { get; set; }
+    }
+
+    // Thay đổi tuyến của một phương án, lưu dạng JSON ở trip_incidents.route_change.
+    // Lưu kèm tên mốc để vẫn đọc được sau khi lộ trình đổi; AppliedAt có giá trị khi đã áp vào lộ trình.
+    public class IncidentRouteChangeModel
+    {
+        public int? InsertAfterCheckpointId { get; set; }
+        public string? InsertAfterName { get; set; }
+        public List<RouteChangeRemovedCheckpointModel> RemovedCheckpoints { get; set; } = new();
+        public List<RouteChangeNewCheckpointModel> NewCheckpoints { get; set; } = new();
+        public DateTimeOffset? AppliedAt { get; set; }
+    }
+
+    public class RouteChangeRemovedCheckpointModel
+    {
+        public int CheckpointId { get; set; }
+        public string CheckpointName { get; set; } = string.Empty;
+        public DateTimeOffset PlannedTime { get; set; }
+    }
+
+    public class RouteChangeNewCheckpointModel
+    {
+        public int? CheckpointId { get; set; } // có sau khi đã áp vào lộ trình
+        public string CheckpointName { get; set; } = string.Empty;
+        public string CheckpointType { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public DateTimeOffset PlannedTime { get; set; }
+        public int MandatoryRestMinutes { get; set; }
     }
 }

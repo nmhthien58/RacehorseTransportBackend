@@ -13,6 +13,8 @@ namespace RacehorseTransport.Repositories.Entities
         public string Description { get; set; } = string.Empty;
         public string Location { get; set; } = string.Empty;
         public string? ProposedAction { get; set; }
+        public string? ResponseAction { get; set; } // IncidentResponseActions
+        public string? RouteChange { get; set; }    // JSON thay đổi tuyến đề xuất kèm phương án (IncidentRouteChangeModel)
         public string? RevisedRouteNotes { get; set; }
         public decimal AdditionalCost { get; set; }
         public string? RejectionReason { get; set; } // lý do của lần từ chối phương án gần nhất

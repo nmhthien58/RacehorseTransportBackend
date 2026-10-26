@@ -376,6 +376,10 @@ CREATE TABLE incident.trip_incidents (
     description             text          NOT NULL,
     location                varchar(255)  NOT NULL,
     proposed_action         varchar(255),
+    -- Loại hành động của phương án; route_change = thay đổi tuyến đi kèm (bỏ / thêm mốc), áp vào lộ trình khi Manager duyệt
+    response_action         varchar(30)
+        CONSTRAINT ck_trip_incidents_response_action CHECK (response_action IN ('WaitAndContinue', 'RepairAndContinue', 'Reroute', 'VeterinaryCare', 'OffloadHorse', 'Other')),
+    route_change            jsonb,
     revised_route_notes     text,
     additional_cost         numeric(18,2) NOT NULL DEFAULT 0,
     rejection_reason        varchar(500), -- lý do của lần Manager từ chối phương án gần nhất
