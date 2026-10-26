@@ -275,11 +275,14 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"The pickup window cannot be longer than {_bookingOptions.MaxPickupWindowDays} days.");
             }
 
-            var earliestDeadline = start + maxTransit;
+            // Ngựa có thể được đón vào bất kỳ lúc nào tới hết ngày cuối của khoảng đón,
+            // nên hạn giao phải đủ cho trường hợp đón muộn nhất (cuối ngày cuối) + thời gian chạy chậm nhất
+            var latestPickup = new DateTimeOffset(end.Date.AddDays(1), end.Offset);
+            var earliestDeadline = latestPickup + maxTransit;
             if (input.DeliveryDeadline.HasValue && input.DeliveryDeadline.Value < earliestDeadline)
             {
                 throw new BusinessException(
-                    $"DeliveryDeadline must be on or after {earliestDeadline:yyyy-MM-dd HH:mm zzz}: this route is estimated to take up to {transit.MaxHours} hours from the start of the pickup window.");
+                    $"DeliveryDeadline must be on or after {earliestDeadline:yyyy-MM-dd HH:mm zzz}: the horses may be picked up as late as the end of {end:yyyy-MM-dd} and this route is estimated to take up to {transit.MaxHours} hours.");
             }
 
             bool urgentPickup = startDay < expressUntil;

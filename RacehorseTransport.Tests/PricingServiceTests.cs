@@ -150,6 +150,23 @@ public class PricingServiceTests
     }
 
     [Fact]
+    public async Task CalculateQuote_DeadlineMustCoverPickupOnLastDayOfWindow()
+    {
+        var service = CreateService();
+        var input = CreateInput(new[] { StallClasses.Shared }, EarliestPickup().AddDays(10));
+        input.PickupWindowEnd = input.PickupWindowStart!.Value.AddDays(3);
+
+        // Đủ nếu đón ngày đầu, nhưng thiếu nếu ngựa được đón vào ngày cuối của khoảng đón
+        input.DeliveryDeadline = input.PickupWindowStart.Value.AddDays(2);
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => service.CalculateQuoteAsync(input));
+        Assert.Contains("DeliveryDeadline", ex.Message);
+
+        input.DeliveryDeadline = null;
+        var quote = await service.CalculateQuoteAsync(input);
+        Assert.True(quote.EarliestDeliveryDeadline >= input.PickupWindowEnd.Value.AddDays(1));
+    }
+
+    [Fact]
     public async Task CalculateQuote_TightDeadlineIsExpress()
     {
         var service = CreateService();
