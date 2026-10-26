@@ -1,0 +1,22 @@
+Subject: Bồi thường giao trễ cho đơn {{BookingCode}}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Bồi thường giao trễ</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#174c3c;">Bồi thường giao trễ chuyến</h2>
+    <p>Xin chào {{FullName}},</p>
+    <p>Chuyến vận chuyển của đơn <strong>{{BookingCode}}</strong> đã kết thúc với thời gian trễ thực tế là <strong>{{DelayHours}} giờ</strong> so với hạn cam kết, do sự cố vận hành thuộc trách nhiệm của công ty.</p>
+    <p>Theo Chính sách cam kết thời gian giao hàng (mục 7), công ty thực hiện bồi thường cho bạn với số tiền:</p>
+    <p style="font-size:18px;color:#174c3c;"><strong>{{Amount}}</strong></p>
+    <p>Khoản tiền bồi thường này đã được duyệt và chuyển hoàn vào phương thức thanh toán ban đầu (VNPay) của bạn. Bạn có thể kiểm tra lịch sử thanh toán trên ứng dụng.</p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Xem chi tiết hoàn tiền</a>
+    </p>
+    <p>Chúng tôi thành thật cáo lỗi về sự chậm trễ này và mong tiếp tục được phục vụ bạn.</p>
+  </div>
+</body>
+</html>

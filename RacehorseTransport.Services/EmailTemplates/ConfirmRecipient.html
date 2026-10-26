@@ -1,0 +1,21 @@
+Subject: Nhắc xác nhận người nhận ngựa cho đơn {{BookingCode}}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Xác nhận người nhận ngựa</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#174c3c;">Xác nhận người nhận ngựa</h2>
+    <p>Xin chào {{FullName}},</p>
+    <p>Chuyến xe chuyên chở ngựa thuộc đơn <strong>{{BookingCode}}</strong> của bạn dự kiến sẽ tới điểm giao vào lúc <strong>{{Eta}}</strong> (trong vòng 24 giờ tới).</p>
+    <p>Người nhận hiện tại được đăng ký trong đơn: <strong>{{RecipientName}}</strong>.</p>
+    <p>Vui lòng mở ứng dụng để <strong>xác nhận người nhận sẽ có mặt</strong> đúng hẹn, hoặc cập nhật người nhận khác nếu có thay đổi đột xuất.</p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Xác nhận người nhận</a>
+    </p>
+    <p>Cảm ơn bạn đã sử dụng dịch vụ Racehorse Transport.</p>
+  </div>
+</body>
+</html>

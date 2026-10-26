@@ -1,0 +1,30 @@
+Subject: Thông báo kế hoạch giao nhận ngựa đơn {{BookingCode}}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Kế hoạch giao nhận ngựa</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#174c3c;">Kế hoạch giao nhận ngựa</h2>
+    <p>Kính gửi {{RecipientName}},</p>
+    <p>Chuyến vận chuyển cho đơn <strong>{{BookingCode}}</strong> chuyên chở ngựa <strong>{{HorseNames}}</strong> đã được lên lịch chính thức. Bạn là người nhận được chỉ định trong đơn vận chuyển này.</p>
+    <table style="border-collapse:collapse;margin:8px 0 16px;">
+      <tr>
+        <td style="padding:6px 16px 6px 0;color:#6b7280;">Thời gian dự kiến tới</td>
+        <td style="padding:6px 0;"><strong>{{ExpectedDate}}</strong></td>
+      </tr>
+      <tr>
+        <td style="padding:6px 16px 6px 0;color:#6b7280;">Hotline hỗ trợ</td>
+        <td style="padding:6px 0;"><strong>{{ContactPhone}}</strong></td>
+      </tr>
+    </table>
+    <p>Khi xe xuất phát và khi sắp tới điểm giao, hệ thống và tài xế sẽ thông báo tiếp cho bạn. Vui lòng chuẩn bị giấy tờ tùy thân để ký biên bản bàn giao điện tử khi nhận ngựa.</p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Theo dõi hành trình</a>
+    </p>
+    <p>Trân trọng cảm ơn,<br>Racehorse Transport</p>
+  </div>
+</body>
+</html>

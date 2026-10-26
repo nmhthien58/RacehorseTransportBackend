@@ -1,0 +1,34 @@
+Subject: Bàn giao thành công ngựa thuộc đơn {{BookingCode}}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Bàn giao ngựa thành công</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#174c3c;">Bàn giao ngựa thành công</h2>
+    <p>Xin chào {{FullName}},</p>
+    <p>Ngựa thuộc đơn vận chuyển <strong>{{BookingCode}}</strong> đã được bàn giao thành công tại điểm đến.</p>
+    <table style="border-collapse:collapse;margin:8px 0 16px;">
+      <tr>
+        <td style="padding:6px 16px 6px 0;color:#6b7280;">Người nhận</td>
+        <td style="padding:6px 0;"><strong>{{RecipientName}}</strong></td>
+      </tr>
+      <tr>
+        <td style="padding:6px 16px 6px 0;color:#6b7280;">Thời gian ký nhận</td>
+        <td style="padding:6px 0;"><strong>{{SignedAt}}</strong></td>
+      </tr>
+      <tr>
+        <td style="padding:6px 16px 6px 0;color:#6b7280;">Tình trạng ngựa</td>
+        <td style="padding:6px 0;"><strong>{{Condition}}</strong></td>
+      </tr>
+    </table>
+    <p>Biên bản bàn giao điện tử (e-POD) cùng chữ ký và ảnh chụp đối chiếu đã được ghi nhận trên hệ thống. Lưu ý: trường hợp phát hiện thương tích sau nhận ngựa, bạn có tối đa 24 giờ để gửi yêu cầu bồi thường.</p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Xem biên bản e-POD</a>
+    </p>
+    <p>Cảm ơn bạn đã tin tưởng dịch vụ Racehorse Transport.</p>
+  </div>
+</body>
+</html>

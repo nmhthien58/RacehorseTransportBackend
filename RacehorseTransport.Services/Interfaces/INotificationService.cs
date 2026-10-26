@@ -18,5 +18,8 @@ namespace RacehorseTransport.Services.Interfaces
         // values: các biến của mẫu (xem EmailTemplateNames). {{FullName}} lấy từ tài khoản,
         // {{Link}} = FrontendBaseUrl + linkPath (ví dụ "/customer/bookings/12").
         Task EmailCustomerAsync(int customerUserId, string templateName, string linkPath, IDictionary<string, string> values);
+
+        // Gửi email theo mẫu đến một địa chỉ email bất kỳ (dùng cho người nhận không phải user hệ thống, ví dụ BE-15)
+        Task EmailAddressAsync(string email, string name, string templateName, IDictionary<string, string> values);
     }
 }
