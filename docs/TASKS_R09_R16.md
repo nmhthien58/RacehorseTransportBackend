@@ -57,8 +57,9 @@ Cập nhật: 26/10/2026 · Người làm: **Thiên** và **Tú** · File Excel 
 | BE-17 | Chung | Cấu hình mới + API chính sách công khai + phiên bản chính sách | Thiên | TB | BE-02 |
 | BE-18 | Chung | Seed dữ liệu demo cho các luồng mới + test tích hợp + tổng hợp API.md | Tú | TB | các task trên |
 | BE-19 | Chung | Mẫu email cho các sự kiện mới | Tú | Thấp | — |
+| BE-20 | R-17 | Hợp đồng vận chuyển: tạo PDF, xem trước, chấp nhận kèm bằng chứng, bản mới khi đổi điều khoản | Thiên | Cao | BE-05 |
 
-Thứ tự gợi ý: **Tú** làm BE-02 → BE-19 → BE-07 → BE-14a → BE-18. **Thiên** làm BE-17 → BE-01 → BE-03 → BE-04 → BE-05 → BE-06 → BE-08/09 → BE-10 → BE-11 → BE-13 → BE-12 → BE-14b → BE-15 → BE-16.
+Thứ tự gợi ý: **Tú** làm BE-02 → BE-19 → BE-07 → BE-14a → BE-18. **Thiên** làm BE-17 → BE-01 → BE-03 → BE-04 → BE-05 → BE-06 → BE-08/09 → BE-10 → BE-11 → BE-13 → BE-12 → BE-14b → BE-15 → BE-16. BE-20 làm ngay sau BE-05 (dùng chung bước chấp nhận báo giá).
 
 ---
 
@@ -257,3 +258,19 @@ Làm:
 - `RecipientAbsent` / `RecipientRefused`: đơn sang trạng thái chờ khách quyết định, email `DeliveryFailed`; khách chọn trong `Delivery.DecisionHours` (`POST /api/bookings/{id}/delivery-decision`: `AlternateRecipient` (kèm người nhận mới + địa chỉ, tạo mốc giao mới), `HoldAtStable`, `ReturnToOrigin`); job quá hạn → `HoldAtStable`. Chi phí của các lựa chọn là khoản phát sinh của khách.
 - `RefusedInjured` / `RefusedWrongHorse`: tạo sự cố + hồ sơ bồi thường (BE-12), `fault_party = Company`, chi phí chuồng tạm do công ty chịu (không cộng phát sinh cho khách).
 - Test công thức phí chờ (xe tới sớm hơn khung đã báo = 0; 2h = 0; 3h10 = 2 giờ tính phí; trần 24 giờ).
+
+### [ ] BE-20 · Hợp đồng vận chuyển (R-17)
+Đọc `docs/PLAN_NGHIEP_VU_R09.md` mục R-17 và `docs/CHINH_SACH_DICH_VU.md` mục 12. **Không có bước ký riêng, không OTP:** cú bấm "Chấp nhận & đặt cọc" sau khi xem hợp đồng là đồng ý giao kết.
+
+Làm:
+- Bảng `booking.booking_contracts`: `contract_id`, `contract_code` (mã `HD-2026-0001`, thêm tiền tố vào `ICodeGenerator`), `booking_id`, `version` (1, 2, …), `status` (`Draft` / `Accepted` / `Superseded`), `reason` (`Initial` / `PickupDropoffChanged` / `DetourAccepted` / `RecipientChanged`), `file_path` (Supabase Storage), `file_sha256`, `policy_version`, `accepted_by_user_id`, `accepted_at`, `accepted_ip`, `accepted_user_agent`, `created_at`. Một đơn chỉ có tối đa một bản `Draft` và một bản `Accepted` hiệu lực. Script `03_update_booking_contracts.sql`.
+- **Sinh PDF** bằng QuestPDF (giấy phép Community miễn phí cho tổ chức nhỏ; nhúng font hỗ trợ tiếng Việt, ví dụ Noto Sans, vào `Services/Assets/Fonts`). Nội dung: số hợp đồng + phiên bản; công ty, khách, người nhận; bảng ngựa (tên, vi mạch, giá trị thỏa thuận, gói bảo hiểm); tuyến đã duyệt (điểm đón / trả, các nước quá cảnh, tổng km); khoảng ngày đón, hạn giao; bảng giá chốt theo `quote_breakdown`, tiền cọc, phần còn lại, hạn thanh toán; Manager duyệt + ngày; phụ lục toàn văn chính sách (render từ `docs/CHINH_SACH_DICH_VU.md` nhúng làm resource, thay các giá trị `[...]` bằng cấu hình hiện hành, bỏ khối ghi chú cho nhóm phát triển). Sinh lại cùng dữ liệu phải ra cùng nội dung chữ (không đưa thời điểm sinh file vào nội dung) để mã băm ổn định.
+- **Tạo bản nháp** khi đơn chuyển `Quoted` (gọi từ BE-05) và mỗi khi báo giá chốt thay đổi; bản nháp cũ bị thay.
+- **Endpoint:**
+  - `GET /api/bookings/{id}/contract` (Customer của đơn, nhân sự): thông tin bản hiện hành (nháp hoặc đã chấp nhận) + `fileSha256` + link tải có hạn.
+  - `GET /api/bookings/{id}/contracts`: lịch sử các phiên bản.
+  - `GET /api/contracts/{contractId}/file`: tải PDF (kiểm tra quyền xem đơn).
+- **Chấp nhận** (mở rộng `accept-quote` của BE-05 và luồng chấp nhận bản mới): body có `contractId`, `contractSha256`, `acceptPolicy`, `policyVersion`. Server kiểm tra bản đó đang là `Draft` hiện hành và mã băm khớp (lệch → 400 `The contract has changed since you opened it. Please review the latest version.`), rồi chuyển `Accepted`, lưu người bấm / thời điểm / IP (`X-Forwarded-For` khi chạy sau proxy Railway) / User-Agent / phiên bản chính sách; bản `Accepted` cũ (nếu có) → `Superseded`. Email PDF cho khách (mẫu `ContractAccepted`: BookingCode, ContractCode, Version, link tải).
+- **Bản mới khi đổi điều khoản:** BE-06 (khách đổi điểm đón / trả → báo giá lại), BE-14b (khách đồng ý trả thêm để đi đường vòng), BE-15 (đổi người nhận) gọi `IContractService.CreateAmendmentAsync(bookingId, reason)` → bản nháp `version + 1`. Thay đổi chỉ có hiệu lực khi khách chấp nhận bản mới (`POST /api/contracts/{contractId}/accept`, cùng kiểm tra như trên). Task nào làm trước thì để `// TODO(BE-20)` ở nơi gọi.
+- **Đơn hàng không:** cột `air_waybill_number`, `air_waybill_file_path` trên chuyến (Coordinator nhập / tải lên), hiện trong chi tiết chuyến.
+- Test: mã băm ổn định khi sinh lại; chấp nhận với mã băm cũ bị chặn; bản mới thay thế đúng bản cũ; khách khác không tải được hợp đồng.

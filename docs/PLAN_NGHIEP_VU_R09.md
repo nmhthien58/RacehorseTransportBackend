@@ -11,6 +11,7 @@ Ngày viết: 22/10/2026, chốt 26/10/2026. Trạng thái: **đã chốt, chưa
 5. **Bỏ nút "Rời chuyến" riêng**, rời chuyến chỉ qua sự cố.
 6. **Bản đồ: không dùng Google Maps.** Google liệt kê Việt Nam (và Trung Quốc) là "Prohibited Territories" của Google Maps Platform (https://cloud.google.com/maps-platform/terms/maps-prohibited-territories): không tạo được dự án Maps với tài khoản thanh toán ở Việt Nam, và tuyến của mình đi qua cả hai nước. Dùng: hiển thị **Leaflet + OpenStreetMap**; tìm địa chỉ / chỉ đường trong VN **Goong** (đã có key); ngoài VN **Nominatim + OSRM** (miễn phí, có giới hạn lượt gọi → cache), **Mapbox** làm dự phòng nếu cần.
 8. **Người nhận (R-16):** liên hệ người nhận chỉ bằng **email + tài xế gọi điện** (không SMS). **Khách (người đặt) xác nhận người nhận có mặt trên app** 24 giờ trước ETA; khách được báo khi người nhận ký xong. Phí chờ **40 USD/giờ** sau 2 giờ miễn phí, tối đa 24 giờ, khách trả qua khoản phát sinh.
+9. **Hợp đồng vận chuyển (R-17):** hệ thống tự tạo hợp đồng PDF từ báo giá chốt. Khách **xem trước** rồi tích "đã đọc" và bấm **Chấp nhận & đặt cọc**; cú bấm đó là đồng ý giao kết. **Không có bước ký riêng, không OTP.** Lưu bằng chứng (người bấm, thời điểm, IP, phiên bản chính sách, mã băm file). Điều khoản đổi → bản hợp đồng mới, khách xem và chấp nhận lại. Thiên làm.
 7. Mọi quy tắc cho khách được viết thành trang **Chính sách**; khách phải tích "Tôi đồng ý với Chính sách dịch vụ" khi gửi yêu cầu và khi chấp nhận báo giá (lưu phiên bản chính sách + thời điểm đồng ý vào đơn).
 
 Nguồn tham khảo đã kiểm tra (ghi ở cuối file): quy định EU 1/2005 về vận chuyển động vật (bản UK/Pháp), mẫu chứng nhận USDA APHIS, tài liệu của vài nhà bảo hiểm ngựa (mortality / agreed value).
@@ -272,6 +273,18 @@ Loại sự cố mới `BorderClosed`, ba phương án như 14.3:
 - Ký e-POD xong → báo khách (thông báo + email).
 - e-POD thêm nhánh **"Không giao được"** (vắng mặt / từ chối, lý do, ảnh). Phí chờ tự tính từ lúc check-in điểm trả tới lúc ký / ghi không giao được, trừ 2 giờ; chỉ tính khi xe tới ≥ đầu khung giờ đã báo; cộng vào khoản phát sinh. Khách có 24 giờ chọn: người nhận khác / chuồng tạm / chở về; quá hạn → chuồng tạm. Từ chối vì ngựa bị thương / nhầm ngựa → sự cố + hồ sơ bồi thường, công ty chịu phí chuồng.
 
+## R-17 · Hợp đồng vận chuyển
+
+**Vì sao:** tích đồng ý chính sách chưa đủ khi tranh chấp (bồi thường, giao trễ, ngựa chết): cần một văn bản gom đúng điều khoản của từng đơn mà khách đã đồng ý. Theo Luật Giao dịch điện tử, hợp đồng giao kết bằng thao tác chấp nhận trên hệ thống có giá trị nếu chứng minh được ai đồng ý, lúc nào, với nội dung nào → không cần bước ký riêng hay OTP.
+
+**Làm:**
+- **Tạo lúc nào:** khi đơn có báo giá chốt (`Quoted`), hệ thống tạo **bản hợp đồng nháp** (PDF) từ dữ liệu báo giá. Không tạo lúc khách mới gửi yêu cầu (chưa có giá, chưa có tuyến).
+- **Nội dung:** số hợp đồng; hai bên (công ty, khách) và người nhận; danh sách ngựa (tên, vi mạch, giá trị thỏa thuận, gói bảo hiểm); tuyến đã duyệt (điểm đón / trả, nước quá cảnh); khoảng ngày đón, hạn giao; bảng giá chốt, tiền cọc, phần còn lại, các hạn thanh toán; toàn văn Chính sách dịch vụ đúng phiên bản hiện hành làm phụ lục.
+- **Chấp nhận:** trang báo giá có nút **Xem hợp đồng**; khách tích "Tôi đã đọc hợp đồng và Chính sách dịch vụ" rồi bấm **Chấp nhận & đặt cọc**. Request gửi kèm mã băm của bản đã xem; server so với bản nháp hiện hành (khác → báo "hợp đồng đã thay đổi, vui lòng xem lại"), rồi **khóa** bản đó và lưu: người bấm, thời điểm, IP, User-Agent, phiên bản chính sách, mã băm SHA-256. Gửi PDF qua email; khách tải lại được trên trang đơn.
+- **Phía công ty:** không ký tay; hợp đồng ghi tên Manager đã duyệt tuyến / báo giá và ngày duyệt.
+- **Thay đổi điều khoản sau khi đã chấp nhận** (khách đổi điểm đón / trả → báo giá lại; khách đồng ý trả thêm để đi đường vòng; đổi người nhận): tạo **bản hợp đồng mới** (số phiên bản tăng, ghi lý do), bản cũ chuyển "đã thay thế"; khách xem và bấm chấp nhận lại như trên. Các khoản phát sinh đã có sẵn trong chính sách (phí chờ, chuồng tạm…) **không** cần bản mới.
+- **Đơn đường hàng không:** thêm ô lưu số vận đơn hàng không (Air Waybill) + tệp đính kèm do hãng / đại lý phát hành (ngoài phạm vi tạo của hệ thống).
+
 ## R-15 · Kiểm tra trước khi xuất phát (gom lại)
 Trước `StartTripAsync`, hệ thống kiểm tra và liệt kê tất cả lỗi một lần:
 1. Hồ sơ mọi ngựa `Cleared` (đã có).
@@ -294,6 +307,7 @@ Trước `StartTripAsync`, hệ thống kiểm tra và liệt kê tất cả l�
 | 6 | R-09 bồi thường trễ + cột `fault_party` | — |
 | 7 | R-14 tình huống xấu (đổi xe, đổi người, cửa khẩu, người nhận, biên giới) | đợt 6 |
 | 7b | R-16 người nhận, thông báo người nhận, xác nhận có mặt, không giao được, phí chờ | R-10 (đơn có người nhận), R-09 |
+| 7c | R-17 hợp đồng vận chuyển (tạo PDF, xem trước, chấp nhận kèm bằng chứng, bản mới khi đổi điều khoản) | R-10 (báo giá chốt) |
 | 8 | Trang Chính sách trên web (từ `CHINH_SACH_DICH_VU.md`) | các đợt trên |
 
 Mỗi đợt: một script `03_update_*.sql` cho Supabase, cập nhật `API.md` + xuất lại file Word, test backend, lint frontend.

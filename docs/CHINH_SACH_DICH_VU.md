@@ -23,7 +23,7 @@ Mọi số tiền được báo bằng **USD**. Khi thanh toán qua VNPay, số 
 1. **Gửi yêu cầu.** Khách chọn điểm đón, điểm giao trên bản đồ, chọn ngựa, khoảng ngày ngựa sẵn sàng được đón và hạn giao trễ nhất. Hệ thống hiển thị **khoảng giá ước tính** (thấp nhất – cao nhất). Khoảng giá này chỉ để tham khảo, **không phải giá cuối cùng**. Ở bước này Khách chưa phải trả tiền.
 2. **Duyệt sơ bộ.** Quản lý kiểm tra yêu cầu có thực hiện được không (ngựa đủ điều kiện, tuyến phục vụ, lịch). Yêu cầu có thể bị từ chối kèm lý do.
 3. **Lập tuyến và báo giá chốt.** Công ty lập tuyến đường cụ thể (các điểm dừng, cửa khẩu, nước quá cảnh) và gửi **báo giá chốt** cho Khách qua email và trên ứng dụng. Báo giá chốt gồm: cước vận chuyển theo quãng đường thực tế, hạng chuồng, phí thủ tục cho từng nước đi qua, phí bảo hiểm (nếu chọn), phụ phí gấp (nếu có).
-4. **Chấp nhận báo giá và đặt cọc.** Khách có `[Booking.QuoteAcceptDays = 3]` ngày để chấp nhận báo giá và đặt cọc. Quá hạn, đơn tự hủy và Khách không mất phí.
+4. **Xem hợp đồng, chấp nhận báo giá và đặt cọc.** Cùng báo giá chốt, hệ thống tạo **Hợp đồng vận chuyển** (mục 12). Khách có `[Booking.QuoteAcceptDays = 3]` ngày để xem hợp đồng, chấp nhận báo giá và đặt cọc. Quá hạn, đơn tự hủy và Khách không mất phí.
 5. **Làm hồ sơ.** Sau khi cọc, chuyên viên yêu cầu các giấy tờ cần thiết theo nước đi, nước quá cảnh và nước đến. Khách nộp giấy trên ứng dụng trong thời hạn được thông báo.
 6. **Xếp chuyến.** Công ty xếp ngựa vào chuyến cụ thể (xe, đoàn, lịch chạy). Một chuyến có thể chở ngựa của nhiều khách cùng tuyến.
 7. **Thanh toán phần còn lại** trước ngày xuất phát (mục 3).
@@ -219,6 +219,15 @@ Công ty có thể cho đoàn chờ biên giới mở lại (ngựa ở chuồng
 
 ---
 
-## 12. Thay đổi chính sách
+## 12. Hợp đồng vận chuyển
 
-Công ty có thể cập nhật chính sách này. Đơn đã đặt áp dụng **phiên bản chính sách Khách đã đồng ý** lúc chấp nhận báo giá. Các con số trong ngoặc vuông là giá trị cấu hình hiện hành và được hiển thị đúng trên trang Chính sách.
+- Khi có báo giá chốt, hệ thống tạo **Hợp đồng vận chuyển** cho đơn, gồm: thông tin hai bên và người nhận; danh sách ngựa, giá trị thỏa thuận và gói bảo hiểm từng con; tuyến đường, khoảng ngày đón, hạn giao; giá chốt, tiền cọc, phần còn lại và các hạn thanh toán. Chính sách dịch vụ này (đúng phiên bản hiện hành) là phụ lục không tách rời của hợp đồng.
+- Khách xem toàn bộ hợp đồng trên ứng dụng **trước khi** đồng ý. Khi Khách tích "Tôi đã đọc hợp đồng và Chính sách dịch vụ" và bấm **Chấp nhận & đặt cọc**, hợp đồng được giao kết theo hình thức điện tử; Khách không phải ký thêm.
+- Hệ thống lưu bằng chứng giao kết: tài khoản đồng ý, thời điểm, địa chỉ IP, phiên bản chính sách và mã nhận dạng nội dung hợp đồng. Hợp đồng đã giao kết không thể bị sửa. Bản PDF được gửi qua email và Khách tải lại được bất cứ lúc nào trên trang đơn.
+- Khi điều khoản thay đổi theo yêu cầu hoặc với sự đồng ý của Khách (đổi điểm đón / giao, đồng ý trả thêm để đi đường vòng, đổi người nhận), hệ thống tạo **bản hợp đồng mới** thay thế bản cũ, Khách xem và chấp nhận lại theo cách trên. Các khoản phát sinh đã quy định trong chính sách này (phí chờ, chuồng tạm, chi phí theo bảng 9.1) được áp dụng mà không cần bản hợp đồng mới.
+
+---
+
+## 13. Thay đổi chính sách
+
+Công ty có thể cập nhật chính sách này. Đơn đã đặt áp dụng **phiên bản chính sách Khách đã đồng ý** lúc chấp nhận báo giá (ghi trong hợp đồng, mục 12). Các con số trong ngoặc vuông là giá trị cấu hình hiện hành và được hiển thị đúng trên trang Chính sách.
