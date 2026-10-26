@@ -91,6 +91,10 @@ namespace RacehorseTransport.Repositories.Context
                 entity.Property(e => e.DepositPercent).HasPrecision(5, 2);
                 entity.Property(e => e.DepositAmount).HasPrecision(18, 2);
                 entity.Property(e => e.ExtraCharges).HasPrecision(18, 2);
+                entity.Property(e => e.PickupLat).HasPrecision(9, 6);
+                entity.Property(e => e.PickupLng).HasPrecision(9, 6);
+                entity.Property(e => e.DropoffLat).HasPrecision(9, 6);
+                entity.Property(e => e.DropoffLng).HasPrecision(9, 6);
                 entity.Property(e => e.QuoteBreakdown).HasColumnType("jsonb");
 
                 entity.HasOne(e => e.Customer).WithMany().HasForeignKey(e => e.CustomerUserId);
@@ -219,6 +223,9 @@ namespace RacehorseTransport.Repositories.Context
             {
                 entity.ToTable("route_checkpoints", "fleet");
                 entity.HasKey(e => e.CheckpointId);
+                entity.Property(e => e.Latitude).HasPrecision(9, 6);
+                entity.Property(e => e.Longitude).HasPrecision(9, 6);
+                entity.Property(e => e.DistanceKmFromPrevious).HasPrecision(10, 2);
 
                 entity.HasOne(e => e.Trip)
                       .WithMany(t => t.Checkpoints)
