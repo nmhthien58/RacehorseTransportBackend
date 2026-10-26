@@ -1,0 +1,36 @@
+Subject: Thông báo giao nhận không thành công cho đơn {{BookingCode}}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Giao nhận không thành công</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#b91c1c;">Giao nhận không thành công</h2>
+    <p>Xin chào {{FullName}},</p>
+    <p>Đoàn xe vận chuyển đã tới điểm giao của đơn <strong>{{BookingCode}}</strong> nhưng việc giao nhận chưa hoàn tất.</p>
+    <table style="border-collapse:collapse;margin:8px 0 16px;">
+      <tr>
+        <td style="padding:6px 16px 6px 0;color:#6b7280;vertical-align:top;">Lý do ghi nhận</td>
+        <td style="padding:6px 0;"><strong>{{Reason}}</strong></td>
+      </tr>
+      <tr>
+        <td style="padding:6px 16px 6px 0;color:#6b7280;">Hạn ra quyết định</td>
+        <td style="padding:6px 0;"><strong>{{DecisionDeadline}}</strong> (trong vòng 24 giờ)</td>
+      </tr>
+    </table>
+    <p>Theo Chính sách dịch vụ (mục 10.5), vui lòng đăng nhập ứng dụng trước thời hạn trên để chọn một trong ba phương án:</p>
+    <ol style="padding-left:20px;color:#374151;">
+      <li>Chỉ định người nhận khác hoặc địa chỉ nhận mới gần đó (tính phí quãng đường thêm).</li>
+      <li>Gửi ngựa tại chuồng tạm gần nhất (bạn chi trả phí chuồng và chăm sóc theo ngày).</li>
+      <li>Vận chuyển ngựa quay về nơi xuất phát (tính cước chiều về).</li>
+    </ol>
+    <p><em>Lưu ý: Quá 24 giờ nếu bạn không phản hồi, ngựa sẽ được mặc định chuyển về chuồng tạm an toàn và chi phí được cộng vào khoản phát sinh.</em></p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Chọn phương án xử lý</a>
+    </p>
+    <p>Trân trọng,<br>Racehorse Transport</p>
+  </div>
+</body>
+</html>

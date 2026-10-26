@@ -1,0 +1,21 @@
+Subject: Xe vận chuyển ngựa đơn {{BookingCode}} đã xuất phát
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Xe vận chuyển đã xuất phát</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#174c3c;">Xe vận chuyển đã xuất phát</h2>
+    <p>Kính gửi {{RecipientName}},</p>
+    <p>Đoàn xe vận chuyển ngựa của đơn <strong>{{BookingCode}}</strong> đã chính thức khởi hành.</p>
+    <p>Thời gian dự kiến tới điểm giao (ETA): <strong>{{Eta}}</strong>.</p>
+    <p>Khi xe rời điểm dừng ngay trước điểm giao, tài xế sẽ gọi điện trực tiếp thông báo cho bạn. Vui lòng sắp xếp thời gian có mặt đúng hẹn để tiếp nhận ngựa.</p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Xem vị trí lộ trình</a>
+    </p>
+    <p>Trân trọng cảm ơn,<br>Racehorse Transport</p>
+  </div>
+</body>
+</html>

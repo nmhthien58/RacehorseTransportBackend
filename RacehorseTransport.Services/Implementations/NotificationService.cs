@@ -127,5 +127,26 @@ namespace RacehorseTransport.Services.Implementations
 
             await SendToUsersAsync(userIds, title, message, referenceType, referenceId);
         }
+
+        public Task EmailAddressAsync(string email, string name, string templateName, IDictionary<string, string> values)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return Task.CompletedTask;
+            }
+
+            var filled = new Dictionary<string, string>(values);
+            if (!filled.ContainsKey("FullName"))
+            {
+                filled["FullName"] = name;
+            }
+            if (!filled.ContainsKey("Link"))
+            {
+                filled["Link"] = _emailOptions.FrontendBaseUrl;
+            }
+
+            _emailService.Queue(email, name, templateName, filled);
+            return Task.CompletedTask;
+        }
     }
 }

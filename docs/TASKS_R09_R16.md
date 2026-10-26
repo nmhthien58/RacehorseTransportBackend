@@ -76,7 +76,7 @@ Làm:
 
 Xong khi: build + test pass; script chạy được hai lần liên tiếp trên DB local mà không lỗi.
 
-### [ ] BE-19 · Mẫu email cho các sự kiện mới
+### [x] BE-19 · Mẫu email cho các sự kiện mới
 **Mục tiêu:** có sẵn mẫu để các task nghiệp vụ chỉ việc gọi.
 
 Tạo file trong `RacehorseTransport.Services/EmailTemplates/` (theo kiểu `BalanceDue.html`: dòng đầu `Subject: ...`, HTML đơn giản, nút dẫn về `{{Link}}`, tiếng Việt), và thêm hằng trong `EmailTemplateNames` kèm comment liệt kê biến:

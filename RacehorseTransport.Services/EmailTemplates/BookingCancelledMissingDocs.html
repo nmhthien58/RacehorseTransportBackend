@@ -1,0 +1,22 @@
+Subject: Đơn {{BookingCode}} đã bị hủy do quá hạn nộp giấy tờ
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Đơn vận chuyển đã bị hủy</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#b91c1c;">Đơn vận chuyển đã bị hủy</h2>
+    <p>Xin chào {{FullName}},</p>
+    <p>Đơn vận chuyển <strong>{{BookingCode}}</strong> đã bị hủy do hồ sơ kiểm dịch không được nộp đủ trước thời hạn quy định dù đã được nhắc nhở 2 lần.</p>
+    <p>Theo Chính sách dịch vụ (mục Hủy đơn sau khi cọc), bạn được hoàn lại:</p>
+    <p style="font-size:18px;color:#174c3c;"><strong>{{RefundAmount}}</strong></p>
+    <p>Số tiền hoàn sẽ được chuyển về phương thức thanh toán ban đầu (hoặc chuyển khoản thủ công nếu có sự cố kỹ thuật). Bạn có thể xem chi tiết giao dịch hoàn tiền trên ứng dụng.</p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Xem chi tiết đơn</a>
+    </p>
+    <p>Cảm ơn bạn đã quan tâm đến dịch vụ Racehorse Transport.</p>
+  </div>
+</body>
+</html>

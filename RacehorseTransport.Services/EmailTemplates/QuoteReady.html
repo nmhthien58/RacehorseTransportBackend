@@ -1,0 +1,30 @@
+Subject: Báo giá chốt cho đơn {{BookingCode}} đã sẵn sàng
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Báo giá chốt vận chuyển</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#174c3c;">Báo giá chốt đã sẵn sàng</h2>
+    <p>Xin chào {{FullName}},</p>
+    <p>Lộ trình dự kiến cho đơn vận chuyển <strong>{{BookingCode}}</strong> đã được phê duyệt. Dưới đây là thông tin báo giá chốt từ công ty:</p>
+    <table style="border-collapse:collapse;margin:8px 0 16px;">
+      <tr>
+        <td style="padding:6px 16px 6px 0;color:#6b7280;">Giá cước chốt</td>
+        <td style="padding:6px 0;"><strong>{{PriceUsd}} USD</strong> (≈ {{PriceVnd}} VND)</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 16px 6px 0;color:#6b7280;">Hạn chấp nhận & đặt cọc</td>
+        <td style="padding:6px 0;"><strong>{{ExpiresAt}}</strong></td>
+      </tr>
+    </table>
+    <p>Vui lòng xem chi tiết tuyến đường, chấp nhận báo giá và thanh toán tiền cọc trong thời hạn quy định. Quá thời hạn này, báo giá sẽ tự hết hạn và đơn tự hủy mà bạn không mất bất kỳ khoản phí nào.</p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Xem báo giá và đặt cọc</a>
+    </p>
+    <p>Cảm ơn bạn đã sử dụng dịch vụ Racehorse Transport.</p>
+  </div>
+</body>
+</html>

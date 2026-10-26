@@ -1,0 +1,30 @@
+Subject: Xe vận chuyển ngựa đơn {{BookingCode}} sắp đến điểm giao
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Xe sắp đến điểm giao</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#174c3c;">Xe vận chuyển sắp đến nơi</h2>
+    <p>Kính gửi {{RecipientName}},</p>
+    <p>Xe vận chuyển ngựa của đơn <strong>{{BookingCode}}</strong> đã rời điểm dừng gần nhất và đang di chuyển tới điểm giao của bạn.</p>
+    <table style="border-collapse:collapse;margin:8px 0 16px;">
+      <tr>
+        <td style="padding:6px 16px 6px 0;color:#6b7280;">Khung giờ tới dự kiến</td>
+        <td style="padding:6px 0;"><strong>{{EtaWindow}}</strong></td>
+      </tr>
+      <tr>
+        <td style="padding:6px 16px 6px 0;color:#6b7280;">Điện thoại tài xế</td>
+        <td style="padding:6px 0;"><strong>{{DriverPhone}}</strong></td>
+      </tr>
+    </table>
+    <p>Vui lòng giữ liên lạc và có mặt tại điểm đón nhận ngựa. Khi xe tới nơi, xe sẽ hỗ trợ chờ tối đa 2 giờ miễn phí.</p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Kiểm tra vị trí xe</a>
+    </p>
+    <p>Trân trọng cảm ơn,<br>Racehorse Transport</p>
+  </div>
+</body>
+</html>
