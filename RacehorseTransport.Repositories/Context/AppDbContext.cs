@@ -19,6 +19,8 @@ namespace RacehorseTransport.Repositories.Context
         public virtual DbSet<Horse> Horses { get; set; } = null!;
         public virtual DbSet<HorseDocument> HorseDocuments { get; set; } = null!;
         public virtual DbSet<BookingRequest> BookingRequests { get; set; } = null!;
+        public virtual DbSet<RoutePlan> RoutePlans { get; set; } = null!;
+        public virtual DbSet<RoutePlanStop> RoutePlanStops { get; set; } = null!;
         public virtual DbSet<BookingHorse> BookingHorses { get; set; } = null!;
         public virtual DbSet<BookingTransitCountry> BookingTransitCountries { get; set; } = null!;
         public virtual DbSet<DocumentType> DocumentTypes { get; set; } = null!;
@@ -36,8 +38,6 @@ namespace RacehorseTransport.Repositories.Context
         public virtual DbSet<SystemNotification> SystemNotifications { get; set; } = null!;
         public virtual DbSet<PriceItem> PriceItems { get; set; } = null!;
         public virtual DbSet<Payment> Payments { get; set; } = null!;
-        public virtual DbSet<RoutePlan> RoutePlans { get; set; } = null!;
-        public virtual DbSet<RoutePlanStop> RoutePlanStops { get; set; } = null!;
         public virtual DbSet<SystemSetting> SystemSettings { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

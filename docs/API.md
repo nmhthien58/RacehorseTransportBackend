@@ -413,6 +413,8 @@ Các trường dưới đây chỉ nhận đúng những giá trị liệt kê, 
 | Trường | Giá trị và ý nghĩa |
 |---|---|
 | Trạng thái đơn (`status`) | `Submitted` chờ duyệt · `PreApproved` đã duyệt sơ bộ, công ty đang lập tuyến · `RoutePlanned` đã duyệt tuyến, chờ báo giá chốt · `AwaitingDeposit` chờ khách đặt cọc · `Approved` đã cọc, đang làm hồ sơ · `Assigned` đã xếp chuyến · `AwaitingFinalPayment` giao xong nhưng còn chi phí phát sinh chưa trả · `Completed` hoàn tất · `Rejected` bị từ chối · `Expired` quá hạn duyệt hoặc quá hạn đặt cọc · `Cancelled` khách hủy |
+| Trạng thái tuyến dự kiến (`routePlan.status`) | `Draft` bản nháp · `Submitted` chờ duyệt · `Approved` tuyến hiệu lực của đơn · `Rejected` bị từ chối, sửa rồi trình lại · `Superseded` bản đã duyệt nhưng bị thay bằng bản mới |
+| Loại mốc của tuyến dự kiến (`stopType`) | `Origin` điểm đón (lấy từ đơn) · `RestStop` trạm nghỉ · `BorderGate` cửa khẩu · `Destination` điểm trả (lấy từ đơn) |
 | `paymentType` (mục 19) | `Deposit` đặt cọc · `Balance` phần còn lại · `Extra` phát sinh · `Refund` hoàn tiền |
 | Trạng thái giao dịch (mục 19) | `Pending` đang chờ cổng · `Succeeded` thành công · `Failed` thất bại · `Expired` link bị thay |
 | `provider` (mục 19) | `VnPay` · `Mock` cổng giả lập · `Manual` ghi nhận tay |
@@ -432,8 +434,6 @@ Các trường dưới đây chỉ nhận đúng những giá trị liệt kê, 
 | `stressLevel` | `Calm` bình tĩnh · `MildStress` hơi căng thẳng · `Agitated` kích động |
 | `incidentType` (loại sự cố) | `MechanicalBreakdown` hỏng xe · `BorderCongestion` tắc biên · `EquineHealthIssue` sức khỏe ngựa · `Weather` thời tiết · `ClimateControlFailure` hỏng điều hòa · `CustomsHold` bị giữ ở hải quan · `Other` khác |
 | `severity` (mức độ sự cố) | `Minor` nhẹ · `Moderate` vừa · `Major` nặng · `Critical` nghiêm trọng |
-| Trạng thái tuyến dự kiến (`routePlan.status`) | `Draft` bản nháp · `Submitted` chờ duyệt · `Approved` tuyến hiệu lực của đơn · `Rejected` bị từ chối, sửa rồi trình lại · `Superseded` bản đã duyệt nhưng bị thay bằng bản mới |
-| Loại mốc của tuyến dự kiến (`stopType`) | `Origin` điểm đón (lấy từ đơn) · `RestStop` trạm nghỉ · `BorderGate` cửa khẩu · `Destination` điểm trả (lấy từ đơn) |
 | Trạng thái sự cố | `Reported` mới báo · `PlanProposed` đã có phương án chờ duyệt · `Approved` phương án được duyệt · `Rejected` phương án bị từ chối · `Resolved` đã xử lý xong |
 | `overallCondition` (tình trạng khi bàn giao) | `Excellent` tốt · `NormalFatigue` mệt bình thường · `Injured` bị thương |
 | `onTimeStatus` (kết quả đúng giờ của chuyến) | `OnTime` đúng giờ · `Delayed_AcceptableForceMajeure` trễ do bất khả kháng · `Delayed_OperationalFault` trễ do lỗi vận hành |
