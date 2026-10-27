@@ -39,6 +39,15 @@ namespace RacehorseTransport.API.RequestModels
         [Range(0, 240, ErrorMessage = "HorseMinAgeMonths must be between 0 and 240.")]
         public int HorseMinAgeMonths { get; set; }
 
+        [Range(300, 400, ErrorMessage = "HorseGestationDays must be between 300 and 400.")]
+        public int HorseGestationDays { get; set; }
+
+        [Range(0, 100, ErrorMessage = "HorseLatePregnancyPercent must be between 0 and 100.")]
+        public decimal HorseLatePregnancyPercent { get; set; }
+
+        [Range(0, 60, ErrorMessage = "HorsePostFoalingDays must be between 0 and 60.")]
+        public int HorsePostFoalingDays { get; set; }
+
         [Range(0, 72, ErrorMessage = "DeliveryFreeWaitingHours must be between 0 and 72.")]
         public int DeliveryFreeWaitingHours { get; set; }
 

@@ -21,6 +21,9 @@ namespace RacehorseTransport.Services.Mappers
                 Color = entity.Color,
                 SpecialCareRequirements = entity.SpecialCareRequirements,
                 PhotoUrl = entity.PhotoUrl,
+                IsPregnant = entity.IsPregnant,
+                ExpectedFoalingDate = entity.ExpectedFoalingDate,
+                LastFoalingDate = entity.LastFoalingDate,
                 IsActive = entity.IsActive,
                 CreatedAt = entity.CreatedAt
             };

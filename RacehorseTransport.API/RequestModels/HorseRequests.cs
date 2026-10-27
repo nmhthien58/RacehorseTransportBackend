@@ -45,6 +45,11 @@ namespace RacehorseTransport.API.RequestModels
 
         public string? SpecialCareRequirements { get; set; }
 
+        // R-12: chỉ ngựa cái. Mang thai thì bắt buộc ngày dự sinh; vừa đẻ thì ghi ngày đẻ gần nhất
+        public bool IsPregnant { get; set; }
+        public DateOnly? ExpectedFoalingDate { get; set; }
+        public DateOnly? LastFoalingDate { get; set; }
+
         // Ảnh ngựa (jpg, png), không bắt buộc
         public IFormFile? Photo { get; set; }
     }

@@ -240,6 +240,17 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Horse(s) with ID {string.Join(", ", missingIds)} were not found among your active horses.");
             }
 
+            // R-12: tuổi tối thiểu, mang thai gần ngày đẻ, vừa đẻ (ngày theo lịch của khách)
+            string? ineligible = HorseEligibilityRules.Describe(
+                ownedHorses,
+                DateOnly.FromDateTime(model.PickupWindowStart.DateTime),
+                DateOnly.FromDateTime(model.PickupWindowEnd.DateTime),
+                await _settingService.GetPolicySettingsAsync());
+            if (ineligible != null)
+            {
+                throw new BusinessException(ineligible);
+            }
+
             // Báo giá trước: đồng thời kiểm tra phương thức, hạng chuồng, tuyến có giá, DistanceKm,
             // khoảng pickup (đủ xa, không quá dài) và hạn giao (đủ thời gian vận chuyển)
             var quote = await _pricingService.CalculateQuoteAsync(new QuoteInputModel
