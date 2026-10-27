@@ -9,6 +9,9 @@ namespace RacehorseTransport.API.RequestModels
         [Range(1, int.MaxValue, ErrorMessage = "BookingId is required.")]
         public int BookingId { get; set; }
 
+        // Giao tại chỗ (R-12): con ngựa rời chuyến với hướng xử lý HandOverHere. Bỏ trống = giao ở điểm trả của đơn.
+        public int? TripHorseId { get; set; }
+
         [Required(ErrorMessage = "RecipientName is required.")]
         [MaxLength(100, ErrorMessage = "RecipientName cannot exceed 100 characters.")]
         public string RecipientName { get; set; } = string.Empty;

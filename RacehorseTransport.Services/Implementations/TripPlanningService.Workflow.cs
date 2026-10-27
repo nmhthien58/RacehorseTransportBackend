@@ -424,6 +424,12 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Booking horse(s) with ID {string.Join(", ", unknownIds)} were not found.");
             }
 
+            var deceased = bookingHorses.FirstOrDefault(bh => bh.Status == BookingHorseStatuses.Deceased);
+            if (deceased != null)
+            {
+                throw new BusinessException($"Horse '{deceased.Horse!.Name}' is recorded as deceased and cannot be placed on a trip.");
+            }
+
             var notPlannable = bookingHorses.FirstOrDefault(bh =>
                 bh.Status == BookingHorseStatuses.Cancelled || bh.Booking!.Status != BookingStatuses.Approved);
             if (notPlannable != null)
@@ -458,11 +464,13 @@ namespace RacehorseTransport.Services.Implementations
             string transportMode = modes[0];
 
             // Mỗi con ngựa trong đơn chỉ nằm trên một chuyến còn hiệu lực
+            // (con rời chuyến chỉ được xếp lại khi hướng xử lý là WaitRecover, R-12)
             var alreadyPlanned = await _tripHorseRepo.GetQueryable()
                 .Where(th => bookingHorseIds.Contains(th.BookingHorseId)
                     && th.TripId != excludeTripId
                     && th.Trip!.OverallStatus != TripStatuses.Cancelled
-                    && TripHorseStatuses.Holding.Contains(th.Status))
+                    && (TripHorseStatuses.Holding.Contains(th.Status)
+                        || (th.Status == TripHorseStatuses.Offloaded && th.OffloadOutcome != OffloadOutcomes.WaitRecover)))
                 .Select(th => th.BookingHorse!.Horse!.Name + " (" + th.Trip!.TripCode + ")")
                 .ToListAsync();
 

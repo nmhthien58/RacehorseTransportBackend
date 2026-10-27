@@ -673,7 +673,8 @@ namespace RacehorseTransport.Services.Implementations
             var onTrip = await _tripHorseRepo.GetQueryable()
                 .Where(th => bookingHorseIds.Contains(th.BookingHorseId)
                     && th.Trip!.OverallStatus != TripStatuses.Cancelled
-                    && TripHorseStatuses.Holding.Contains(th.Status))
+                    && (TripHorseStatuses.Holding.Contains(th.Status)
+                        || (th.Status == TripHorseStatuses.Offloaded && th.OffloadOutcome != OffloadOutcomes.WaitRecover)))
                 .Select(th => th.Trip!.TripCode)
                 .FirstOrDefaultAsync();
             if (onTrip != null)

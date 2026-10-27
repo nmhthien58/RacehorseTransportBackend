@@ -145,7 +145,9 @@ Làm:
 - `GET /api/policy` **không cần đăng nhập**: trả phiên bản chính sách + toàn bộ giá trị cấu hình mà `CHINH_SACH_DICH_VU.md` nhắc tới (kể cả các khóa `Payment.*` đã có), để frontend dựng trang Chính sách.
 - Giá trị không hợp lệ (âm, % > 100…) → 400.
 
-### [ ] BE-01 · Dịch vụ bản đồ (R-11)
+### [x] BE-01 · Dịch vụ bản đồ (R-11)
+Đã làm: `IGeoService` điều phối các `IGeocodingProvider` / `IRoutingProvider` (Goong, Nominatim, OSRM; thứ tự đăng ký trong DI = thứ tự ưu tiên, thêm Mapbox chỉ cần một class mới). Dự phòng khi lỗi: đường chim bay × `Geo:FallbackRoadFactor` (1,3), tốc độ `Transit:TruckAverageSpeedKmh`. `CountriesAlongAsync` chia đôi đoạn đường thay vì lấy mẫu đều để ít gọi Nominatim. Goong chỉ chạy khi có `Goong:ApiKey` (máy dev hiện chưa có khóa, nên đã thử thật với Nominatim + OSRM).
+
 Không dùng Google Maps (Việt Nam và Trung Quốc nằm trong danh sách cấm của Google Maps Platform). Dùng **Goong** trong Việt Nam (đã có `Goong:ApiKey`), **Nominatim** (tìm địa chỉ) + **OSRM** (chỉ đường) ngoài Việt Nam. Thiết kế qua interface để thay nhà cung cấp (vd Mapbox) mà không sửa nơi gọi.
 
 Làm:
@@ -159,6 +161,7 @@ Làm:
 - Cấu hình URL các nhà cung cấp trong `appsettings` (`Geo:NominatimUrl`, `Geo:OsrmUrl`).
 
 Xong khi: unit test với `HttpMessageHandler` giả cho từng nhà cung cấp + trường hợp lỗi rơi về dự phòng.
+
 
 ### [ ] BE-03 · Khoảng giá ước tính khi tạo đơn (R-10)
 Làm:
@@ -214,12 +217,19 @@ Làm:
 - `StartTripAsync` kiểm tra và trả **một lỗi liệt kê tất cả vấn đề**: hồ sơ chưa `Cleared`; giấy hết hạn tính tại **giờ xuất phát thực tế**; thiếu `FIT_EXAM` trong 48 giờ; đơn chưa trả đủ phần còn lại; thiếu tài xế theo quy tắc BE-07.
 - `GET /api/trips/{id}/departure-check` (đoàn xe, Coordinator) trả cùng danh sách đó để app hiện trước khi bấm xuất phát.
 
-### [ ] BE-11 · Rời chuyến chỉ qua sự cố + `Deceased` (R-12)
+### [x] BE-11 · Rời chuyến chỉ qua sự cố + `Deceased` (R-12)
+Đã làm (quyết định chốt 26/10/2026):
+- `HandOverHere`: ký **biên bản e-POD riêng** cho con ngựa tại nơi dỡ (`POST /api/trips/{id}/handover` + `tripHorseId`); bỏ ràng buộc một biên bản / đơn / chuyến.
+- `ReturnToOrigin`: con ngựa **kết thúc** với đơn, không về hàng chờ; chở về do Coordinator sắp xếp ngoài hệ thống. Chỉ `WaitRecover` về hàng chờ.
+- Biên bản thú y nộp **lúc đề xuất** phương án (`vetReportPath`, tải lên qua `POST /api/files`); `Deceased` chỉ ở sự cố `Critical`.
+- Còn để `TODO(BE-12)` (mở hồ sơ bồi thường) và `TODO(BE-14b)` (hoàn cước chưa đi) trong `IncidentService.ApplyOffloadAsync`.
+
 Làm:
 - Bỏ endpoint `POST /api/trips/{id}/horses/{tripHorseId}/offload` (hoặc trả 410 kèm hướng dẫn), cập nhật API.md.
 - Phương án `OffloadHorse` (đã có) bắt buộc `affectedTripHorseId` + `offloadOutcome`: `WaitRecover` (về hàng chờ xếp chuyến), `ReturnToOrigin`, `HandOverHere` (khách nhận tại chỗ, cho phép ký e-POD tại mốc đó), `Deceased`. Duyệt phương án mới đổi trạng thái ngựa. Trường hợp khẩn cấp: tài xế đánh dấu `emergencyOffload` khi báo sự cố → ngựa đổi trạng thái ngay, phương án vẫn phải duyệt sau.
 - Trạng thái mới `Deceased` cho `trip_horses` và `booking_horses`; bắt buộc có tệp biên bản thú y; thông báo + email khách; mở hồ sơ bồi thường (gọi BE-12).
 - Hoàn phần cước chưa đi của con ngựa đó theo `fault_party` (dùng hàm tính của BE-14b).
+
 
 ### [ ] BE-12 · Bảo hiểm và hồ sơ bồi thường (R-13)
 Làm:
@@ -231,7 +241,9 @@ Làm:
 - Email `ClaimDecision`. Endpoint cho khách (xem, mở, nộp chứng từ) và Manager (danh sách, duyệt, từ chối, đánh dấu đã trả).
 - Test các trần chi trả và điều kiện "chỉ khi lỗi công ty".
 
-### [ ] BE-13 · `fault_party` + bồi thường giao trễ (R-09)
+### [x] BE-13 · `fault_party` + bồi thường giao trễ (R-09)
+Đã làm: `resolve` bắt buộc `faultParty` (+ `faultNote`); đóng chuyến bị chặn khi còn sự cố `Approved` chưa đóng. "Lỗi công ty" = không có sự cố được chấp nhận hoặc có ít nhất một sự cố `Company` (dùng cho cả KPI và bồi thường). Sự cố `Company` không cộng chi phí vào phát sinh của khách (Chính sách 9.1). Bồi thường lưu ở bảng riêng `billing.delay_compensations` (chờ duyệt → duyệt / từ chối); duyệt thì tạo các dòng `Refund` qua `IPaymentService.RefundAmountAsync` (dùng lại cho BE-12 / BE-14b). Phí thủ tục = `FEE_DOCS`, `FEE_CLEARANCE`, `FEE_QUARANTINE`, `FEE_TRANSIT`; `FEE_PICKUP` tính là cước.
+
 Làm:
 - `incident.trip_incidents`: thêm `fault_party` (`Company` / `Customer` / `ForceMajeure`), bắt buộc khi đóng sự cố (`ResolveIncidentAsync` nhận thêm tham số).
 - KPI: `DelayedForceMajeure` chỉ khi các sự cố đã duyệt có `fault_party = ForceMajeure` (thay cách hiện tại "có sự cố là bất khả kháng").
