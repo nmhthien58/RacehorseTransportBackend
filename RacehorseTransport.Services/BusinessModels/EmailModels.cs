@@ -43,6 +43,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public const string HandoverCompleted = "HandoverCompleted";                     // {{BookingCode}}, {{RecipientName}}, {{SignedAt}}, {{Condition}}
         public const string DeliveryFailed = "DeliveryFailed";                           // {{BookingCode}}, {{Reason}}, {{DecisionDeadline}}
         public const string DelayCompensation = "DelayCompensation";                     // {{BookingCode}}, {{DelayHours}}, {{Amount}}
+        public const string ContractAccepted = "ContractAccepted";                       // {{BookingCode}}, {{ContractCode}}, {{Version}} (R-17)
         public const string ClaimDecision = "ClaimDecision";                             // {{ClaimCode}}, {{BookingCode}}, {{HorseName}}, {{Decision}}, {{Amount}}, {{Reason}}
     }
 }

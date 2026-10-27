@@ -657,12 +657,39 @@ Content-Type: application/json
 POST {{baseUrl}}/api/route-plans/3/approve
 Authorization: Bearer {{managerToken}}
 
-### [ĐÚNG] Khách chấp nhận báo giá chốt (đổi 2 thành mã đơn đang Quoted) -> AwaitingDeposit
+### [ĐÚNG] Khách xem hợp đồng nháp của đơn đang Quoted (lấy contractId + fileSha256 cho bước chấp nhận)
+# @name currentContract
+GET {{baseUrl}}/api/bookings/2/contract
+Authorization: Bearer {{customerToken}}
+
+### [ĐÚNG] Lịch sử các phiên bản hợp đồng
+GET {{baseUrl}}/api/bookings/2/contracts
+Authorization: Bearer {{managerToken}}
+
+### [ĐÚNG] Tải PDF (302 tới link có hạn)
+GET {{baseUrl}}/api/contracts/{{currentContract.response.body.$.data.contractId}}/file
+Authorization: Bearer {{customerToken}}
+
+### [ĐÚNG] Khách chấp nhận báo giá chốt + hợp đồng ("Chấp nhận & đặt cọc") -> AwaitingDeposit
 POST {{baseUrl}}/api/bookings/2/accept-quote
 Authorization: Bearer {{customerToken}}
 Content-Type: application/json
 
 {
+  "contractId": {{currentContract.response.body.$.data.contractId}},
+  "contractSha256": "{{currentContract.response.body.$.data.fileSha256}}",
+  "acceptPolicy": true,
+  "policyVersion": "1.0"
+}
+
+### [SAI - 400] Mã băm không khớp (khách đang xem bản cũ)
+POST {{baseUrl}}/api/bookings/2/accept-quote
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "contractId": {{currentContract.response.body.$.data.contractId}},
+  "contractSha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "acceptPolicy": true,
   "policyVersion": "1.0"
 }
@@ -673,9 +700,35 @@ Authorization: Bearer {{customerToken}}
 Content-Type: application/json
 
 {
+  "contractId": {{currentContract.response.body.$.data.contractId}},
+  "contractSha256": "{{currentContract.response.body.$.data.fileSha256}}",
   "acceptPolicy": false,
   "policyVersion": "1.0"
 }
+
+### [SAI - 400] Bản đầu không chấp nhận qua API bản sửa đổi
+POST {{baseUrl}}/api/contracts/{{currentContract.response.body.$.data.contractId}}/accept
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "contractSha256": "{{currentContract.response.body.$.data.fileSha256}}",
+  "acceptPolicy": true,
+  "policyVersion": "1.0"
+}
+
+### [ĐÚNG] Điều phối nhập vận đơn hàng không (chuyến phải chở ngựa của đơn Air)
+PUT {{baseUrl}}/api/trips/1/air-waybill
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "airWaybillNumber": "880-12345675"
+}
+
+### [ĐÚNG] Xem vận đơn hàng không của chuyến
+GET {{baseUrl}}/api/trips/1/air-waybill
+Authorization: Bearer {{managerToken}}
 
 ### [ĐÚNG] Khách từ chối báo giá chốt -> Cancelled, không mất phí
 POST {{baseUrl}}/api/bookings/2/decline-quote

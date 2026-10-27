@@ -7,6 +7,8 @@
 docs/
 database/
 *.md
+# Ngoại lệ: văn bản Chính sách dịch vụ được nhúng vào assembly làm phụ lục hợp đồng (R-17)
+!docs/CHINH_SACH_DICH_VU.md
 docker-compose.yml
 
 # Cấu hình riêng của từng máy (chứa mật khẩu, khóa): tuyệt đối không vào image

@@ -871,7 +871,8 @@ namespace RacehorseTransport.Services.Implementations
             return query;
         }
 
-        private static bool CanView(BookingRequest booking, CurrentUser currentUser)
+        // Dùng chung với ContractService (R-17)
+        internal static bool CanView(BookingRequest booking, CurrentUser currentUser)
         {
             if (currentUser.IsCustomer)
             {

@@ -5,6 +5,7 @@ using RacehorseTransport.API.Mappers;
 using RacehorseTransport.API.RequestModels;
 using RacehorseTransport.API.ResponseModels;
 using RacehorseTransport.Repositories.Constants;
+using RacehorseTransport.Services.BusinessModels;
 using RacehorseTransport.Services.Interfaces;
 
 namespace RacehorseTransport.API.Controllers
@@ -120,7 +121,8 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
-        /// Customer accepts the final quote (with the current service policy version). The booking then waits for the deposit until the quote deadline.
+        /// Customer accepts the final quote and the draft contract (contractId + SHA-256 they reviewed, current service policy version).
+        /// The contract is concluded and the booking then waits for the deposit until the quote deadline.
         /// </summary>
         [HttpPost("{id:int}/accept-quote")]
         [Authorize(Roles = UserRoles.Customer)]
@@ -130,7 +132,15 @@ namespace RacehorseTransport.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> AcceptQuote(int id, [FromBody] AcceptQuoteRequest request)
         {
-            var booking = await _quoteService.AcceptQuoteAsync(id, request.AcceptPolicy, request.PolicyVersion, User.ToCurrentUser());
+            var booking = await _quoteService.AcceptQuoteAsync(id, new ContractAcceptanceModel
+            {
+                ContractId = request.ContractId,
+                ContractSha256 = request.ContractSha256,
+                AcceptPolicy = request.AcceptPolicy,
+                PolicyVersion = request.PolicyVersion,
+                IpAddress = HttpContext.GetClientIp(),
+                UserAgent = HttpContext.GetUserAgent()
+            }, User.ToCurrentUser());
             return Ok(ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse(), "Quote accepted, please pay the deposit"));
         }
 

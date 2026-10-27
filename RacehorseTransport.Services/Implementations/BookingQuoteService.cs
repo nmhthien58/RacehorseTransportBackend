@@ -28,6 +28,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IBookingService _bookingService;
         private readonly IBookingActivator _bookingActivator;
         private readonly INotificationService _notificationService;
+        private readonly IContractService _contractService;
         private readonly IUnitOfWork _unitOfWork;
 
         public BookingQuoteService(
@@ -38,6 +39,7 @@ namespace RacehorseTransport.Services.Implementations
             IBookingService bookingService,
             IBookingActivator bookingActivator,
             INotificationService notificationService,
+            IContractService contractService,
             IUnitOfWork unitOfWork)
         {
             _bookingRepo = bookingRepo;
@@ -47,6 +49,7 @@ namespace RacehorseTransport.Services.Implementations
             _bookingService = bookingService;
             _bookingActivator = bookingActivator;
             _notificationService = notificationService;
+            _contractService = contractService;
             _unitOfWork = unitOfWork;
         }
 
@@ -101,6 +104,9 @@ namespace RacehorseTransport.Services.Implementations
             booking.Status = BookingStatuses.Quoted;
             await _bookingRepo.SaveChangesAsync();
 
+            // R-17: hợp đồng nháp theo báo giá này (bản nháp cũ, nếu có, bị thay)
+            await _contractService.CreateDraftAsync(booking.BookingId, ContractReasons.Initial);
+
             await _notificationService.SendAsync(
                 booking.CustomerUserId,
                 $"Final quote for booking {booking.BookingCode}",
@@ -124,7 +130,7 @@ namespace RacehorseTransport.Services.Implementations
         // Khách chấp nhận / từ chối
         // =============================================================================================
 
-        public async Task<BookingDetailModel> AcceptQuoteAsync(int bookingId, bool acceptPolicy, string policyVersion, CurrentUser currentUser)
+        public async Task<BookingDetailModel> AcceptQuoteAsync(int bookingId, ContractAcceptanceModel acceptance, CurrentUser currentUser)
         {
             var booking = await GetOwnBookingAsync(bookingId, currentUser);
             if (booking.Status != BookingStatuses.Quoted)
@@ -136,7 +142,8 @@ namespace RacehorseTransport.Services.Implementations
             {
                 throw new BusinessException($"This quote expired at {VietnamTime(booking.QuoteExpiresAt!.Value)} (Vietnam time). Please submit a new request.");
             }
-            await EnsurePolicyAcceptedAsync(acceptPolicy, policyVersion);
+            await EnsurePolicyAcceptedAsync(acceptance.AcceptPolicy, acceptance.PolicyVersion);
+            string policyVersion = acceptance.PolicyVersion;
 
             var payment = await _settingService.GetPaymentSettingsAsync();
             decimal deposit = QuoteRules.DepositAmount(booking.EstimatedCost, payment.DepositPercent);
@@ -150,7 +157,9 @@ namespace RacehorseTransport.Services.Implementations
                 booking.DepositAmount = deposit;
                 booking.Status = BookingStatuses.AwaitingDeposit;
                 await _bookingRepo.UpdateAsync(booking);
-                // TODO(BE-20): lưu bằng chứng chấp nhận hợp đồng (bản PDF, mã băm, IP, User-Agent)
+
+                // R-17: giao kết hợp đồng (kiểm tra đúng bản nháp hiện hành + mã băm, lưu bằng chứng)
+                await _contractService.AcceptInitialAsync(booking.BookingId, acceptance, currentUser);
 
                 if (deposit <= 0)
                 {

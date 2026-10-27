@@ -228,6 +228,27 @@ namespace RacehorseTransport.Repositories.Constants
         public const string DelayedOperationalFault = "Delayed_OperationalFault";
     }
 
+    // Hợp đồng vận chuyển (R-17): mỗi đơn tối đa một bản Draft (chờ khách chấp nhận) và một bản Accepted hiệu lực
+    public static class ContractStatuses
+    {
+        public const string Draft = "Draft";             // đã tạo PDF, chờ khách xem và chấp nhận
+        public const string Accepted = "Accepted";       // khách đã chấp nhận: hợp đồng đã giao kết, không sửa được
+        public const string Superseded = "Superseded";   // bị thay bằng bản mới (nháp cũ hoặc bản đã chấp nhận cũ)
+
+        public static readonly string[] All = { Draft, Accepted, Superseded };
+    }
+
+    // Lý do tạo một phiên bản hợp đồng
+    public static class ContractReasons
+    {
+        public const string Initial = "Initial";                             // bản đầu, theo báo giá chốt
+        public const string PickupDropoffChanged = "PickupDropoffChanged";   // khách đổi điểm đón / trả (BE-06)
+        public const string DetourAccepted = "DetourAccepted";               // khách đồng ý trả thêm để đi đường vòng (BE-14b)
+        public const string RecipientChanged = "RecipientChanged";           // đổi người nhận (BE-15)
+
+        public static readonly string[] All = { Initial, PickupDropoffChanged, DetourAccepted, RecipientChanged };
+    }
+
     // Tuyến dự kiến của đơn (R-10): Coordinator lập, Manager duyệt; mỗi đơn chỉ một bản Approved hiệu lực
     public static class RoutePlanStatuses
     {

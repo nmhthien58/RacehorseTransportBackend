@@ -21,6 +21,7 @@ namespace RacehorseTransport.Repositories.Context
         public virtual DbSet<BookingRequest> BookingRequests { get; set; } = null!;
         public virtual DbSet<RoutePlan> RoutePlans { get; set; } = null!;
         public virtual DbSet<RoutePlanStop> RoutePlanStops { get; set; } = null!;
+        public virtual DbSet<BookingContract> BookingContracts { get; set; } = null!;
         public virtual DbSet<BookingHorse> BookingHorses { get; set; } = null!;
         public virtual DbSet<BookingTransitCountry> BookingTransitCountries { get; set; } = null!;
         public virtual DbSet<DocumentType> DocumentTypes { get; set; } = null!;
@@ -120,6 +121,14 @@ namespace RacehorseTransport.Repositories.Context
                 entity.HasOne(e => e.Booking).WithMany().HasForeignKey(e => e.BookingId);
                 entity.HasOne(e => e.PlannedBy).WithMany().HasForeignKey(e => e.PlannedByUserId);
                 entity.HasOne(e => e.ReviewedBy).WithMany().HasForeignKey(e => e.ReviewedByUserId);
+            });
+
+            modelBuilder.Entity<BookingContract>(entity =>
+            {
+                entity.ToTable("booking_contracts", "booking");
+                entity.HasKey(e => e.ContractId);
+                entity.HasOne(e => e.Booking).WithMany().HasForeignKey(e => e.BookingId);
+                entity.HasOne(e => e.AcceptedBy).WithMany().HasForeignKey(e => e.AcceptedByUserId);
             });
 
             modelBuilder.Entity<RoutePlanStop>(entity =>

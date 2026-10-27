@@ -10,11 +10,15 @@
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="8.0.0" />
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="7.1.2" />
+    <!-- R-17: sinh hợp đồng PDF (giấy phép Community; font Lato đi kèm gói, có đủ dấu tiếng Việt) -->
+    <PackageReference Include="QuestPDF" Version="2026.2.3" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Mẫu email: mỗi file .html trong EmailTemplates được nhúng vào assembly -->
     <EmbeddedResource Include="EmailTemplates\*.html" />
+    <!-- R-17: văn bản Chính sách dịch vụ, in làm phụ lục hợp đồng (bản gốc ở docs/, xem .dockerignore) -->
+    <EmbeddedResource Include="..\docs\CHINH_SACH_DICH_VU.md" LogicalName="RacehorseTransport.Services.PolicyDocument.md" />
   </ItemGroup>
 
   <ItemGroup>

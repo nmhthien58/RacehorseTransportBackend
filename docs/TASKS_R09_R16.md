@@ -282,7 +282,8 @@ Làm:
 - `RefusedInjured` / `RefusedWrongHorse`: tạo sự cố + hồ sơ bồi thường (BE-12), `fault_party = Company`, chi phí chuồng tạm do công ty chịu (không cộng phát sinh cho khách).
 - Test công thức phí chờ (xe tới sớm hơn khung đã báo = 0; 2h = 0; 3h10 = 2 giờ tính phí; trần 24 giờ).
 
-### [ ] BE-20 · Hợp đồng vận chuyển (R-17)
+### [x] BE-20 · Hợp đồng vận chuyển (R-17)
+Đã làm: bảng `booking_contracts` (+ chỉ mục "một Draft / một Accepted mỗi đơn"), mã `HD-yyyy-nnnn` mỗi phiên bản. `ContractService` + `ContractPdfRenderer` (QuestPDF 2026.2.3, giấy phép Community; dùng font **Lato đi kèm gói QuestPDF**, đủ dấu tiếng Việt, không phải tải font riêng). Metadata PDF cố định theo ngày báo giá → sinh lại cùng dữ liệu ra **đúng từng byte**, nên `file_sha256` là SHA-256 của file. Phụ lục: `docs/CHINH_SACH_DICH_VU.md` nhúng vào assembly (`.dockerignore` có ngoại lệ cho file này), bỏ khối ghi chú `>`, thay `[Khóa = ...]` bằng cấu hình hiện hành (`SystemSettingService.ConfigValues`). Duyệt tuyến → báo giá → bản nháp; lập lại tuyến khi `Quoted` → bản nháp mới, bản cũ `Superseded`. `accept-quote` bắt `contractId` + `contractSha256`, lưu IP (`X-Forwarded-For`), User-Agent, phiên bản chính sách; email `ContractAccepted` gửi **link** tới trang đơn (không đính kèm file: hệ thống email hiện chưa hỗ trợ đính kèm). `IContractService.CreateAmendmentAsync` + `POST /api/contracts/{id}/accept` sẵn cho BE-06 / BE-14b / BE-15 (`TODO` áp dụng thay đổi khi chấp nhận). Vận đơn hàng không: cột `air_waybill_number`, `air_waybill_file_path` trên `fleet.trips`, API riêng `GET/PUT /api/trips/{id}/air-waybill` (không sửa chi tiết chuyến để tránh đụng BE-07). Người nhận trên hợp đồng: `TODO(BE-15)`.
 Đọc `docs/PLAN_NGHIEP_VU_R09.md` mục R-17 và `docs/CHINH_SACH_DICH_VU.md` mục 12. **Không có bước ký riêng, không OTP:** cú bấm "Chấp nhận & đặt cọc" sau khi xem hợp đồng là đồng ý giao kết.
 
 Làm:

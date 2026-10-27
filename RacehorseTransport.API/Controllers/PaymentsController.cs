@@ -192,19 +192,6 @@ namespace RacehorseTransport.API.Controllers
         }
 
         // Railway đứng sau proxy: IP thật của khách nằm ở X-Forwarded-For
-        private string GetClientIp()
-        {
-            string? forwarded = Request.Headers["X-Forwarded-For"].FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(forwarded))
-            {
-                return forwarded.Split(',')[0].Trim();
-            }
-            var ip = HttpContext.Connection.RemoteIpAddress;
-            if (ip == null)
-            {
-                return "127.0.0.1";
-            }
-            return ip.IsIPv4MappedToIPv6 ? ip.MapToIPv4().ToString() : ip.ToString() == "::1" ? "127.0.0.1" : ip.ToString();
-        }
+        private string GetClientIp() => HttpContext.GetClientIp();
     }
 }

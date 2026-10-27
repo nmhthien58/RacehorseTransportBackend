@@ -129,6 +129,8 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IRoutePlanService, RoutePlanService>();
             services.AddScoped<IBookingQuoteService, BookingQuoteService>();
+            services.AddScoped<IContractService, ContractService>();
+            services.AddScoped<IAirWaybillService, AirWaybillService>();
             services.AddScoped<IHorseService, HorseService>();
             services.AddScoped<IHorseDocumentService, HorseDocumentService>();
             services.AddSingleton<ITransitTimeEstimator, TransitTimeEstimator>();
