@@ -425,7 +425,9 @@ Các trường dưới đây chỉ nhận đúng những giá trị liệt kê, 
 | `crewRole` | `Driver` lái xe · `Escort` áp tải |
 | `checkpointType` (loại mốc) | `Origin` điểm đi · `PickUp` điểm đón ngựa của một đơn · `RestStop` trạm nghỉ · `BorderGate` cửa khẩu · `DropOff` điểm trả ngựa của một đơn · `Destination` điểm giao (mốc cuối) |
 | Trạng thái mốc | `Pending` chưa tới · `Arrived` đã tới · `Cleared` đã thông quan (chỉ cửa khẩu) · `Departed` đã rời · `Cancelled` bị bỏ khi nắn tuyến |
-| Trạng thái ngựa trên chuyến (`horses[].status`) | `Planned` đã xếp chuyến, chưa lên xe · `InTransit` đang trên xe · `Delivered` đã ký bàn giao · `Offloaded` rớt lại giữa đường (sự cố / thú y), quay về hàng chờ xếp chuyến · `Cancelled` chuyến bị hủy |
+| Trạng thái ngựa trên chuyến (`horses[].status`) | `Planned` đã xếp chuyến, chưa lên xe · `InTransit` đang trên xe · `Delivered` đã ký bàn giao (ở điểm trả, hoặc tại chỗ khi rời chuyến) · `Offloaded` đã rời chuyến giữa đường qua sự cố, đi tiếp thế nào xem `offloadOutcome` · `Deceased` chết trên đường · `Cancelled` chuyến bị hủy |
+| Hướng xử lý khi ngựa rời chuyến (`offloadOutcome`) | `WaitRecover` chờ hồi phục rồi về hàng chờ xếp chuyến khác · `ReturnToOrigin` đưa về nơi đi (con ngựa kết thúc với đơn) · `HandOverHere` khách nhận ngựa tại nơi dỡ, ký e-POD tại chỗ · `Deceased` ngựa chết. `null` khi tài xế vừa dỡ khẩn cấp và phương án chưa được duyệt |
+| Trạng thái ngựa trong đơn | `Pending` chờ duyệt · `Approved` đã duyệt · `Cancelled` đã hủy · `Deceased` chết trên đường |
 | `feedStatus` (ăn uống) | `Normal` bình thường · `Reduced` ăn ít · `Refused` bỏ ăn |
 | `stressLevel` | `Calm` bình tĩnh · `MildStress` hơi căng thẳng · `Agitated` kích động |
 | `incidentType` (loại sự cố) | `MechanicalBreakdown` hỏng xe · `BorderCongestion` tắc biên · `EquineHealthIssue` sức khỏe ngựa · `Weather` thời tiết · `ClimateControlFailure` hỏng điều hòa · `CustomsHold` bị giữ ở hải quan · `Other` khác |
@@ -3566,9 +3568,10 @@ Response `200` — phần `data`:
 | `horses[].escortUserId`, `escortName` | Người áp tải phụ trách con ngựa. Dùng để vẽ sơ đồ chuồng (tô màu ô theo người áp tải) và để màn của áp tải chỉ hiện ngựa của mình |
 | `horses[].specialCareRequirements`, `photoUrl` | Yêu cầu chăm sóc và ảnh, để tài xế nhận diện |
 | `horses[].dossierStatus` | Trạng thái hồ sơ; chuyến chỉ xuất phát được khi mọi con đều `Cleared` |
-| `horses[].status` | Trạng thái của con ngựa trên chuyến (mục 3): `Planned`, `InTransit`, `Delivered`, `Offloaded`, `Cancelled` |
+| `horses[].status` | Trạng thái của con ngựa trên chuyến (mục 3): `Planned`, `InTransit`, `Delivered`, `Offloaded`, `Deceased`, `Cancelled` |
 | `horses[].pickedUpAt`, `deliveredAt` | Lúc xe rời điểm đón của con ngựa, lúc ký bàn giao |
-| `horses[].offloadedAt`, `offloadReason` | Lúc và lý do con ngựa rớt lại giữa đường |
+| `horses[].offloadedAt`, `offloadReason` | Lúc và lý do con ngựa rời chuyến (qua sự cố) |
+| `horses[].offloadOutcome` | Hướng xử lý tiếp khi rời chuyến (mục 3): `WaitRecover`, `ReturnToOrigin`, `HandOverHere`, `Deceased`; `null` nếu chưa rời chuyến hoặc đang chờ phương án |
 | `checkpoints[].bookingId`, `bookingCode` | Với mốc `PickUp` / `DropOff`: đơn được đón / trả ở đây; `null` với mốc khác |
 | `checkpoints[].estimatedArrivalTime` | Mốc đã tới: giờ tới thực tế. Mốc chưa tới: giờ kế hoạch cộng độ trễ hiện tại (cách tính xem "Giờ dự kiến theo check-in" ở `GET /api/tracking/trips`). `null` với mốc đã bị bỏ khi nắn tuyến |
 | `liveDelayMinutes` | Số phút chuyến đang trễ theo check-in thực tế (0 là đúng giờ). Khác `delayMinutes` là kết quả chốt khi đóng chuyến |
@@ -3581,7 +3584,7 @@ Response `200` — phần `data`:
 | `bookings[]` | Các đơn có ngựa trên chuyến: khách, điểm giao, `horseCountOnTrip`, và `handoverCompleted` (đơn đã có biên bản bàn giao chưa, mục 12) |
 | `bookings[].pickupCheckpointId`, `dropoffCheckpointId` | Mốc đón / mốc trả của đơn: `PickUp` / `DropOff` riêng, không có thì `Origin` / `Destination`. Tài xế ký e-POD cho đơn khi đang ở mốc `dropoffCheckpointId` |
 | `bookings[].estimatedDeliveryAt`, `deliveryDeadline` | Giờ dự kiến tới mốc trả và hạn giao của đơn |
-| `bookings[].deliveredHorseCount`, `offloadedHorseCount` | Số con đã giao, số con rớt lại giữa đường |
+| `bookings[].deliveredHorseCount`, `offloadedHorseCount` | Số con đã giao, số con đã rời chuyến (`Offloaded`) |
 
 Ví dụ một phần tử `horses[]`, `checkpoints[]` và `bookings[]` của chuyến ghép đơn (lấy từ chuyến thật trên máy test):
 
@@ -3607,7 +3610,8 @@ Ví dụ một phần tử `horses[]`, `checkpoints[]` và `bookings[]` của ch
     "pickedUpAt": "2026-10-18T12:59:25.307849+00:00",
     "deliveredAt": null,
     "offloadedAt": "2026-10-18T13:00:48.509219+00:00",
-    "offloadReason": "Lameness, vet stop"
+    "offloadReason": "INC-2026-0007: Lameness, vet stop",
+    "offloadOutcome": "WaitRecover"
   },
   "checkpoint": {
     "checkpointId": 19,
@@ -3665,7 +3669,13 @@ Mỗi mốc:  Pending ──(tới)──> Arrived ──(thông quan, chỉ c�
 
 Mỗi con ngựa (horses[].status):
   Planned ──(xe rời điểm đón của con ngựa)──> InTransit ──(ký e-POD ở điểm trả)──> Delivered
-                                               └──(rớt lại giữa đường)──> Offloaded (quay về hàng chờ xếp chuyến)
+                                               │
+                                               └──(sự cố, phương án OffloadHorse được duyệt)──> Offloaded / Deceased
+                                                     offloadOutcome = WaitRecover    → về hàng chờ xếp chuyến
+                                                                    = ReturnToOrigin → đưa về nơi đi, con ngựa kết thúc
+                                                                    = HandOverHere   → ký e-POD tại chỗ → Delivered
+                                                                    = Deceased       → status Deceased
+  Dỡ khẩn cấp (báo sự cố với emergencyOffload = true): InTransit → Offloaded ngay, offloadOutcome = null tới khi phương án được duyệt
 ```
 
 Trạng thái chuyến là trạng thái của **xe**. Mỗi con ngựa có trạng thái riêng: ngựa của đơn không có mốc `PickUp` lên xe lúc xuất phát; ngựa của đơn có mốc `PickUp` lên xe khi đoàn xe rời mốc đó.
@@ -3780,42 +3790,29 @@ Lỗi thường gặp:
 
 Khi xe tới mốc `PickUp` / `DropOff`, chỉ khách của đơn đó nhận thông báo; tới mốc `DropOff` thì khách của đơn được trả ở đó nhận thêm email "ngựa đã tới".
 
-### POST /api/trips/{id}/horses/{tripHorseId}/offload — Ngựa rớt lại giữa đường
+### POST /api/trips/{id}/horses/{tripHorseId}/offload — Đã bỏ (luôn trả 410)
 
-Ghi nhận một con ngựa không thể đi tiếp (thú y, chấn thương, sự cố...) và phải rời chuyến giữa đường. Chuyến vẫn chạy tiếp với các con còn lại. Con ngựa chuyển `Offloaded` và **quay về hàng chờ xếp chuyến** (`GET /api/trips/unplanned-horses`) để điều phối viên xếp chuyến khác; đơn của nó chưa hoàn tất cho tới khi con ngựa được giao. Khách (thông báo + email), quản lý và người lập chuyến được báo.
+Nút "Rời chuyến" riêng **đã bị bỏ** (R-12). Ngựa chỉ rời chuyến qua **sự cố**, để luôn có người duyệt và có hướng xử lý tiếp rõ ràng:
 
-- **Ai gọi được:** Đoàn xe của chuyến, FleetCoordinator, LogisticsManager, Admin
-- **Dữ liệu gửi lên:** JSON
+1. Tài xế báo sự cố cho con ngựa: `POST /api/trips/{tripId}/incidents` với `affectedTripHorseId`. Nếu thú y yêu cầu dỡ ngựa xuống **ngay**, gửi thêm `emergencyOffload: true`: con ngựa chuyển `Offloaded` liền, chưa có hướng xử lý.
+2. Điều phối viên đề xuất phương án `OffloadHorse` kèm `offloadOutcome` (`POST /api/incidents/{id}/propose`).
+3. Quản lý duyệt (`POST /api/incidents/{id}/approve`): con ngựa đổi trạng thái theo hướng xử lý.
 
-Tham số trên đường dẫn:
+Đường dẫn cũ vẫn còn để app bản cũ nhận thông báo rõ ràng thay vì 404. Frontend cần **xóa nút "Rời chuyến"** và dùng luồng sự cố.
 
-| Tham số | Mô tả |
-|---|---|
-| `id` | Mã chuyến |
-| `tripHorseId` | Mã "ngựa trên chuyến" (`horses[].tripHorseId` của chuyến) |
+- **Ai gọi được:** Đoàn xe của chuyến, FleetCoordinator, LogisticsManager, Admin (ai gọi cũng nhận 410)
+- **Dữ liệu gửi lên:** không dùng
 
-| Trường | Kiểu | Bắt buộc | Mô tả |
-|---|---|---|---|
-| `reason` | chuỗi | Có | Lý do, tối đa 300 ký tự |
-
-Ví dụ request:
+Response `410`:
 
 ```json
 {
-  "reason": "Lameness, vet stop"
+  "success": false,
+  "message": "This endpoint was removed. To take a horse off trip 5, report an incident for trip horse 12 (POST /api/trips/5/incidents, emergencyOffload = true if it must leave the vehicle now); a coordinator then proposes an OffloadHorse plan for a manager to approve.",
+  "data": null,
+  "errors": null
 }
 ```
-
-Response `200`: chi tiết chuyến; con ngựa có `status` là `Offloaded`, kèm `offloadedAt` và `offloadReason`.
-
-Lỗi thường gặp:
-
-| HTTP | `message` | Khi nào |
-|---|---|---|
-| 400 | `A horse can only be offloaded while the trip is under way (current status: Scheduled).` | Chuyến chưa xuất phát hoặc đã đóng |
-| 400 | `Sakura Wind cannot be offloaded (status: Delivered).` | Con ngựa đã giao hoặc đã rớt lại |
-| 403 | `Only the trip crew, a coordinator or a manager can offload a horse.` | Người gọi không có quyền |
-| 404 | `Trip horse with ID 99 is not on trip TRP-2026-0005.` | Con ngựa không thuộc chuyến |
 
 ### POST /api/trips/{id}/welfare-logs — Ghi nhật ký thể trạng ngựa
 
@@ -4116,7 +4113,7 @@ Response `200` — phần `data`:
 | `checkpoints[].estimatedArrivalTime` | Mốc đã tới: giờ tới thực tế. Mốc chưa tới: giờ kế hoạch cộng độ trễ hiện tại |
 | `checkpoints[].isMyPickup`, `isMyDropoff` | Mốc đón / trả của đơn này, để tô nổi |
 | `checkpoints[].isOtherBookingStop` | `true` là điểm đón / trả của **khách khác** đi chung chuyến: `checkpointName` và `address` để trống, frontend hiện "Điểm dừng của đơn khác" |
-| `horses[].status`, `deliveredAt`, `offloadedAt`, `offloadReason` | Trạng thái của từng con ngựa trên chuyến (mục 3) |
+| `horses[].status`, `deliveredAt`, `offloadedAt`, `offloadReason`, `offloadOutcome` | Trạng thái của từng con ngựa trên chuyến (mục 3) |
 
 Ví dụ các trường mới của một chuyến ghép (khách đơn BKG-2026-0202; mốc thứ 2 là điểm trả của đơn khác nên bị ẩn tên):
 
@@ -4166,7 +4163,8 @@ Ví dụ các trường mới của một chuyến ghép (khách đơn BKG-2026-
     "pickedUpAt": "2026-10-18T12:59:25.307849+00:00",
     "deliveredAt": null,
     "offloadedAt": "2026-10-18T13:00:48.509219+00:00",
-    "offloadReason": "Lameness, vet stop"
+    "offloadReason": "INC-2026-0007: Lameness, vet stop",
+    "offloadOutcome": "WaitRecover"
   }
 }
 ```
@@ -4212,6 +4210,17 @@ Thứ tự gọi thông thường:
 
 Ai thấy sự cố nào: khách thấy sự cố trên chuyến có ngựa của mình; tài xế / áp tải thấy sự cố của các chuyến mình đi; các vai trò còn lại thấy tất cả.
 
+**Ngựa rời chuyến (R-12).** Một con ngựa chỉ rời chuyến qua sự cố, với phương án `OffloadHorse`. Phương án bắt buộc chọn **hướng xử lý tiếp** (`offloadOutcome`):
+
+| `offloadOutcome` | Ý nghĩa | Sau khi quản lý duyệt |
+|---|---|---|
+| `WaitRecover` | Chờ hồi phục rồi đi chuyến khác | Ngựa `Offloaded`, **quay về hàng chờ xếp chuyến** (`GET /api/trips/unplanned-horses`); người lập chuyến được báo |
+| `ReturnToOrigin` | Đưa ngựa về nơi đi | Ngựa `Offloaded`, **không** về hàng chờ; việc chở về do điều phối sắp xếp. Con ngựa được tính là đã xong với đơn |
+| `HandOverHere` | Khách nhận ngựa tại nơi dỡ | Ngựa `Offloaded`; đoàn xe ký e-POD tại chỗ (`POST /api/trips/{tripId}/handover` với `tripHorseId`) → `Delivered` |
+| `Deceased` | Ngựa chết | Ngựa `Deceased` (cả trên chuyến và trong đơn). Chỉ chọn được ở sự cố mức `Critical` và **bắt buộc biên bản thú y** |
+
+Mỗi trường hợp, khách của con ngựa nhận thông báo + email. Chuyến chỉ đóng được khi không còn con nào đang chờ phương án hoặc chờ ký e-POD tại chỗ. Hoàn tiền phần cước chưa đi và hồ sơ bồi thường bảo hiểm sẽ có ở các bản sau (BE-14b, BE-12).
+
 Một sự cố (`incident`) có dạng:
 
 ```json
@@ -4238,7 +4247,10 @@ Một sự cố (`incident`) có dạng:
   "approvedByUserId": null,
   "approvedByName": null,
   "approvedAt": null,
-  "resolvedAt": null
+  "resolvedAt": null,
+  "emergencyOffload": false,
+  "offloadOutcome": null,
+  "vetReportUrl": null
 }
 ```
 
@@ -4255,6 +4267,9 @@ Một sự cố (`incident`) có dạng:
 | `rejectionReason` | Lý do quản lý từ chối phương án gần nhất. Được giữ lại khi điều phối đề xuất lại, và xóa (`null`) khi phương án được duyệt |
 | `approvedByName`, `approvedAt` | Quản lý duyệt phương án |
 | `resolvedAt` | Thời điểm đóng sự cố |
+| `emergencyOffload` | `true` khi tài xế đã dỡ con ngựa `affectedTripHorseId` xuống ngay lúc báo sự cố |
+| `offloadOutcome` | Hướng xử lý tiếp của phương án `OffloadHorse` (`WaitRecover`, `ReturnToOrigin`, `HandOverHere`, `Deceased`); `null` với phương án khác |
+| `vetReportUrl` | Link xem biên bản thú y (có hạn, mục 2.5); có khi phương án kèm biên bản |
 
 ### POST /api/trips/{tripId}/incidents — Báo sự cố
 
@@ -4277,7 +4292,8 @@ Các trường gửi lên:
 | `severity` | chuỗi | Có | `Minor`, `Moderate`, `Major` hoặc `Critical` |
 | `location` | chuỗi | Có | Vị trí xảy ra, tối đa 255 ký tự. App tài xế tự lấy từ GPS của thiết bị, dạng `"10.875115, 106.800901 (±90 m)"` (vĩ độ, kinh độ, sai số); backend lưu nguyên chuỗi |
 | `description` | chuỗi | Có | Mô tả, tối đa 2000 ký tự |
-| `affectedTripHorseId` | số | Không | Con ngựa bị ảnh hưởng, lấy từ `horses[].tripHorseId` của chuyến |
+| `affectedTripHorseId` | số | Không (bắt buộc khi `emergencyOffload` là `true`) | Con ngựa bị ảnh hưởng, lấy từ `horses[].tripHorseId` của chuyến |
+| `emergencyOffload` | true/false | Không (mặc định `false`) | `true` khi thú y yêu cầu dỡ con ngựa xuống **ngay**. Con ngựa chuyển `Offloaded` liền (chưa có hướng xử lý), khách của con ngựa nhận thông báo + email. Điều phối viên vẫn phải đề xuất phương án `OffloadHorse` và quản lý duyệt |
 
 Ví dụ request:
 
@@ -4291,13 +4307,28 @@ Ví dụ request:
 }
 ```
 
-Response `201`: `data` là sự cố vừa tạo, `status` là `Reported`.
+Ví dụ dỡ khẩn cấp (thú y bắt buộc dỡ ngay):
+
+```json
+{
+  "incidentType": "EquineHealthIssue",
+  "severity": "Critical",
+  "location": "10.875115, 106.800901 (±40 m)",
+  "description": "Đau bụng cấp, thú y yêu cầu dỡ ngựa ngay",
+  "affectedTripHorseId": 12,
+  "emergencyOffload": true
+}
+```
+
+Response `201`: `data` là sự cố vừa tạo, `status` là `Reported`. Khi `emergencyOffload` là `true`, con ngựa trên chuyến có `status` `Offloaded` và `offloadOutcome` `null`.
 
 Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
 | 400 | `Incidents can only be reported while the trip is on the road (current status: Scheduled).` | Chuyến chưa xuất phát hoặc đã tới đích |
+| 400 | `Choose the horse that is offloaded in an emergency (AffectedTripHorseId).` | Gửi `emergencyOffload: true` mà không chọn ngựa |
+| 400 | `Sakura Wind is not on the vehicle (status: Delivered), so it cannot be offloaded.` | Dỡ khẩn cấp con ngựa đã giao / đã rời chuyến |
 | 400 | `IncidentType '...' is invalid. Allowed values: ...` | Viết sai loại sự cố |
 | 400 | `Trip horse with ID 99 is not on trip TRP-2026-0003.` | Con ngựa không thuộc chuyến |
 | 403 | `Only the crew assigned to this trip can report an incident.` | Người gọi không thuộc đoàn xe |
@@ -4383,6 +4414,9 @@ Các trường gửi lên:
 | `routeChange` | object | Không (bắt buộc khi `responseAction` là `Reroute`) | Thay đổi tuyến, cùng dạng body của `apply-reroute` bên dưới: `deactivateCheckpointIds`, `newCheckpoints`, `insertAfterCheckpointId`. Phải có ít nhất một mốc bỏ hoặc thêm. Mỗi mốc mới bắt buộc có `address` |
 | `revisedRouteNotes` | chuỗi | Không | Ghi chú thêm về tuyến đường, tối đa 2000 ký tự |
 | `additionalCost` | số | Không | Chi phí phát sinh, không âm (mặc định 0) |
+| `affectedTripHorseId` | số | Không | Chỉ dùng với `OffloadHorse`: con ngựa rời chuyến. Bỏ trống = con ngựa đã chọn lúc báo sự cố. Sự cố dỡ khẩn cấp thì phải là đúng con đã dỡ |
+| `offloadOutcome` | chuỗi | Có khi `responseAction` là `OffloadHorse` | Hướng xử lý tiếp: `WaitRecover`, `ReturnToOrigin`, `HandOverHere`, `Deceased` (bảng ở đầu mục 11) |
+| `vetReportPath` | chuỗi | Có khi `offloadOutcome` là `Deceased` | Đường dẫn biên bản thú y: tải file lên trước bằng `POST /api/files` với `category = documents` (PDF hoặc ảnh), rồi gửi `path` nhận được |
 
 Ví dụ request:
 
@@ -4408,7 +4442,36 @@ Ví dụ request:
 }
 ```
 
-Response `200`: sự cố với `status` là `PlanProposed`, kèm `responseAction` và `routeChange` (dạng bên dưới, `appliedAt` là `null` vì chưa áp).
+Ví dụ phương án cho ngựa rời chuyến (ngựa chết, sự cố mức `Critical`):
+
+```js
+// 1. Tải biên bản thú y lên
+const file = new FormData();
+file.append("file", vetReportFile);       // PDF / JPG / PNG, tối đa 10 MB
+file.append("category", "documents");
+const uploaded = await api.post("/api/files", file);
+
+// 2. Đề xuất phương án
+await api.post(`/api/incidents/${incidentId}/propose`, {
+  responseAction: "OffloadHorse",
+  proposedAction: "Ngựa chết tại trạm thú y Bằng Tường, lập biên bản và báo khách",
+  offloadOutcome: "Deceased",
+  vetReportPath: uploaded.data.data.path,  // ví dụ "documents/2026/10/3f2a...e1.pdf"
+});
+```
+
+Các hướng xử lý khác không cần biên bản, ví dụ:
+
+```json
+{
+  "responseAction": "OffloadHorse",
+  "proposedAction": "Gửi ngựa tại phòng khám thú y Lạng Sơn, xếp chuyến sau khi hồi phục",
+  "affectedTripHorseId": 12,
+  "offloadOutcome": "WaitRecover"
+}
+```
+
+Response `200`: sự cố với `status` là `PlanProposed`, kèm `responseAction` và `routeChange` (dạng bên dưới, `appliedAt` là `null` vì chưa áp). Phương án `OffloadHorse` có thêm `offloadOutcome`, `affectedTripHorseId` và `vetReportUrl` (nếu có biên bản). Con ngựa **chưa** đổi trạng thái cho tới khi quản lý duyệt.
 
 **Trường `routeChange` trong mọi response sự cố** (`null` nếu phương án không đổi tuyến):
 
@@ -4428,6 +4491,14 @@ Lỗi thường gặp:
 | 400 | `ResponseAction 'X' is invalid. Allowed values: ...` | Sai loại hành động |
 | 400 | `A reroute plan must remove or add at least one checkpoint.` | Chọn `Reroute` mà không gửi thay đổi tuyến |
 | 400 | Các lỗi kiểm tra tuyến giống `apply-reroute` | Thay đổi tuyến không hợp lệ trên lộ trình hiện tại |
+| 400 | `OffloadOutcome is required for an OffloadHorse plan. Allowed values: WaitRecover, ReturnToOrigin, HandOverHere, Deceased.` | Chọn `OffloadHorse` mà không chọn hướng xử lý |
+| 400 | `Choose the horse that leaves the trip (AffectedTripHorseId).` | Sự cố không gắn con ngựa nào và request cũng không chọn |
+| 400 | `Sakura Wind cannot leave the trip (status: Delivered).` | Con ngựa đã giao, đã chết hoặc đã rời chuyến theo phương án khác |
+| 400 | `A horse can only be recorded as deceased on a Critical incident. Ask the crew to report a Critical incident for this horse.` | Chọn `Deceased` ở sự cố không phải mức `Critical` |
+| 400 | `A veterinary report is required when a horse is recorded as deceased. ...` | Chọn `Deceased` mà không gửi `vetReportPath` |
+| 400 | `VetReportPath is not a valid file path. ...` | `vetReportPath` không phải đường dẫn do `POST /api/files` (category `documents`) trả về |
+| 400 | `A horse was offloaded in an emergency on this incident, so the plan must be OffloadHorse with the next step for that horse.` | Sự cố dỡ khẩn cấp mà đề xuất loại hành động khác |
+| 400 | `This incident is about the horse offloaded in an emergency; the plan must be for that horse.` | Sự cố dỡ khẩn cấp mà chọn con ngựa khác |
 
 ### POST /api/incidents/{id}/approve — Duyệt phương án
 
@@ -4442,6 +4513,8 @@ Tham số trên đường dẫn:
 |---|---|
 | `id` | Mã sự cố |
 
+Phương án `OffloadHorse`: con ngựa `affectedTripHorseId` đổi trạng thái theo `offloadOutcome` (bảng ở đầu mục 11): `Deceased` → ngựa `Deceased` cả trên chuyến và trong đơn; các hướng khác → `Offloaded` kèm `offloadOutcome`. Khách của con ngựa nhận thông báo + email; với `WaitRecover`, người lập chuyến được báo để xếp chuyến khác.
+
 Response `200`: sự cố với `status` là `Approved`, có `approvedByName`, `approvedAt`; `rejectionReason` thành `null`.
 
 Lỗi thường gặp:
@@ -4449,6 +4522,7 @@ Lỗi thường gặp:
 | HTTP | `message` | Khi nào |
 |---|---|---|
 | 400 | `Only a proposed plan can be reviewed (current status: Reported).` | Chưa có phương án, hoặc phương án đã được xử lý |
+| 400 | `The offload plan can no longer be applied (Sakura Wind is Delivered). Reject the plan so the coordinator can propose a new one.` | Từ lúc đề xuất tới lúc duyệt con ngựa đã được giao / đổi trạng thái, hoặc phương án `OffloadHorse` cũ (đề xuất trước bản này) chưa có hướng xử lý. Từ chối để điều phối viên đề xuất lại |
 | 400 | `The proposed route change no longer fits the current route: ... Reject the plan so the coordinator can propose a new one.` | Từ lúc đề xuất tới lúc duyệt, đoàn xe đã đi qua mốc liên quan (hoặc chuyến không còn trên đường). Từ chối để điều phối viên đề xuất lại |
 
 ### POST /api/incidents/{id}/reject — Từ chối phương án
@@ -4578,6 +4652,8 @@ Khi chuyến Completed: xe được giải phóng; chi phí phát sinh của s�
 còn ngựa trên xe lúc xảy ra sự cố. Đơn đã Completed mà có phát sinh thì chuyển AwaitingFinalPayment.
 ```
 
+**Giao tại chỗ (R-12).** Con ngựa rời chuyến với hướng xử lý `HandOverHere` được ký **biên bản riêng** tại nơi dỡ ngựa (gửi thêm `tripHorseId`), không cần xe ở điểm trả. Vì vậy một đơn có thể có nhiều biên bản trên cùng một chuyến: biên bản tại chỗ cho con đó và biên bản ở điểm trả cho các con còn lại. Đơn được **hoàn tất** khi mọi con ngựa đã xong: đã giao (ở điểm trả hoặc tại chỗ), đã chết, hoặc đã được đưa về nơi đi (`ReturnToOrigin`). Con `WaitRecover` còn phải đi chuyến sau nên đơn chưa hoàn tất.
+
 Thứ tự gọi thông thường:
 
 1. Tài xế: `GET /api/trips/{id}` để xem `bookings[]` (các đơn phải giao, `dropoffCheckpointId` là mốc trả của từng đơn) và `horses[]` (mã vi mạch, trạng thái từng con).
@@ -4633,8 +4709,8 @@ Một biên bản bàn giao (`handover`) có dạng:
 | `overallCondition` | Tình trạng ngựa khi giao: `Excellent` tốt · `NormalFatigue` mệt bình thường sau chuyến đi · `Injured` bị thương |
 | `remarks` | Ghi chú |
 | `driverUserId`, `driverName` | Người lập biên bản |
-| `checkpointId` | Mốc nơi ký nhận (mốc `DropOff` của đơn hoặc `Destination`) |
-| `horses[]` | Các con ngựa của đơn được giao trong biên bản |
+| `checkpointId` | Mốc nơi ký nhận (mốc `DropOff` của đơn hoặc `Destination`). Biên bản giao tại chỗ: mốc gần nhất đoàn xe đã tới lúc dỡ ngựa |
+| `horses[]` | Các con ngựa được giao trong biên bản này (biên bản giao tại chỗ chỉ có một con) |
 
 ### POST /api/trips/{tripId}/handover — Lập biên bản bàn giao (e-POD)
 
@@ -4654,6 +4730,7 @@ Các trường gửi lên:
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
 | `bookingId` | số | Có | Đơn được bàn giao, lấy từ `bookings[].bookingId` của chuyến |
+| `tripHorseId` | số | Không | Chỉ gửi khi **giao tại chỗ** con ngựa rời chuyến với hướng xử lý `HandOverHere` (`horses[].tripHorseId`). Khi đó không cần xe ở điểm trả, và `microchipNumbers` chỉ gồm mã của con này. Bỏ trống = giao ở điểm trả như bình thường |
 | `recipientName` | chuỗi | Có | Họ tên người nhận, tối đa 100 ký tự |
 | `recipientPhone` | chuỗi | Có | Số điện thoại người nhận |
 | `recipientIdCard` | chuỗi | Có | Số CMND / CCCD / hộ chiếu của người nhận, tối đa 50 ký tự |
@@ -4685,6 +4762,15 @@ form.append("signature", blob, "chu-ky.png");
 const res = await api.post(`/api/trips/${tripId}/handover`, form);
 ```
 
+Giao tại chỗ con ngựa rời chuyến (`HandOverHere`): như trên, thêm `tripHorseId` và chỉ quét mã vi mạch của con đó:
+
+```js
+form.append("bookingId", "2");
+form.append("tripHorseId", "12");
+form.append("microchipNumbers", "982000412345676");
+// ... recipientName, recipientPhone, recipientIdCard, overallCondition, signature như trên
+```
+
 Response `201`: `data` là biên bản vừa lập (dạng như trên).
 
 Lỗi thường gặp:
@@ -4693,10 +4779,12 @@ Lỗi thường gặp:
 |---|---|---|
 | 400 | `Booking BKG-2026-0202 is handed over at 'Nanning'; record the arrival there first (status: Pending).` | Xe chưa tới điểm trả của đơn này |
 | 400 | `Horses can only be handed over while the trip is under way or has arrived (current status: Scheduled).` | Chuyến chưa xuất phát hoặc đã đóng |
-| 400 | `Booking BKG-2026-0202 has no horses on board to hand over.` | Mọi con ngựa của đơn đã rớt lại giữa đường |
+| 400 | `Booking BKG-2026-0202 has no horses on board to hand over.` | Không còn con nào của đơn trên xe (đã giao, hoặc đã rời chuyến hết) |
 | 400 | `Microchip check failed. Not scanned: Golden Pegasus (Kim Mã) (982000412345672).` | Thiếu mã vi mạch của một con ngựa; `message` nêu tên con còn thiếu |
 | 400 | `Microchip check failed. These microchips do not belong to booking BKG-2026-0002 on this trip: 999.` | Có mã vi mạch không thuộc đơn này |
-| 400 | `Booking BKG-2026-0002 has already been handed over on trip TRP-2026-0003.` | Đơn này đã có biên bản trên chuyến |
+| 400 | `Booking BKG-2026-0002 has already been handed over at 'Quảng Châu' on trip TRP-2026-0003.` | Đơn này đã có biên bản ở điểm trả trên chuyến |
+| 400 | `Sakura Wind can only be handed over on site after an OffloadHorse plan with HandOverHere is approved (status: InTransit).` | Gửi `tripHorseId` cho con ngựa chưa có phương án `HandOverHere` được duyệt |
+| 400 | `Trip horse with ID 99 does not belong to booking BKG-2026-0002 on trip TRP-2026-0003.` | `tripHorseId` không thuộc đơn trên chuyến |
 | 400 | `Booking with ID 9 has no horses on trip TRP-2026-0003.` | Đơn không có ngựa trên chuyến này |
 | 400 | `Signature is required.` | Không gửi ảnh chữ ký |
 | 403 | `Only the crew assigned to this trip can record a handover.` | Người gọi không thuộc đoàn xe |
@@ -4737,7 +4825,7 @@ Lỗi thường gặp:
 
 ### POST /api/trips/{tripId}/close — Đóng chuyến và chốt KPI
 
-Đóng một chuyến đã tới đích sau khi **mọi đơn trên chuyến đã có biên bản bàn giao**. Hệ thống tự tính và lưu kết quả; không sửa lại được.
+Đóng một chuyến đã tới đích sau khi **mọi con ngựa trên chuyến đã xong**: đã ký biên bản bàn giao, hoặc đã rời chuyến theo phương án `OffloadHorse` được duyệt (R-12). Con ngựa đang chờ phương án (dỡ khẩn cấp) hoặc chờ ký e-POD tại chỗ (`HandOverHere`) sẽ chặn việc đóng chuyến. Hệ thống tự tính và lưu kết quả; không sửa lại được.
 
 - **Ai gọi được:** LogisticsManager, Admin
 - **Dữ liệu gửi lên:** JSON
@@ -4789,7 +4877,7 @@ Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
-| 400 | `The trip cannot be closed: handover is not signed for BKG-2026-0002.` | Còn đơn chưa có biên bản; `message` nêu mã đơn |
+| 400 | `The trip cannot be closed: Sakura Wind (BKG-2026-0002): handover is not signed.` | Còn con ngựa chưa xong; `message` liệt kê từng con, mã đơn và lý do: `handover is not signed` (còn trên xe), `offloaded in an emergency, waiting for an approved OffloadHorse plan`, `on-site handover is not signed` |
 | 400 | `Only a trip that has arrived at the destination can be closed (current status: InTransit).` | Chuyến chưa tới đích, hoặc đã đóng rồi |
 
 ### GET /api/reports/summary — Báo cáo tổng hợp
@@ -6267,6 +6355,7 @@ Response `200`:
       "InTransit",
       "Delivered",
       "Offloaded",
+      "Deceased",
       "Cancelled"
     ],
     "feedStatuses": [
@@ -7206,7 +7295,7 @@ Tổng cộng 121 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/checkpoints/{id}/arrive` | Đã tới mốc | Đoàn xe của chuyến, Admin |
 | POST | `/api/checkpoints/{id}/clear` | Đã thông quan tại cửa khẩu | Đoàn xe của chuyến, Admin |
 | POST | `/api/checkpoints/{id}/depart` | Rời mốc | Đoàn xe của chuyến, Admin |
-| POST | `/api/trips/{id}/horses/{tripHorseId}/offload` | Ngựa rớt lại giữa đường | Đoàn xe của chuyến, FleetCoordinator, LogisticsManager, Admin |
+| POST | `/api/trips/{id}/horses/{tripHorseId}/offload` | **Đã bỏ**, luôn trả 410: ngựa rời chuyến qua sự cố (phương án `OffloadHorse`) | Đoàn xe của chuyến, FleetCoordinator, LogisticsManager, Admin |
 | POST | `/api/trips/{id}/welfare-logs` | Ghi nhật ký thể trạng ngựa | Áp tải phụ trách con ngựa, trưởng nhóm áp tải, Admin |
 | GET | `/api/trips/{id}/welfare-logs` | Xem nhật ký của chuyến | Mọi nhân sự; tài xế / áp tải chỉ xem được chuyến của mình |
 | GET | `/api/tracking/trips` | Bảng theo dõi các chuyến | FleetCoordinator, LogisticsManager, Admin |

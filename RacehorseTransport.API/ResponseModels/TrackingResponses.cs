@@ -113,6 +113,7 @@ namespace RacehorseTransport.API.ResponseModels
         public DateTimeOffset? DeliveredAt { get; set; }
         public DateTimeOffset? OffloadedAt { get; set; }
         public string? OffloadReason { get; set; }
+        public string? OffloadOutcome { get; set; }
         public WelfareLogResponse? LatestLog { get; set; }
         public List<WelfareLogResponse> Logs { get; set; } = new();
     }

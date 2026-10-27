@@ -210,12 +210,19 @@ Làm:
 - `StartTripAsync` kiểm tra và trả **một lỗi liệt kê tất cả vấn đề**: hồ sơ chưa `Cleared`; giấy hết hạn tính tại **giờ xuất phát thực tế**; thiếu `FIT_EXAM` trong 48 giờ; đơn chưa trả đủ phần còn lại; thiếu tài xế theo quy tắc BE-07.
 - `GET /api/trips/{id}/departure-check` (đoàn xe, Coordinator) trả cùng danh sách đó để app hiện trước khi bấm xuất phát.
 
-### [ ] BE-11 · Rời chuyến chỉ qua sự cố + `Deceased` (R-12)
+### [x] BE-11 · Rời chuyến chỉ qua sự cố + `Deceased` (R-12)
+Đã làm (quyết định chốt 26/10/2026):
+- `HandOverHere`: ký **biên bản e-POD riêng** cho con ngựa tại nơi dỡ (`POST /api/trips/{id}/handover` + `tripHorseId`); bỏ ràng buộc một biên bản / đơn / chuyến.
+- `ReturnToOrigin`: con ngựa **kết thúc** với đơn, không về hàng chờ; chở về do Coordinator sắp xếp ngoài hệ thống. Chỉ `WaitRecover` về hàng chờ.
+- Biên bản thú y nộp **lúc đề xuất** phương án (`vetReportPath`, tải lên qua `POST /api/files`); `Deceased` chỉ ở sự cố `Critical`.
+- Còn để `TODO(BE-12)` (mở hồ sơ bồi thường) và `TODO(BE-14b)` (hoàn cước chưa đi) trong `IncidentService.ApplyOffloadAsync`.
+
 Làm:
 - Bỏ endpoint `POST /api/trips/{id}/horses/{tripHorseId}/offload` (hoặc trả 410 kèm hướng dẫn), cập nhật API.md.
 - Phương án `OffloadHorse` (đã có) bắt buộc `affectedTripHorseId` + `offloadOutcome`: `WaitRecover` (về hàng chờ xếp chuyến), `ReturnToOrigin`, `HandOverHere` (khách nhận tại chỗ, cho phép ký e-POD tại mốc đó), `Deceased`. Duyệt phương án mới đổi trạng thái ngựa. Trường hợp khẩn cấp: tài xế đánh dấu `emergencyOffload` khi báo sự cố → ngựa đổi trạng thái ngay, phương án vẫn phải duyệt sau.
 - Trạng thái mới `Deceased` cho `trip_horses` và `booking_horses`; bắt buộc có tệp biên bản thú y; thông báo + email khách; mở hồ sơ bồi thường (gọi BE-12).
 - Hoàn phần cước chưa đi của con ngựa đó theo `fault_party` (dùng hàm tính của BE-14b).
+
 
 ### [ ] BE-12 · Bảo hiểm và hồ sơ bồi thường (R-13)
 Làm:

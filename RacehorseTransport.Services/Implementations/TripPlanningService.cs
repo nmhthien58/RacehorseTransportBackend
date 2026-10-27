@@ -71,11 +71,13 @@ namespace RacehorseTransport.Services.Implementations
         {
             var query = _bookingHorseRepo.GetQueryable().AsNoTracking()
                 .Where(bh => bh.Status != BookingHorseStatuses.Cancelled
+                    && bh.Status != BookingHorseStatuses.Deceased
                     && bh.Booking!.Status == BookingStatuses.Approved
-                    // Ngựa trên chuyến đã hủy, hoặc bị rớt lại giữa đường (Offloaded), được coi là chưa xếp;
-                    // đã giao (Delivered) thì đã đi rồi
+                    // Ngựa trên chuyến đã hủy, hoặc rời chuyến để chờ hồi phục (Offloaded + WaitRecover), được coi là chưa xếp;
+                    // đã giao, chết, rời chuyến với hướng xử lý khác hoặc chưa có hướng xử lý thì không xếp lại (R-12)
                     && !bh.TripHorses.Any(th => th.Trip!.OverallStatus != TripStatuses.Cancelled
-                        && TripHorseStatuses.Holding.Contains(th.Status)));
+                        && (TripHorseStatuses.Holding.Contains(th.Status)
+                            || (th.Status == TripHorseStatuses.Offloaded && th.OffloadOutcome != OffloadOutcomes.WaitRecover))));
 
             if (!string.IsNullOrWhiteSpace(transportMode))
             {
