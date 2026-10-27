@@ -76,6 +76,7 @@ namespace RacehorseTransport.API.ResponseModels
         public DateTimeOffset? DeliveredAt { get; set; }
         public DateTimeOffset? OffloadedAt { get; set; }
         public string? OffloadReason { get; set; }
+        public string? OffloadOutcome { get; set; } // WaitRecover | ReturnToOrigin | HandOverHere | Deceased (R-12)
     }
 
     public class TripCheckpointResponse

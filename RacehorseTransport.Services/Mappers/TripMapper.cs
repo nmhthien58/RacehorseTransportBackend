@@ -95,7 +95,10 @@ namespace RacehorseTransport.Services.Mappers
                             PickupAddress = booking.PickupAddress,
                             DropoffAddress = booking.DropoffAddress,
                             HorseCountOnTrip = g.Count(),
-                            HandoverCompleted = entity.Handovers.Any(h => h.BookingId == booking.BookingId)
+                            // Biên bản ở điểm trả của đơn; biên bản giao tại chỗ (R-12) ký ở mốc khác nên không tính.
+                            // Biên bản cũ chưa ghi mốc (checkpoint_id null) vẫn được tính.
+                            HandoverCompleted = entity.Handovers.Any(h => h.BookingId == booking.BookingId
+                                && (h.CheckpointId == null || h.CheckpointId == dropoff?.CheckpointId))
                         };
                     })
                     .OrderBy(b => b.BookingId)
@@ -133,7 +136,8 @@ namespace RacehorseTransport.Services.Mappers
                 PickedUpAt = entity.PickedUpAt,
                 DeliveredAt = entity.DeliveredAt,
                 OffloadedAt = entity.OffloadedAt,
-                OffloadReason = entity.OffloadReason
+                OffloadReason = entity.OffloadReason,
+                OffloadOutcome = entity.OffloadOutcome
             };
         }
 
