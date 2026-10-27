@@ -12,6 +12,9 @@ namespace RacehorseTransport.Services.Interfaces
         Task<BookingDetailModel> ApproveBookingAsync(int id, int specialistUserId, CurrentUser currentUser);
         Task<BookingDetailModel> RejectBookingAsync(int id, string reason, CurrentUser currentUser);
         Task<BookingDetailModel> UpdateTransitCountriesAsync(int id, List<string> transitCountryCodes, CurrentUser currentUser);
+
+        // BE-09: Manager chốt giá trị thỏa thuận từng con (mặc định = giá trị khai báo) trước khi gửi báo giá
+        Task<BookingDetailModel> UpdateHorseValuesAsync(int id, UpdateHorseValuesModel model, CurrentUser currentUser);
         Task<BookingDetailModel> ReassignSpecialistAsync(int id, int specialistUserId, CurrentUser currentUser);
         Task<BookingDetailModel> CancelBookingAsync(int id, CurrentUser currentUser);
 

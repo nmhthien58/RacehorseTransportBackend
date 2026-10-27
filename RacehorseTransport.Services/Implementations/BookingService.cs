@@ -22,6 +22,9 @@ namespace RacehorseTransport.Services.Implementations
         };
 
         // Khách tự hủy được khi đơn còn ở các trạng thái này (và ngựa chưa nằm trên chuyến nào)
+        // BE-09: Manager chốt giá trị thỏa thuận trước khi gửi báo giá (TODO(BE-04): thêm PreApproved, RoutePlanned)
+        private static readonly string[] HorseValueEditableStatuses = { BookingStatuses.Submitted };
+
         private static readonly string[] CancellableStatuses =
         {
             BookingStatuses.Submitted, BookingStatuses.AwaitingDeposit, BookingStatuses.Approved, BookingStatuses.Assigned
@@ -37,6 +40,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IClearanceScheduleService _clearanceSchedule;
         private readonly IPaymentService _paymentService;
         private readonly ISystemSettingService _settingService;
+        private readonly IFileStorageService _fileStorage;
         private readonly IBookingActivator _bookingActivator;
         private readonly INotificationService _notificationService;
         private readonly ICodeGenerator _codeGenerator;
@@ -54,6 +58,7 @@ namespace RacehorseTransport.Services.Implementations
             IClearanceScheduleService clearanceSchedule,
             IPaymentService paymentService,
             ISystemSettingService settingService,
+            IFileStorageService fileStorage,
             IBookingActivator bookingActivator,
             INotificationService notificationService,
             ICodeGenerator codeGenerator,
@@ -70,6 +75,7 @@ namespace RacehorseTransport.Services.Implementations
             _clearanceSchedule = clearanceSchedule;
             _paymentService = paymentService;
             _settingService = settingService;
+            _fileStorage = fileStorage;
             _bookingActivator = bookingActivator;
             _notificationService = notificationService;
             _codeGenerator = codeGenerator;
@@ -207,6 +213,7 @@ namespace RacehorseTransport.Services.Implementations
             var model = booking.ToDetailModel(_pricingService.ParseLines(booking.QuoteBreakdown));
             model.Payment = _paymentService.BuildSummary(booking, await _settingService.GetPaymentSettingsAsync());
             model.CustomerStage = CustomerStageRules.Resolve(booking, model.Payment);
+            await _fileStorage.ResolveViewUrlsAsync(model.Horses, h => h.ValueProofUrl, (h, url) => h.ValueProofUrl = url);
             return model;
         }
 
@@ -241,14 +248,31 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             // R-12: tuổi tối thiểu, mang thai gần ngày đẻ, vừa đẻ (ngày theo lịch của khách)
+            var policy = await _settingService.GetPolicySettingsAsync();
             string? ineligible = HorseEligibilityRules.Describe(
                 ownedHorses,
                 DateOnly.FromDateTime(model.PickupWindowStart.DateTime),
                 DateOnly.FromDateTime(model.PickupWindowEnd.DateTime),
-                await _settingService.GetPolicySettingsAsync());
+                policy);
             if (ineligible != null)
             {
                 throw new BusinessException(ineligible);
+            }
+
+            // R-12 / R-13: giá trị từng con. Khai theo từng con thì giá trị của đơn = tổng các con
+            // (client cũ chỉ gửi một giá trị cho cả đơn vẫn chạy như trước)
+            var horseNames = ownedHorses.ToDictionary(h => h.HorseId, h => h.Name);
+            var valueErrors = HorseValueRules.Validate(
+                model.Horses.Select(h => new HorseValueRules.HorseValue(horseNames[h.HorseId], h.DeclaredValue, h.ValueProofPath, h.InsurancePlan)).ToList(),
+                policy.InsuranceProofThresholdUsd,
+                path => _fileStorage.IsValidPath(path, FileCategories.Documents));
+            if (valueErrors.Count > 0)
+            {
+                throw new BusinessException(string.Join(" ", valueErrors));
+            }
+            if (model.Horses.All(h => h.DeclaredValue.HasValue))
+            {
+                model.DeclaredValue = model.Horses.Sum(h => h.DeclaredValue!.Value);
             }
 
             // Báo giá trước: đồng thời kiểm tra phương thức, hạng chuồng, tuyến có giá, DistanceKm,
@@ -323,7 +347,11 @@ namespace RacehorseTransport.Services.Implementations
                         HorseId = h.HorseId,
                         StallClass = h.StallClass,
                         Notes = h.Notes,
-                        Status = BookingHorseStatuses.Pending
+                        Status = BookingHorseStatuses.Pending,
+                        DeclaredValue = h.DeclaredValue,
+                        AgreedValue = h.DeclaredValue, // mặc định = giá trị khai báo, Manager chốt lại trước khi báo giá
+                        ValueProofPath = string.IsNullOrWhiteSpace(h.ValueProofPath) ? null : h.ValueProofPath.Trim(),
+                        InsurancePlan = string.IsNullOrWhiteSpace(h.InsurancePlan) ? InsurancePlans.None : h.InsurancePlan
                     }).ToList()
                 };
 
@@ -404,6 +432,69 @@ namespace RacehorseTransport.Services.Implementations
         // R-03: Manager xác nhận / sửa các nước quá cảnh khi xét duyệt (khách có thể đã gợi ý lúc đặt).
         // Đổi nước quá cảnh làm đổi giá (phí quá cảnh, thời gian qua cửa khẩu) nên tính lại báo giá,
         // lấy mốc "hôm nay" là ngày tạo đơn để không bắt khách đổi lịch chỉ vì đơn đã chờ duyệt vài ngày.
+        // BE-09: Manager chốt giá trị thỏa thuận từng con trước khi gửi báo giá.
+        // TODO(BE-04): khi có duyệt sơ bộ / duyệt tuyến thì cho sửa thêm ở PreApproved, RoutePlanned (trước Quoted).
+        public async Task<BookingDetailModel> UpdateHorseValuesAsync(int id, UpdateHorseValuesModel model, CurrentUser currentUser)
+        {
+            var booking = await GetTrackedBookingAsync(id);
+            if (!HorseValueEditableStatuses.Contains(booking.Status))
+            {
+                throw new BusinessException($"Agreed values can only be set before the quote is sent (current status: {booking.Status}).");
+            }
+            if (model.Horses.Count == 0)
+            {
+                throw new BusinessException("Send at least one horse.");
+            }
+
+            var activeHorses = booking.BookingHorses.Where(bh => bh.Status != BookingHorseStatuses.Cancelled).ToList();
+            var unknown = model.Horses.Select(h => h.BookingHorseId).Except(activeHorses.Select(bh => bh.BookingHorseId)).ToList();
+            if (unknown.Count > 0)
+            {
+                throw new BusinessException($"Booking horse(s) with ID {string.Join(", ", unknown)} are not in booking {booking.BookingCode}.");
+            }
+            if (model.Horses.Select(h => h.BookingHorseId).Distinct().Count() != model.Horses.Count)
+            {
+                throw new BusinessException("The same horse appears more than once.");
+            }
+            if (model.Horses.Any(h => h.AgreedValue < 0))
+            {
+                throw new BusinessException("AgreedValue cannot be negative.");
+            }
+
+            var horseIds = activeHorses.Select(bh => bh.HorseId).ToList();
+            var horseNames = await _horseRepo.GetQueryable().AsNoTracking()
+                .Where(h => horseIds.Contains(h.HorseId))
+                .ToDictionaryAsync(h => h.HorseId, h => h.Name);
+
+            var changes = new List<string>();
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                foreach (var input in model.Horses)
+                {
+                    var bookingHorse = activeHorses.First(bh => bh.BookingHorseId == input.BookingHorseId);
+                    if (bookingHorse.AgreedValue != input.AgreedValue)
+                    {
+                        changes.Add($"{horseNames[bookingHorse.HorseId]}: {input.AgreedValue:N2} USD");
+                        bookingHorse.AgreedValue = input.AgreedValue;
+                    }
+                }
+                await _bookingRepo.SaveChangesAsync();
+
+                if (changes.Count > 0)
+                {
+                    string note = string.IsNullOrWhiteSpace(model.Note) ? string.Empty : $" Note: {model.Note.Trim()}";
+                    await _notificationService.SendAsync(
+                        booking.CustomerUserId,
+                        $"Agreed horse values for booking {booking.BookingCode}",
+                        $"Insurance and compensation will use these values: {string.Join("; ", changes)}.{note}",
+                        NotificationReferenceTypes.Booking,
+                        booking.BookingId);
+                }
+            });
+
+            return await GetBookingByIdAsync(id, currentUser);
+        }
+
         public async Task<BookingDetailModel> UpdateTransitCountriesAsync(int id, List<string> transitCountryCodes, CurrentUser currentUser)
         {
             var booking = await GetTrackedBookingAsync(id);

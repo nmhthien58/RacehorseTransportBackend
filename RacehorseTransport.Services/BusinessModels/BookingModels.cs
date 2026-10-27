@@ -39,6 +39,24 @@ namespace RacehorseTransport.Services.BusinessModels
         public int HorseId { get; set; }
         public string StallClass { get; set; } = string.Empty;
         public string? Notes { get; set; }
+
+        // R-12 / R-13: giá trị khai báo (USD), chứng từ (bắt buộc từ ngưỡng Insurance.ProofThresholdUsd), gói bảo hiểm
+        public decimal? DeclaredValue { get; set; }
+        public string? ValueProofPath { get; set; }
+        public string? InsurancePlan { get; set; }
+    }
+
+    // Manager chốt giá trị thỏa thuận từng con trước khi gửi báo giá
+    public class UpdateHorseValuesModel
+    {
+        public List<HorseAgreedValueModel> Horses { get; set; } = new();
+        public string? Note { get; set; }
+    }
+
+    public class HorseAgreedValueModel
+    {
+        public int BookingHorseId { get; set; }
+        public decimal AgreedValue { get; set; }
     }
 
     // Dòng trong danh sách đơn
@@ -98,6 +116,12 @@ namespace RacehorseTransport.Services.BusinessModels
         public string StallClass { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string? Notes { get; set; }
+
+        // R-12 / R-13: giá trị khai báo, giá trị thỏa thuận (bảo hiểm / bồi thường tính trên giá trị này), chứng từ, gói bảo hiểm
+        public decimal? DeclaredValue { get; set; }
+        public decimal? AgreedValue { get; set; }
+        public string? ValueProofUrl { get; set; }       // link xem chứng từ giá trị (có hạn)
+        public string InsurancePlan { get; set; } = string.Empty;
 
         // Hồ sơ kiểm dịch của con ngựa này (null khi đơn chưa được duyệt)
         public int? DossierId { get; set; }

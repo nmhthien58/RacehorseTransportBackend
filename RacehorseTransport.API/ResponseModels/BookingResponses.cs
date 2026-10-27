@@ -110,6 +110,10 @@ namespace RacehorseTransport.API.ResponseModels
         public string StallClass { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string? Notes { get; set; }
+        public decimal? DeclaredValue { get; set; }   // giá trị khách khai báo (USD)
+        public decimal? AgreedValue { get; set; }     // giá trị thỏa thuận Manager chốt; bảo hiểm / bồi thường tính trên giá trị này
+        public string? ValueProofUrl { get; set; }    // link xem chứng từ giá trị (có hạn)
+        public string InsurancePlan { get; set; } = string.Empty; // None | Full
         public int? DossierId { get; set; }
         public string? DossierCode { get; set; }
         public string? DossierStatus { get; set; }

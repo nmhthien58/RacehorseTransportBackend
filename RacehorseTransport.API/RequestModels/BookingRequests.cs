@@ -91,6 +91,37 @@ namespace RacehorseTransport.API.RequestModels
 
         [MaxLength(300, ErrorMessage = "Notes cannot exceed 300 characters.")]
         public string? Notes { get; set; }
+
+        // R-12 / R-13: giá trị khai báo của con ngựa (USD). Khai cho một con thì phải khai cho mọi con.
+        [Range(0, 1000000000, ErrorMessage = "DeclaredValue must be between 0 and 1,000,000,000.")]
+        public decimal? DeclaredValue { get; set; }
+
+        // Chứng từ giá trị (bắt buộc từ ngưỡng Insurance.ProofThresholdUsd): đường dẫn do POST /api/files (category documents) trả về
+        [MaxLength(500, ErrorMessage = "ValueProofPath cannot exceed 500 characters.")]
+        public string? ValueProofPath { get; set; }
+
+        // None (mặc định) | Full
+        public string? InsurancePlan { get; set; }
+    }
+
+    // BE-09: Manager chốt giá trị thỏa thuận từng con trước khi gửi báo giá
+    public class UpdateHorseValuesRequest
+    {
+        [Required(ErrorMessage = "Horses is required.")]
+        [MinLength(1, ErrorMessage = "Horses must have at least one horse.")]
+        public List<HorseAgreedValueRequest> Horses { get; set; } = new();
+
+        [MaxLength(500, ErrorMessage = "Note cannot exceed 500 characters.")]
+        public string? Note { get; set; }
+    }
+
+    public class HorseAgreedValueRequest
+    {
+        [Range(1, int.MaxValue, ErrorMessage = "BookingHorseId is required.")]
+        public int BookingHorseId { get; set; }
+
+        [Range(0, 1000000000, ErrorMessage = "AgreedValue must be between 0 and 1,000,000,000.")]
+        public decimal AgreedValue { get; set; }
     }
 
     // Duyệt đơn và đổi người phụ trách đều cần chọn một Transport Specialist
