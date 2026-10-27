@@ -410,6 +410,54 @@ DELETE {{baseUrl}}/api/country-doc-requirements/999999
 Authorization: Bearer {{accessToken}}
 
 ### =====================================================================
+### BE-13 · Nguyên nhân sự cố + bồi thường giao trễ
+### =====================================================================
+
+### [SAI - 400] Đóng sự cố mà không chọn nguyên nhân (đổi 1 thành sự cố đang Approved)
+POST {{baseUrl}}/api/incidents/1/resolve
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{}
+
+### [ĐÚNG] Đóng sự cố, lỗi công ty
+POST {{baseUrl}}/api/incidents/1/resolve
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "faultParty": "Company",
+  "faultNote": "Phanh không được bảo dưỡng đúng hạn"
+}
+
+### [ĐÚNG] Manager xem các khoản bồi thường chờ duyệt
+GET {{baseUrl}}/api/delay-compensations?status=AwaitingApproval
+Authorization: Bearer {{managerToken}}
+
+### [SAI - 403] Khách không xem danh sách chung
+GET {{baseUrl}}/api/delay-compensations
+Authorization: Bearer {{customerToken}}
+
+### [ĐÚNG] Duyệt với số tiền khác số tính (bắt buộc lý do)
+POST {{baseUrl}}/api/delay-compensations/1/approve
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "amount": 150,
+  "reason": "Một phần thời gian trễ do kẹt biên"
+}
+
+### [ĐÚNG] Từ chối
+POST {{baseUrl}}/api/delay-compensations/1/reject
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "reason": "Khách đổi người nhận sát giờ giao"
+}
+
+### =====================================================================
 ### B-03 · Bảng giá
 ### Chạy yêu cầu tạo trước các yêu cầu dùng {{createdPriceItemId}}.
 ### =====================================================================
@@ -763,3 +811,154 @@ Authorization: Bearer {{customerToken}}
 
 ### [SAI - 401] Không có mã truy cập
 GET {{baseUrl}}/api/lookups/enums
+
+### =====================================================================
+### BE-11 · Ngựa rời chuyến chỉ qua sự cố (R-12)
+### Cần một chuyến đang chạy (InTransit). Đổi 3 biến dưới đây theo chuyến của bạn:
+### @be11TripId: mã chuyến; @be11TripHorseId: horses[].tripHorseId; @be11BookingId: đơn của con ngựa đó.
+### Biên bản thú y: tải lên bằng POST /api/files (category documents) rồi dán path vào @be11VetReportPath.
+### =====================================================================
+@be11TripId = 5
+@be11TripHorseId = 12
+@be11BookingId = 2
+@be11VetReportPath = documents/2026/10/00000000000000000000000000000000.pdf
+
+###
+# @name loginDriver
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "driver@racehorsetransport.com",
+  "password": "{{password}}"
+}
+
+###
+@driverToken = {{loginDriver.response.body.$.data.accessToken}}
+
+### [SAI - 410] Nút "Rời chuyến" cũ đã bỏ
+POST {{baseUrl}}/api/trips/{{be11TripId}}/horses/{{be11TripHorseId}}/offload
+Authorization: Bearer {{driverToken}}
+
+### [SAI - 400] Dỡ khẩn cấp mà không chọn ngựa
+POST {{baseUrl}}/api/trips/{{be11TripId}}/incidents
+Authorization: Bearer {{driverToken}}
+Content-Type: application/json
+
+{
+  "incidentType": "EquineHealthIssue",
+  "severity": "Critical",
+  "location": "Km 42",
+  "description": "Thú y yêu cầu dỡ ngựa ngay",
+  "emergencyOffload": true
+}
+
+### [ĐÚNG] Tài xế báo sự cố và dỡ khẩn cấp con ngựa: ngựa Offloaded ngay, offloadOutcome = null
+# @name be11Report
+POST {{baseUrl}}/api/trips/{{be11TripId}}/incidents
+Authorization: Bearer {{driverToken}}
+Content-Type: application/json
+
+{
+  "incidentType": "EquineHealthIssue",
+  "severity": "Critical",
+  "location": "Km 42",
+  "description": "Đau bụng cấp, thú y yêu cầu dỡ ngựa ngay",
+  "affectedTripHorseId": {{be11TripHorseId}},
+  "emergencyOffload": true
+}
+
+###
+@be11IncidentId = {{be11Report.response.body.$.data.incidentId}}
+
+### [SAI - 400] Sự cố dỡ khẩn cấp phải có phương án OffloadHorse
+POST {{baseUrl}}/api/incidents/{{be11IncidentId}}/propose
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "responseAction": "WaitAndContinue",
+  "proposedAction": "Chờ rồi đi tiếp"
+}
+
+### [SAI - 400] Deceased thiếu biên bản thú y
+POST {{baseUrl}}/api/incidents/{{be11IncidentId}}/propose
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "responseAction": "OffloadHorse",
+  "proposedAction": "Ngựa chết, lập biên bản",
+  "offloadOutcome": "Deceased"
+}
+
+### [ĐÚNG] Đề xuất ngựa chờ hồi phục rồi xếp chuyến khác (đổi thành Deceased + vetReportPath, ReturnToOrigin hoặc HandOverHere để thử hướng khác)
+POST {{baseUrl}}/api/incidents/{{be11IncidentId}}/propose
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "responseAction": "OffloadHorse",
+  "proposedAction": "Gửi ngựa ở phòng khám thú y, xếp chuyến sau khi hồi phục",
+  "offloadOutcome": "WaitRecover"
+}
+
+### [ĐÚNG] Đề xuất ngựa chết (sự cố phải mức Critical, cần biên bản thú y đã tải lên)
+POST {{baseUrl}}/api/incidents/{{be11IncidentId}}/propose
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "responseAction": "OffloadHorse",
+  "proposedAction": "Ngựa chết tại trạm thú y, lập biên bản và báo khách",
+  "offloadOutcome": "Deceased",
+  "vetReportPath": "{{be11VetReportPath}}"
+}
+
+### [ĐÚNG] Quản lý duyệt: ngựa đổi trạng thái theo offloadOutcome
+POST {{baseUrl}}/api/incidents/{{be11IncidentId}}/approve
+Authorization: Bearer {{managerToken}}
+
+### [ĐÚNG] Ngựa WaitRecover quay lại hàng chờ xếp chuyến
+GET {{baseUrl}}/api/trips/unplanned-horses
+Authorization: Bearer {{coordinatorToken}}
+
+### [ĐÚNG] Giao tại chỗ con ngựa HandOverHere (multipart; chọn file ảnh chữ ký có thật trên máy)
+POST {{baseUrl}}/api/trips/{{be11TripId}}/handover
+Authorization: Bearer {{driverToken}}
+Content-Type: multipart/form-data; boundary=be11
+
+--be11
+Content-Disposition: form-data; name="bookingId"
+
+{{be11BookingId}}
+--be11
+Content-Disposition: form-data; name="tripHorseId"
+
+{{be11TripHorseId}}
+--be11
+Content-Disposition: form-data; name="recipientName"
+
+Le Van A
+--be11
+Content-Disposition: form-data; name="recipientPhone"
+
+0901234567
+--be11
+Content-Disposition: form-data; name="recipientIdCard"
+
+079123456789
+--be11
+Content-Disposition: form-data; name="overallCondition"
+
+NormalFatigue
+--be11
+Content-Disposition: form-data; name="microchipNumbers"
+
+982000412345676
+--be11
+Content-Disposition: form-data; name="signature"; filename="chu-ky.png"
+Content-Type: image/png
+
+< ./chu-ky.png
+--be11--

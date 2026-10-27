@@ -113,8 +113,9 @@ namespace RacehorseTransport.Repositories.Constants
         public const string Pending = "Pending";
         public const string Approved = "Approved";
         public const string Cancelled = "Cancelled";
+        public const string Deceased = "Deceased"; // ngựa chết trên đường (R-12), chỉ ghi qua phương án sự cố đã duyệt
 
-        public static readonly string[] All = { Pending, Approved, Cancelled };
+        public static readonly string[] All = { Pending, Approved, Cancelled, Deceased };
     }
 
     // Gói bảo hiểm của từng con ngựa trong đơn (R-13)
@@ -280,16 +281,29 @@ namespace RacehorseTransport.Repositories.Constants
         public const string Planned = "Planned";       // đã xếp chuyến, chưa lên xe
         public const string InTransit = "InTransit";   // xe đã rời điểm đón của con ngựa
         public const string Delivered = "Delivered";   // đã ký biên bản bàn giao
-        public const string Offloaded = "Offloaded";   // rớt lại giữa đường (sự cố / thú y), quay về hàng chờ xếp chuyến
+        public const string Offloaded = "Offloaded";   // rời chuyến giữa đường qua sự cố; đi tiếp thế nào xem OffloadOutcome (R-12)
+        public const string Deceased = "Deceased";     // chết trên đường (R-12)
         public const string Cancelled = "Cancelled";   // chuyến bị hủy
 
-        public static readonly string[] All = { Planned, InTransit, Delivered, Offloaded, Cancelled };
+        public static readonly string[] All = { Planned, InTransit, Delivered, Offloaded, Deceased, Cancelled };
 
-        // Con ngựa đang được một chuyến "giữ" (chưa thể xếp lên chuyến khác)
-        public static readonly string[] Holding = { Planned, InTransit, Delivered };
+        // Con ngựa đang được một chuyến "giữ" (chưa thể xếp lên chuyến khác).
+        // Con Offloaded chỉ được thả về hàng chờ khi hướng xử lý là WaitRecover: các truy vấn kiểm tra thêm OffloadOutcome.
+        public static readonly string[] Holding = { Planned, InTransit, Delivered, Deceased };
 
         // Con ngựa còn phải chở / giao trên chuyến
         public static readonly string[] OnBoard = { Planned, InTransit };
+    }
+
+    // Hướng xử lý tiếp khi ngựa rời chuyến qua sự cố (R-12); null = tài xế dỡ khẩn cấp, chờ phương án được duyệt
+    public static class OffloadOutcomes
+    {
+        public const string WaitRecover = "WaitRecover";       // chờ hồi phục rồi về hàng chờ xếp chuyến khác
+        public const string ReturnToOrigin = "ReturnToOrigin"; // đưa về nơi đi (sắp xếp ngoài hệ thống); con ngựa kết thúc
+        public const string HandOverHere = "HandOverHere";     // khách nhận tại nơi dỡ, ký e-POD tại chỗ
+        public const string Deceased = "Deceased";             // ngựa chết; bắt buộc biên bản thú y
+
+        public static readonly string[] All = { WaitRecover, ReturnToOrigin, HandOverHere, Deceased };
     }
 
     public static class CheckpointStatuses
@@ -345,6 +359,26 @@ namespace RacehorseTransport.Repositories.Constants
         public const string Other = "Other";
 
         public static readonly string[] All = { WaitAndContinue, RepairAndContinue, Reroute, VeterinaryCare, OffloadHorse, Other };
+    }
+
+    // Nguyên nhân sự cố, chọn khi đóng sự cố (R-09): quyết định ai chịu chi phí và có bồi thường giao trễ không
+    public static class FaultParties
+    {
+        public const string Company = "Company";           // lỗi công ty: hoàn cước phần chưa đi, công ty chịu phát sinh, có bồi thường trễ
+        public const string Customer = "Customer";         // lỗi khách: không hoàn, khách chịu phát sinh
+        public const string ForceMajeure = "ForceMajeure"; // bất khả kháng: hoàn theo quãng đường chưa đi, không bồi thường trễ
+
+        public static readonly string[] All = { Company, Customer, ForceMajeure };
+    }
+
+    // Bồi thường giao trễ (R-09): hệ thống tính khi đóng chuyến, Manager duyệt (có thể sửa số tiền) hoặc từ chối
+    public static class DelayCompensationStatuses
+    {
+        public const string AwaitingApproval = "AwaitingApproval";
+        public const string Approved = "Approved";   // đã duyệt, tiền hoàn qua các dòng Refund
+        public const string Rejected = "Rejected";
+
+        public static readonly string[] All = { AwaitingApproval, Approved, Rejected };
     }
 
     public static class IncidentSeverities

@@ -135,6 +135,7 @@ namespace RacehorseTransport.API.Mappers
                         DeliveredAt = h.DeliveredAt,
                         OffloadedAt = h.OffloadedAt,
                         OffloadReason = h.OffloadReason,
+                        OffloadOutcome = h.OffloadOutcome,
                         LatestLog = h.LatestLog?.ToResponse(),
                         Logs = h.Logs.Select(l => l.ToResponse()).ToList()
                     }).ToList()

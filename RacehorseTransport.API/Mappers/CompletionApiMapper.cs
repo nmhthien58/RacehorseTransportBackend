@@ -12,6 +12,7 @@ namespace RacehorseTransport.API.Mappers
             return new CreateHandoverModel
             {
                 BookingId = request.BookingId,
+                TripHorseId = request.TripHorseId,
                 RecipientName = request.RecipientName.Trim(),
                 RecipientPhone = request.RecipientPhone.Trim(),
                 RecipientIdCard = request.RecipientIdCard.Trim(),

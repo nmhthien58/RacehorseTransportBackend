@@ -72,7 +72,8 @@ namespace RacehorseTransport.API.Mappers
                     PickedUpAt = h.PickedUpAt,
                     DeliveredAt = h.DeliveredAt,
                     OffloadedAt = h.OffloadedAt,
-                    OffloadReason = h.OffloadReason
+                    OffloadReason = h.OffloadReason,
+                    OffloadOutcome = h.OffloadOutcome
                 }).ToList(),
                 Checkpoints = model.Checkpoints.Select(c => new TripCheckpointResponse
                 {

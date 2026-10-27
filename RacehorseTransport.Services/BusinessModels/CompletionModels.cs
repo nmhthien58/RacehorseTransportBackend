@@ -4,6 +4,10 @@ namespace RacehorseTransport.Services.BusinessModels
     public class CreateHandoverModel
     {
         public int BookingId { get; set; }
+
+        // Giao tại chỗ (R-12): con ngựa rời chuyến với hướng xử lý HandOverHere. Bỏ trống = giao ở điểm trả của đơn.
+        public int? TripHorseId { get; set; }
+
         public string RecipientName { get; set; } = string.Empty;
         public string RecipientPhone { get; set; } = string.Empty;
         public string RecipientIdCard { get; set; } = string.Empty;

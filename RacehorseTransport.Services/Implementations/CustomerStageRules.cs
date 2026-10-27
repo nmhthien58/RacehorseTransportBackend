@@ -65,8 +65,9 @@ namespace RacehorseTransport.Services.Implementations
                 return balanceOpen ? CustomerStages.AwaitingPayment : CustomerStages.Scheduled;
             }
 
-            // Con đã giao xong không cần xét hồ sơ nữa
-            var waiting = horses.Where(bh => !bh.TripHorses.Any(th => th.Status == TripHorseStatuses.Delivered)).ToList();
+            // Con đã xong (giao, chết, đưa về nơi đi) không cần xét hồ sơ nữa
+            var waiting = horses.Where(bh => bh.Status != BookingHorseStatuses.Deceased
+                && !bh.TripHorses.Any(th => th.Trip?.OverallStatus != TripStatuses.Cancelled && OffloadRules.IsFinished(th))).ToList();
             if (waiting.Any(bh => bh.Dossier?.Status != DossierStatuses.Cleared))
             {
                 return CustomerStages.PreparingDossier;
