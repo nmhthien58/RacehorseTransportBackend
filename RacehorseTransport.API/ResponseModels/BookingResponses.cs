@@ -31,6 +31,11 @@ namespace RacehorseTransport.API.ResponseModels
         public DateOnly ExpressUntilDate { get; set; }
         public DateTimeOffset EarliestDeliveryDeadline { get; set; }
         public TransitEstimateResponse Transit { get; set; } = new();
+
+        // R-10: khoảng giá ước tính (giá chốt gửi sau khi công ty lập tuyến); Total = QuoteMin
+        public decimal QuoteMin { get; set; }
+        public decimal QuoteMax { get; set; }
+        public bool RouteIsEstimate { get; set; } // quãng đường ước tính (bản đồ lỗi)
     }
 
     // Thời gian vận chuyển ước tính, tách theo thành phần (giờ)
@@ -72,6 +77,8 @@ namespace RacehorseTransport.API.ResponseModels
         public string TransportMode { get; set; } = string.Empty;
         public int TotalHorses { get; set; }
         public decimal EstimatedCost { get; set; }
+        public decimal? QuoteMin { get; set; }   // R-10: khoảng giá ước tính lúc tạo đơn (null với đơn cũ)
+        public decimal? QuoteMax { get; set; }
         public string CurrencyCode { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string CustomerStage { get; set; } = string.Empty; // giai đoạn theo góc nhìn khách (R-07)

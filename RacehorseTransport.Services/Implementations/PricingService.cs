@@ -30,6 +30,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IDistanceService _distanceService;
         private readonly ITransitTimeEstimator _transitTimeEstimator;
         private readonly IClearanceScheduleService _clearanceSchedule;
+        private readonly IGeoService _geoService;
         private readonly BookingOptions _bookingOptions;
 
         public PricingService(
@@ -38,6 +39,7 @@ namespace RacehorseTransport.Services.Implementations
             IDistanceService distanceService,
             ITransitTimeEstimator transitTimeEstimator,
             IClearanceScheduleService clearanceSchedule,
+            IGeoService geoService,
             IOptions<BookingOptions> bookingOptions)
         {
             _priceItemRepo = priceItemRepo;
@@ -45,7 +47,105 @@ namespace RacehorseTransport.Services.Implementations
             _distanceService = distanceService;
             _transitTimeEstimator = transitTimeEstimator;
             _clearanceSchedule = clearanceSchedule;
+            _geoService = geoService;
             _bookingOptions = bookingOptions.Value;
+        }
+
+        // R-10: khoảng giá ước tính khi khách tạo đơn / xem giá.
+        //   Có tọa độ (đường bộ): quãng đường thật A -> B và các nước đường đi qua lấy từ bản đồ (BE-01);
+        //   nước quá cảnh khách tự nhập không còn dùng.
+        //   min = giá theo quãng đường thật; max = quãng đường × QuoteRangeDistanceFactor
+        //   + phí thủ tục cho QuoteExtraTransitCountries nước dự phòng nếu tuyến đi ra nước ngoài.
+        public async Task<QuoteModel> CalculateQuoteRangeAsync(QuoteInputModel input)
+        {
+            bool routed = false;
+            bool routeIsEstimate = false;
+            string? routeSummary = null;
+            if (input.TransportMode == TransportModes.Ground
+                && input.PickupLat.HasValue && input.PickupLng.HasValue && input.DropoffLat.HasValue && input.DropoffLng.HasValue)
+            {
+                string origin = string.IsNullOrWhiteSpace(input.PickupCountryCode) ? "VN" : input.PickupCountryCode.Trim().ToUpperInvariant();
+                string destination = input.DropoffCountryCode.Trim().ToUpperInvariant();
+                var route = await _geoService.RouteAsync(new[]
+                {
+                    new GeoPointModel((double)input.PickupLat.Value, (double)input.PickupLng.Value, origin),
+                    new GeoPointModel((double)input.DropoffLat.Value, (double)input.DropoffLng.Value, destination)
+                }, includeCountries: origin != destination);
+
+                input.DistanceKm = Math.Max(1, (int)Math.Ceiling(route.TotalDistanceKm));
+                // Các nước đường đi qua (đã gộp trùng liên tiếp) trừ nước đi và nước đến = nước quá cảnh
+                var alongRoute = (route.CountryCodes ?? new List<string>())
+                    .Where(c => c != origin && c != destination)
+                    .Distinct()
+                    .ToList();
+                input.TransitCountryCodes = TransitCountryRules.Normalize(alongRoute, origin, destination);
+                routeIsEstimate = route.IsEstimate;
+                routeSummary = route.CountryCodes is { Count: > 0 }
+                    ? $"{input.DistanceKm} km ({string.Join(" → ", route.CountryCodes)})"
+                    : $"{input.DistanceKm} km";
+                routed = true;
+            }
+            else
+            {
+                // Không có tọa độ (app cũ): không còn nhận nước quá cảnh do khách nhập
+                input.TransitCountryCodes = new List<string>();
+            }
+
+            var min = await CalculateQuoteAsync(input);
+            if (routed)
+            {
+                min.RouteSummary = routeSummary;
+            }
+
+            decimal max = min.Total;
+            if (input.TransportMode == TransportModes.Ground && min.DistanceKm.HasValue)
+            {
+                var maxQuote = await CalculateQuoteAsync(new QuoteInputModel
+                {
+                    TransportMode = input.TransportMode,
+                    DropoffCountryCode = input.DropoffCountryCode,
+                    PickupCountryCode = input.PickupCountryCode,
+                    DistanceKm = (int)Math.Ceiling(min.DistanceKm.Value * _bookingOptions.QuoteRangeDistanceFactor),
+                    RequiresClimateControl = input.RequiresClimateControl,
+                    DeclaredValue = input.DeclaredValue,
+                    PickupWindowStart = input.PickupWindowStart,
+                    PickupWindowEnd = input.PickupWindowEnd,
+                    DeliveryDeadline = input.DeliveryDeadline,
+                    TransitCountryCodes = min.TransitCountryCodes,
+                    QuotedAt = input.QuotedAt,
+                    StallClasses = input.StallClasses,
+                    SkipScheduleCheck = true,
+                    ForceExpress = min.IsExpress
+                });
+                max = maxQuote.Total;
+            }
+
+            string originCode = string.IsNullOrWhiteSpace(input.PickupCountryCode) ? "VN" : input.PickupCountryCode.Trim().ToUpperInvariant();
+            if (input.TransportMode == TransportModes.Ground && originCode != input.DropoffCountryCode.Trim().ToUpperInvariant())
+            {
+                max += await TransitReserveAsync(input.TransportMode, input.DropoffCountryCode, min.HorseCount, _bookingOptions.QuoteExtraTransitCountries);
+            }
+
+            min.QuoteMin = min.Total;
+            min.QuoteMax = Math.Max(max, min.Total);
+            min.RouteIsEstimate = routeIsEstimate;
+            return min;
+        }
+
+        // Phí thủ tục quá cảnh cho một số nước dự phòng (cùng đơn giá FEE_TRANSIT)
+        private async Task<decimal> TransitReserveAsync(string mode, string destination, int horseCount, int countries)
+        {
+            if (countries <= 0)
+            {
+                return 0;
+            }
+            var prices = await GetApplicablePricesAsync(mode, destination.Trim().ToUpperInvariant());
+            if (!prices.TryGetValue(TransitFeeCode, out var fee) || fee.Value <= 0)
+            {
+                return 0;
+            }
+            int quantity = countries * (fee.CalcType == PriceCalcTypes.PerHorse ? horseCount : 1);
+            return Round(quantity * fee.Value);
         }
 
         public async Task<QuoteModel> CalculateQuoteAsync(QuoteInputModel input)
@@ -87,7 +187,9 @@ namespace RacehorseTransport.Services.Implementations
             // Thời gian đặt trước tối thiểu theo thời gian làm hồ sơ của chính tuyến này, rồi kiểm tra lịch khách chọn
             int clearanceDays = await _clearanceSchedule.GetClearanceDaysAsync(origin, transitCountries, destination);
             int leadTimeDays = _bookingOptions.LeadTimeDaysFor(clearanceDays);
-            var schedule = CheckSchedule(input, transit, leadTimeDays);
+            var schedule = input.SkipScheduleCheck
+                ? new ScheduleCheck(input.ForceExpress ?? false, default, default, default)
+                : CheckSchedule(input, transit, leadTimeDays);
 
             var prices = await GetApplicablePricesAsync(mode, destination);
 

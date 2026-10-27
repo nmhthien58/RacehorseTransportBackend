@@ -168,7 +168,7 @@ namespace RacehorseTransport.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> PreviewQuote([FromBody] QuotePreviewRequest request)
         {
-            var quote = await _pricingService.CalculateQuoteAsync(request.ToBusinessModel());
+            var quote = await _pricingService.CalculateQuoteRangeAsync(request.ToBusinessModel());
             return Ok(ApiResponse<QuoteResponse>.SuccessResult(quote.ToResponse(), "Quote calculated successfully"));
         }
 

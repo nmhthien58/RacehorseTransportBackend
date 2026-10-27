@@ -97,6 +97,8 @@ namespace RacehorseTransport.Services.Mappers
             model.TransportMode = entity.TransportMode;
             model.TotalHorses = entity.TotalHorses;
             model.EstimatedCost = entity.EstimatedCost;
+            model.QuoteMin = entity.QuoteMin;
+            model.QuoteMax = entity.QuoteMax;
             model.CurrencyCode = entity.CurrencyCode;
             model.Status = entity.Status;
             model.AssignedSpecialistId = entity.AssignedSpecialistId;

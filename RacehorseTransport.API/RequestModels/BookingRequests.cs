@@ -73,8 +73,19 @@ namespace RacehorseTransport.API.RequestModels
         [MaxLength(2000, ErrorMessage = "SpecialInstructions cannot exceed 2000 characters.")]
         public string? SpecialInstructions { get; set; }
 
-        // Nước ngựa đi qua theo thứ tự (gợi ý của khách, Manager xác nhận khi duyệt). Bỏ trống nếu đi thẳng.
-        public List<string>? TransitCountryCodes { get; set; }
+        // R-10 / R-11: tọa độ điểm đón / trả chọn trên bản đồ (GET /api/geo/search, /reverse).
+        // Gửi đủ 4 số thì quãng đường và các nước đi qua lấy từ bản đồ; bỏ trống thì tính như trước.
+        [Range(-90, 90, ErrorMessage = "PickupLat must be between -90 and 90.")]
+        public decimal? PickupLat { get; set; }
+
+        [Range(-180, 180, ErrorMessage = "PickupLng must be between -180 and 180.")]
+        public decimal? PickupLng { get; set; }
+
+        [Range(-90, 90, ErrorMessage = "DropoffLat must be between -90 and 90.")]
+        public decimal? DropoffLat { get; set; }
+
+        [Range(-180, 180, ErrorMessage = "DropoffLng must be between -180 and 180.")]
+        public decimal? DropoffLng { get; set; }
 
         [Required(ErrorMessage = "Horses is required.")]
         [MinLength(1, ErrorMessage = "At least one horse is required.")]
@@ -175,7 +186,19 @@ namespace RacehorseTransport.API.RequestModels
         public DateTimeOffset? PickupWindowEnd { get; set; }
         public DateTimeOffset? DeliveryDeadline { get; set; }
 
-        public List<string>? TransitCountryCodes { get; set; }
+        // R-10 / R-11: tọa độ điểm đón / trả chọn trên bản đồ (GET /api/geo/search, /reverse).
+        // Gửi đủ 4 số thì quãng đường và các nước đi qua lấy từ bản đồ; bỏ trống thì tính như trước.
+        [Range(-90, 90, ErrorMessage = "PickupLat must be between -90 and 90.")]
+        public decimal? PickupLat { get; set; }
+
+        [Range(-180, 180, ErrorMessage = "PickupLng must be between -180 and 180.")]
+        public decimal? PickupLng { get; set; }
+
+        [Range(-90, 90, ErrorMessage = "DropoffLat must be between -90 and 90.")]
+        public decimal? DropoffLat { get; set; }
+
+        [Range(-180, 180, ErrorMessage = "DropoffLng must be between -180 and 180.")]
+        public decimal? DropoffLng { get; set; }
 
         [Required(ErrorMessage = "Horses is required.")]
         [MinLength(1, ErrorMessage = "At least one horse is required.")]

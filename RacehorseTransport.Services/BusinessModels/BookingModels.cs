@@ -29,8 +29,11 @@ namespace RacehorseTransport.Services.BusinessModels
         public decimal? DeclaredValue { get; set; }
         public string? SpecialInstructions { get; set; }
 
-        // Nước quá cảnh khách gợi ý (Manager xác nhận / sửa khi duyệt)
-        public List<string> TransitCountryCodes { get; set; } = new();
+        // R-10 / R-11: tọa độ điểm đón / trả (đủ 4 số thì quãng đường + nước đi qua lấy từ bản đồ)
+        public decimal? PickupLat { get; set; }
+        public decimal? PickupLng { get; set; }
+        public decimal? DropoffLat { get; set; }
+        public decimal? DropoffLng { get; set; }
         public List<CreateBookingHorseModel> Horses { get; set; } = new();
     }
 
@@ -77,6 +80,8 @@ namespace RacehorseTransport.Services.BusinessModels
         public string TransportMode { get; set; } = string.Empty;
         public int TotalHorses { get; set; }
         public decimal EstimatedCost { get; set; }
+        public decimal? QuoteMin { get; set; }
+        public decimal? QuoteMax { get; set; }
         public string CurrencyCode { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string CustomerStage { get; set; } = string.Empty; // xem CustomerStages (R-07)

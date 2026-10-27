@@ -25,6 +25,16 @@ namespace RacehorseTransport.Services.BusinessModels
         // Nước quá cảnh theo thứ tự (R-03); để trống với đường bay thẳng
         public List<string> TransitCountryCodes { get; set; } = new();
 
+        // R-10 / R-11: tọa độ điểm đón / trả chọn trên bản đồ. Đủ 4 số thì quãng đường và các nước đi qua lấy từ bản đồ.
+        public decimal? PickupLat { get; set; }
+        public decimal? PickupLng { get; set; }
+        public decimal? DropoffLat { get; set; }
+        public decimal? DropoffLng { get; set; }
+
+        // Dùng nội bộ khi tính giá cao nhất: không kiểm tra lại lịch, giữ Express như giá thấp nhất
+        public bool SkipScheduleCheck { get; set; }
+        public bool? ForceExpress { get; set; }
+
         // Mốc tính "hôm nay" cho thời gian đặt trước tối thiểu. Để trống = bây giờ.
         // Tính lại giá cho đơn đã gửi thì truyền ngày tạo đơn, để không bắt khách đổi lịch vì Manager xử lý chậm.
         public DateTimeOffset? QuotedAt { get; set; }
@@ -67,5 +77,11 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset EarliestDeliveryDeadline { get; set; }
 
         public TransitEstimateModel Transit { get; set; } = new();
+
+        // R-10: khoảng giá ước tính khi tạo đơn. QuoteMin = Total (quãng đường thật); QuoteMax = quãng đường × hệ số
+        // + phí thủ tục cho các nước dự phòng. Giá chốt gửi sau khi công ty lập tuyến (BE-05).
+        public decimal QuoteMin { get; set; }
+        public decimal QuoteMax { get; set; }
+        public bool RouteIsEstimate { get; set; } // quãng đường ước tính theo đường chim bay (nhà cung cấp bản đồ lỗi)
     }
 }
