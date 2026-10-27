@@ -35,9 +35,6 @@ namespace RacehorseTransport.Services.Implementations
         };
 
         // Khách tự hủy được khi đơn còn ở các trạng thái này (và ngựa chưa nằm trên chuyến nào)
-        // BE-09: Manager chốt giá trị thỏa thuận trước khi gửi báo giá (TODO(BE-04): thêm PreApproved, RoutePlanned)
-        private static readonly string[] HorseValueEditableStatuses = { BookingStatuses.Submitted };
-
         private static readonly string[] CancellableStatuses =
         {
             BookingStatuses.Submitted, BookingStatuses.PreApproved, BookingStatuses.RoutePlanned,

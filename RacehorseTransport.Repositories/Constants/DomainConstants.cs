@@ -123,15 +123,6 @@ namespace RacehorseTransport.Repositories.Constants
         public static readonly string[] All = { None, Full };
     }
 
-    // Gói bảo hiểm của từng con ngựa trong đơn (R-13)
-    public static class InsurancePlans
-    {
-        public const string None = "None"; // không mua: trách nhiệm cơ bản, chỉ khi lỗi công ty
-        public const string Full = "Full"; // toàn giá trị thỏa thuận
-
-        public static readonly string[] All = { None, Full };
-    }
-
     public static class TransportModes
     {
         public const string Ground = "Ground";
