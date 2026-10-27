@@ -28,7 +28,8 @@ namespace RacehorseTransport.API.Mappers
                 Severity = request.Severity.Trim(),
                 Location = request.Location.Trim(),
                 Description = request.Description.Trim(),
-                AffectedTripHorseId = request.AffectedTripHorseId
+                AffectedTripHorseId = request.AffectedTripHorseId,
+                EmergencyOffload = request.EmergencyOffload
             };
         }
 
@@ -40,7 +41,10 @@ namespace RacehorseTransport.API.Mappers
                 ResponseAction = request.ResponseAction.Trim(),
                 RouteChange = request.RouteChange?.ToBusinessModel(),
                 RevisedRouteNotes = string.IsNullOrWhiteSpace(request.RevisedRouteNotes) ? null : request.RevisedRouteNotes.Trim(),
-                AdditionalCost = request.AdditionalCost
+                AdditionalCost = request.AdditionalCost,
+                AffectedTripHorseId = request.AffectedTripHorseId,
+                OffloadOutcome = string.IsNullOrWhiteSpace(request.OffloadOutcome) ? null : request.OffloadOutcome.Trim(),
+                VetReportPath = string.IsNullOrWhiteSpace(request.VetReportPath) ? null : request.VetReportPath.Trim()
             };
         }
 
@@ -102,7 +106,10 @@ namespace RacehorseTransport.API.Mappers
                 ApprovedByUserId = model.ApprovedByUserId,
                 ApprovedByName = model.ApprovedByName,
                 ApprovedAt = model.ApprovedAt,
-                ResolvedAt = model.ResolvedAt
+                ResolvedAt = model.ResolvedAt,
+                EmergencyOffload = model.EmergencyOffload,
+                OffloadOutcome = model.OffloadOutcome,
+                VetReportUrl = model.VetReportUrl
             };
         }
     }
