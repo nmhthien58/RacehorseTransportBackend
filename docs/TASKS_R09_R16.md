@@ -192,7 +192,9 @@ Làm:
 - Đổi tuyến **do công ty** sau khi khách đã chấp nhận báo giá (Coordinator tạo phiên bản tuyến mới, Manager duyệt): giá chốt **giữ nguyên**; nước mới → thêm giấy cần nộp + đặt hạn mới + email; khách chọn hủy vì không lo được giấy → **hoàn 100%** (`POST /api/bookings/{id}/cancel-route-change`).
 - Đổi điểm đón / trả **do khách**: tạo lại báo giá (về `RoutePlanned` → `Quoted`).
 
-### [ ] BE-08 · Điều kiện ngựa: tuổi, mang thai (R-12)
+### [x] BE-08 · Điều kiện ngựa: tuổi, mang thai (R-12)
+Đã làm: `racehorse.horses` thêm `is_pregnant`, `expected_foaling_date`, `last_foaling_date` (chỉ ngựa cái); cấu hình mới `Horse.GestationDays` (340), `Horse.LatePregnancyPercent` (90), `Horse.PostFoalingDays` (7) trong nhóm chính sách của BE-17. Kiểm tra lúc tạo đơn (`HorseEligibilityRules`), một lỗi liệt kê mọi con. Vừa đẻ: tính tới **ngày đầu** khoảng đón (task không nói rõ; chọn ngày đầu để ngày đón nào cũng đã qua 7 ngày). Chưa có API thêm ngựa vào đơn đã tạo nên chỉ kiểm tra ở bước tạo đơn.
+
 Làm:
 - Bảng ngựa: thêm `sex` nếu chưa có, `is_pregnant`, `expected_foaling_date` (nullable).
 - Khi thêm ngựa vào đơn (và khi tạo đơn): chặn nếu tuổi tại **ngày cuối của khoảng đón** < `Horse.MinAgeMonths`; ngựa cái mang thai mà ngày cuối của khoảng đón ≥ ngày dự sinh − 34 ngày (≈ 90% của 340 ngày, đưa 340 và 90% vào cấu hình); vừa đẻ trong 7 ngày (thêm `last_foaling_date` nếu cần). Thông báo lỗi ghi rõ tên ngựa và lý do.

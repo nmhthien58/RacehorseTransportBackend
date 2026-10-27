@@ -1156,6 +1156,9 @@ Một con ngựa (`horse`) có dạng:
   "specialCareRequirements": "Dễ say xe, cần cỏ tươi",
   "photoUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/horses/2026/10/6f316c....png?token=eyJ...",
   "isActive": true,
+  "isPregnant": false,
+  "expectedFoalingDate": null,
+  "lastFoalingDate": null,
   "createdAt": "2026-10-08T07:24:30+00:00"
 }
 ```
@@ -1173,6 +1176,8 @@ Một con ngựa (`horse`) có dạng:
 | `specialCareRequirements` | Yêu cầu chăm sóc đặc biệt, tài xế sẽ đọc được |
 | `photoUrl` | Link ảnh, dùng được ngay; `null` nếu không có ảnh |
 | `isActive` | `false` là ngựa đã bị xóa |
+| `isPregnant`, `expectedFoalingDate` | Ngựa cái đang mang thai và ngày dự sinh (dạng `2026-12-20`) |
+| `lastFoalingDate` | Lần đẻ gần nhất của ngựa cái; `null` nếu chưa đẻ / không khai |
 
 ### GET /api/horses — Danh sách ngựa
 
@@ -1235,6 +1240,9 @@ Các trường gửi lên:
 | `dateOfBirth` | ngày | Có | Dạng `2019-05-20`, phải ở quá khứ |
 | `color` | chuỗi | Có | Màu lông, tối đa 30 ký tự |
 | `specialCareRequirements` | chuỗi | Không | Yêu cầu chăm sóc đặc biệt |
+| `isPregnant` | true / false | Không | Chỉ ngựa cái (`Mare`). Mặc định `false` |
+| `expectedFoalingDate` | ngày | Có khi `isPregnant` là `true` | Ngày dự sinh, dạng `2026-12-20` |
+| `lastFoalingDate` | ngày | Không | Chỉ ngựa cái: lần đẻ gần nhất, sau ngày sinh và không ở tương lai |
 | `photo` | file | Không | Ảnh ngựa: `jpg`, `jpeg`, `png`, tối đa 10 MB |
 
 Ví dụ code: xem mục 2.5.
@@ -1250,6 +1258,9 @@ Lỗi thường gặp:
 | 400 | `Microchip number '...' is already registered.` | Mã vi mạch đã có trong hệ thống |
 | 400 | `Passport number '...' is already registered.` | Số hộ chiếu đã có trong hệ thống |
 | 400 | `DateOfBirth must be in the past.` | Ngày sinh ở tương lai |
+| 400 | `Only a mare can be pregnant or have a foaling date.` | Khai mang thai / ngày đẻ cho ngựa đực hoặc ngựa thiến |
+| 400 | `ExpectedFoalingDate is required when the mare is pregnant.` | Khai mang thai mà không có ngày dự sinh |
+| 400 | `LastFoalingDate must be after DateOfBirth and not in the future.` | Ngày đẻ gần nhất không hợp lệ |
 | 400 | `Files in category 'horses' must be images (.jpg, .jpeg, .png).` | Gửi PDF làm ảnh |
 | 400 | `The file content does not match its extension '.png'.` | File không phải ảnh thật |
 
@@ -1278,6 +1289,9 @@ Các trường gửi lên:
 | `dateOfBirth` | ngày | Có | Dạng `2019-05-20`, phải ở quá khứ |
 | `color` | chuỗi | Có | Màu lông, tối đa 30 ký tự |
 | `specialCareRequirements` | chuỗi | Không | Yêu cầu chăm sóc đặc biệt |
+| `isPregnant` | true / false | Không | Chỉ ngựa cái (`Mare`). Mặc định `false` |
+| `expectedFoalingDate` | ngày | Có khi `isPregnant` là `true` | Ngày dự sinh, dạng `2026-12-20` |
+| `lastFoalingDate` | ngày | Không | Chỉ ngựa cái: lần đẻ gần nhất, sau ngày sinh và không ở tương lai |
 | `photo` | file | Không | Ảnh ngựa: `jpg`, `jpeg`, `png`, tối đa 10 MB |
 | `removePhoto` | true / false | Không | `true` để xóa ảnh đang có |
 
@@ -1813,6 +1827,7 @@ Lỗi thường gặp:
 | 400 | `The pickup window cannot be longer than 30 days.` | Khoảng pickup quá dài |
 | 400 | `Horse(s) with ID 9 were not found among your active horses.` | Ngựa không phải của khách, hoặc đã xóa |
 | 400 | `These horses are already in another booking for an overlapping period: ...` | Ngựa đang nằm trong một đơn khác trùng thời gian |
+| 400 | `These horses cannot be transported in this pickup window: Little Star: it will be younger than 6 months on 2026-11-30 (born 2026-07-01). Lady Due: it is due to foal on 2026-12-20; a pregnant mare can only travel if the pickup window ends before 2026-11-16.` | Ngựa không đủ điều kiện chở (Chính sách mục 5): chưa đủ `Horse.MinAgeMonths` tháng tuổi tính tới **ngày cuối** khoảng đón; ngựa cái mang thai mà ngày cuối khoảng đón không trước ngày dự sinh − 34 ngày (340 × 10%); ngựa cái vừa đẻ chưa đủ `Horse.PostFoalingDays` ngày tính tới **ngày đầu** khoảng đón. `message` liệt kê mọi con không đạt và lý do |
 | 400 | `The same horse appears more than once in this booking.` | Chọn trùng một con ngựa |
 | 403 | `You do not have permission to perform this action.` | Người gọi không phải `Customer` |
 
@@ -6951,7 +6966,7 @@ Response `200`:
       "vetCapPercent": 20,
       "proofThresholdUsd": 50000
     },
-    "horse": { "minAgeMonths": 6 },
+    "horse": { "minAgeMonths": 6, "gestationDays": 340, "latePregnancyPercent": 90, "postFoalingDays": 7 },
     "delivery": { "freeWaitingHours": 2, "waitingFeePerHourUsd": 40, "maxWaitingHours": 24, "decisionHours": 24 },
     "values": {
       "Policy.Version": "1.0",
@@ -6970,6 +6985,9 @@ Response `200`:
       "Insurance.VetCapPercent": 20,
       "Insurance.ProofThresholdUsd": 50000,
       "Horse.MinAgeMonths": 6,
+      "Horse.GestationDays": 340,
+      "Horse.LatePregnancyPercent": 90,
+      "Horse.PostFoalingDays": 7,
       "Delivery.FreeWaitingHours": 2,
       "Delivery.WaitingFeePerHourUsd": 40,
       "Delivery.MaxWaitingHours": 24,
@@ -6993,6 +7011,8 @@ Response `200`:
 | `insurance.vetCapPercent` | Có bảo hiểm: chi phí thú y tối đa, % giá trị thỏa thuận |
 | `insurance.proofThresholdUsd` | Giá trị khai báo mỗi con từ mức này phải kèm chứng từ |
 | `horse.minAgeMonths` | Tuổi tối thiểu (tháng) của ngựa |
+| `horse.gestationDays`, `latePregnancyPercent` | Thai kỳ trung bình (ngày) và ngưỡng: không chở ngựa cái đã quá `latePregnancyPercent`% thai kỳ (mặc định 340 × 10% = 34 ngày trước ngày dự sinh) |
+| `horse.postFoalingDays` | Không chở ngựa cái vừa đẻ trong số ngày này |
 | `delivery.freeWaitingHours`, `waitingFeePerHourUsd`, `maxWaitingHours` | Phí chờ tại điểm giao: số giờ miễn phí, phí mỗi giờ (USD), số giờ tính phí tối đa |
 | `delivery.decisionHours` | Số giờ khách có để chọn cách xử lý khi không giao được |
 | `values` | Cùng các giá trị trên, theo **đúng tên khóa** trong văn bản chính sách. Dùng để thay các chỗ `[Tên.Khóa = ...]` trong văn bản |
@@ -7031,6 +7051,9 @@ Response `200`:
     "insuranceVetCapPercent": 20,
     "insuranceProofThresholdUsd": 50000,
     "horseMinAgeMonths": 6,
+    "horseGestationDays": 340,
+    "horseLatePregnancyPercent": 90,
+    "horsePostFoalingDays": 7,
     "deliveryFreeWaitingHours": 2,
     "deliveryWaitingFeePerHourUsd": 40,
     "deliveryMaxWaitingHours": 24,
@@ -7054,7 +7077,7 @@ Response `200`:
 Giá trị mới áp dụng từ lúc lưu. Đơn đã đồng ý chính sách giữ phiên bản đã đồng ý. Khi đổi nội dung quy tắc, nhớ **tăng `policyVersion`** (ví dụ `1.0` → `1.1`) để các đơn mới lưu đúng phiên bản.
 
 - **Ai gọi được:** LogisticsManager, Admin
-- **Dữ liệu gửi lên:** JSON, gửi **đủ cả 15 trường** (kể cả trường không đổi)
+- **Dữ liệu gửi lên:** JSON, gửi **đủ cả 18 trường** (kể cả trường không đổi)
 
 | Trường | Kiểu | Giới hạn | Khóa cấu hình |
 |---|---|---|---|
@@ -7069,6 +7092,9 @@ Giá trị mới áp dụng từ lúc lưu. Đơn đã đồng ý chính sách g
 | `insuranceVetCapPercent` | số | 0 – 100 | `Insurance.VetCapPercent` |
 | `insuranceProofThresholdUsd` | số | ≥ 0 | `Insurance.ProofThresholdUsd` |
 | `horseMinAgeMonths` | số nguyên | 0 – 240 | `Horse.MinAgeMonths` |
+| `horseGestationDays` | số nguyên | 300 – 400 | `Horse.GestationDays` |
+| `horseLatePregnancyPercent` | số | 0 – 100 | `Horse.LatePregnancyPercent` |
+| `horsePostFoalingDays` | số nguyên | 0 – 60 | `Horse.PostFoalingDays` |
 | `deliveryFreeWaitingHours` | số nguyên | 0 – 72 | `Delivery.FreeWaitingHours` |
 | `deliveryWaitingFeePerHourUsd` | số | ≥ 0 | `Delivery.WaitingFeePerHourUsd` |
 | `deliveryMaxWaitingHours` | số nguyên | 1 – 168 | `Delivery.MaxWaitingHours` |

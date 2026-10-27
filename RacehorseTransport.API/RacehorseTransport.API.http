@@ -486,7 +486,7 @@ Authorization: Bearer {{managerToken}}
 GET {{baseUrl}}/api/settings/policy
 Authorization: Bearer {{customerToken}}
 
-### [ĐÚNG] Quản lý sửa cấu hình chính sách (gửi đủ 15 trường)
+### [ĐÚNG] Quản lý sửa cấu hình chính sách (gửi đủ 18 trường)
 PUT {{baseUrl}}/api/settings/policy
 Authorization: Bearer {{managerToken}}
 Content-Type: application/json
@@ -503,6 +503,9 @@ Content-Type: application/json
   "insuranceVetCapPercent": 20,
   "insuranceProofThresholdUsd": 50000,
   "horseMinAgeMonths": 6,
+  "horseGestationDays": 340,
+  "horseLatePregnancyPercent": 90,
+  "horsePostFoalingDays": 7,
   "deliveryFreeWaitingHours": 2,
   "deliveryWaitingFeePerHourUsd": 40,
   "deliveryMaxWaitingHours": 24,
@@ -526,6 +529,9 @@ Content-Type: application/json
   "insuranceVetCapPercent": 20,
   "insuranceProofThresholdUsd": 50000,
   "horseMinAgeMonths": 6,
+  "horseGestationDays": 340,
+  "horseLatePregnancyPercent": 90,
+  "horsePostFoalingDays": 7,
   "deliveryFreeWaitingHours": 2,
   "deliveryWaitingFeePerHourUsd": 40,
   "deliveryMaxWaitingHours": 24,
