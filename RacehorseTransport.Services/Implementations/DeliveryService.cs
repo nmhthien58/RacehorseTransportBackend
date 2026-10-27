@@ -36,6 +36,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ISystemSettingService _settingService;
         private readonly IFileStorageService _fileStorage;
         private readonly INotificationService _notificationService;
+        private readonly IClaimService _claimService;
 
         public DeliveryService(
             IRepository<DeliveryFailure> failureRepo,
@@ -48,7 +49,8 @@ namespace RacehorseTransport.Services.Implementations
             IPricingService pricingService,
             ISystemSettingService settingService,
             IFileStorageService fileStorage,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IClaimService claimService)
         {
             _failureRepo = failureRepo;
             _tripRepo = tripRepo;
@@ -61,6 +63,7 @@ namespace RacehorseTransport.Services.Implementations
             _settingService = settingService;
             _fileStorage = fileStorage;
             _notificationService = notificationService;
+            _claimService = claimService;
         }
 
         // =============================================================================================
@@ -189,7 +192,14 @@ namespace RacehorseTransport.Services.Implementations
             }
             else
             {
-                // TODO(BE-12): mở hồ sơ bồi thường cho ngựa bị thương / giao nhầm
+                // R-13: từ chối vì ngựa bị thương / giao nhầm ngựa -> hồ sơ bồi thường cho từng con của đơn
+                foreach (var tripHorse in horses.Where(th => th.Status == TripHorseStatuses.InTransit))
+                {
+                    await _claimService.OpenAutomaticallyAsync(tripHorse.BookingHorseId,
+                        model.Reason == DeliveryFailureReasons.RefusedInjured ? ClaimTypes.Injury : ClaimTypes.Loss,
+                        $"Delivery of booking {booking.BookingCode} refused: {ReasonText(model.Reason)}. {failure.Note}".Trim(),
+                        failure.IncidentId, failure.FailureId);
+                }
                 await _notificationService.SendAsync(
                     booking.CustomerUserId,
                     $"Delivery of booking {booking.BookingCode} was refused",

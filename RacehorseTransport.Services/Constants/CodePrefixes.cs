@@ -9,6 +9,7 @@ namespace RacehorseTransport.Services.Constants
         public const string Incident = "INC";
         public const string Payment = "PAY";
         public const string Contract = "HD";
+        public const string Claim = "CLM";
     }
 
     // Giá trị cột reference_type của thông báo: cho FE biết bấm vào thông báo thì mở màn hình nào

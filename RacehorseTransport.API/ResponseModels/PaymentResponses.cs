@@ -42,6 +42,7 @@ namespace RacehorseTransport.API.ResponseModels
         public DateTimeOffset? ExtraDueAt { get; set; }
         public bool ExtraOverdue { get; set; }
         public decimal RefundedAmount { get; set; }
+        public decimal CompensationAmount { get; set; } // R-13: bồi thường bảo hiểm đã chi
         public decimal TotalDue { get; set; }
         public decimal TotalPaid { get; set; }
         public decimal Outstanding { get; set; }

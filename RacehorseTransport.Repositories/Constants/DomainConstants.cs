@@ -63,9 +63,12 @@ namespace RacehorseTransport.Repositories.Constants
         public const string Balance = "Balance"; // phần còn lại của giá báo, trả trước khi xuất phát
         public const string Extra = "Extra";     // chi phí phát sinh (sự cố) sau khi đóng chuyến
         public const string Refund = "Refund";   // hoàn tiền khi hủy đơn
+        public const string Compensation = "Compensation"; // R-13: chi bồi thường bảo hiểm (qua VNPay hoặc chuyển khoản thủ công)
 
         public static readonly string[] Charges = { Deposit, Balance, Extra };
-        public static readonly string[] All = { Deposit, Balance, Extra, Refund };
+        public static readonly string[] All = { Deposit, Balance, Extra, Refund, Compensation };
+        // Các dòng tiền chi cho khách (có thể thử lại / đánh dấu đã chi thủ công)
+        public static readonly string[] Payouts = { Refund, Compensation };
     }
 
     public static class PaymentStatuses
@@ -435,6 +438,28 @@ namespace RacehorseTransport.Repositories.Constants
         public const string AwaitingConsent = "AwaitingConsent";
 
         public static readonly string[] All = { Reported, PlanProposed, Approved, Rejected, Resolved, AwaitingConsent };
+    }
+
+    // R-13 (BE-12): hồ sơ bồi thường bảo hiểm
+    public static class ClaimTypes
+    {
+        public const string Death = "Death";   // chết / phải an tử
+        public const string Injury = "Injury"; // bị thương: chi phí thú y
+        public const string Loss = "Loss";     // mất / thất lạc / giao nhầm
+
+        public static readonly string[] All = { Death, Injury, Loss };
+    }
+
+    public static class ClaimStatuses
+    {
+        public const string Open = "Open";
+        public const string UnderReview = "UnderReview";
+        public const string Approved = "Approved";
+        public const string Rejected = "Rejected";
+        public const string Paid = "Paid";
+
+        public static readonly string[] All = { Open, UnderReview, Approved, Rejected, Paid };
+        public static readonly string[] Reviewable = { Open, UnderReview };
     }
 
     // R-16 (BE-16): lý do không giao được

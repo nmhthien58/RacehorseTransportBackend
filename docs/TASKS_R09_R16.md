@@ -228,7 +228,7 @@ Làm:
 - `HandOverHere`: ký **biên bản e-POD riêng** cho con ngựa tại nơi dỡ (`POST /api/trips/{id}/handover` + `tripHorseId`); bỏ ràng buộc một biên bản / đơn / chuyến.
 - `ReturnToOrigin`: con ngựa **kết thúc** với đơn, không về hàng chờ; chở về do Coordinator sắp xếp ngoài hệ thống. Chỉ `WaitRecover` về hàng chờ.
 - Biên bản thú y nộp **lúc đề xuất** phương án (`vetReportPath`, tải lên qua `POST /api/files`); `Deceased` chỉ ở sự cố `Critical`.
-- Còn để `TODO(BE-12)` (mở hồ sơ bồi thường) và `TODO(BE-14b)` (hoàn cước chưa đi) trong `IncidentService.ApplyOffloadAsync`.
+- `TODO(BE-12)` (mở hồ sơ bồi thường) và `TODO(BE-14b)` (hoàn cước chưa đi) trong `IncidentService.ApplyOffloadAsync` đã làm ở hai task đó.
 
 Làm:
 - Bỏ endpoint `POST /api/trips/{id}/horses/{tripHorseId}/offload` (hoặc trả 410 kèm hướng dẫn), cập nhật API.md.
@@ -237,7 +237,8 @@ Làm:
 - Hoàn phần cước chưa đi của con ngựa đó theo `fault_party` (dùng hàm tính của BE-14b).
 
 
-### [ ] BE-12 · Bảo hiểm và hồ sơ bồi thường (R-13)
+### [x] BE-12 · Bảo hiểm và hồ sơ bồi thường (R-13)
+Đã làm: phí `Full` theo từng con đã có từ BE-04 (dòng `INS_FULL`). Bảng `billing.insurance_claims` (chốt gói + giá trị thỏa thuận lúc mở, thêm `fault_party`, `delivery_failure_id`, `paid_reference`); `ClaimService` + `ClaimRules` (trần chi trả, cửa sổ 24 giờ, có unit test). Tự mở ở: sự cố `Critical` có chọn ngựa (`Injury`), rời chuyến `Deceased` (`Death`; hồ sơ `Injury` chưa quyết định của cùng sự cố được nâng thành `Death`), rời chuyến vì `EquineHealthIssue`, e-POD `Injured`, từ chối nhận `RefusedInjured` / `RefusedWrongHorse` (`Injury` / `Loss`); mỗi sự cố / lần không giao được chỉ một hồ sơ mỗi con. Khách mở trong 24 giờ sau `delivered_at` của con ngựa. Duyệt: `faultParty` bỏ trống thì lấy theo sự cố. Chi trả qua `IPaymentService.PayCompensationAsync`: phần ≤ số còn hoàn được → hoàn qua cổng (dòng `Compensation` gắn khoản gốc, dùng lại retry / mark-refunded), phần vượt → dòng `Compensation` `Manual` kèm mã chuyển khoản. `payments.payment_type` nới lên `varchar(15)`; `ck_payments_refund_link` cho phép `Compensation` có hoặc không có khoản gốc. 8 endpoint mới (API.md mục 19c). Script `03_update_insurance_claims.sql`.
 Làm:
 - Phí: `Full` = `Insurance.PremiumPercent` × `agreed_value` từng con, cộng vào báo giá (thay dòng `INS_TRANSIT` hiện tại).
 - Bảng `billing.insurance_claims`: `claim_code`, `booking_id`, `booking_horse_id`, `incident_id?`, `claim_type` (`Death` / `Injury` / `Loss`), `plan` (lúc xảy ra), `requested_amount`, `approved_amount`, `status` (`Open` / `UnderReview` / `Approved` / `Rejected` / `Paid`), `decision_reason`, `evidence` (danh sách tệp), `opened_by`, `reviewed_by`, các mốc thời gian.
@@ -278,7 +279,7 @@ Làm:
 - Ký e-POD xong → thông báo + email `HandoverCompleted` cho khách.
 
 ### [x] BE-16 · Không giao được, phí chờ, quyết định 24 giờ (R-16)
-Đã làm: bảng `acceptance.delivery_failures`, `handover_acceptances.waiting_hours / waiting_fee`; `DeliveryService` + `DeliveryRules` (phí chờ tính theo phút đầy đủ, giờ lẻ làm tròn lên). Ghi không giao được: lưu lý do / ảnh, tự mở sự cố (`RecipientUnavailable`, hoặc `EquineHealthIssue` / `Other` khi từ chối vì bị thương / nhầm ngựa) **trực tiếp** vì chuyến có thể đã `ArrivedDestination`; cho xe rời mốc `DropOff`. Theo lựa chọn của anh, **chi phí tự tính**: khóa mới `Delivery.ExtraKmFeeUsd` (2 USD/km) cho người nhận / địa chỉ khác (km theo bản đồ), chuồng tạm theo `Stable.FeePerHorsePerDayUsd` (tính khi đóng chuyến), chở về = báo giá chiều ngược (bảng giá chưa có chiều ngược thì lấy cước cùng tuyến chiều đi). Quá hạn → `HoldAtStable` (job). Phí chờ + chi phí lựa chọn cộng vào phát sinh khi đóng chuyến (`GetChargesForTripAsync`). Điều phối thực hiện lựa chọn qua sự cố đã mở. Hồ sơ bồi thường khi từ chối vì bị thương / nhầm ngựa: `TODO(BE-12)`.
+Đã làm: bảng `acceptance.delivery_failures`, `handover_acceptances.waiting_hours / waiting_fee`; `DeliveryService` + `DeliveryRules` (phí chờ tính theo phút đầy đủ, giờ lẻ làm tròn lên). Ghi không giao được: lưu lý do / ảnh, tự mở sự cố (`RecipientUnavailable`, hoặc `EquineHealthIssue` / `Other` khi từ chối vì bị thương / nhầm ngựa) **trực tiếp** vì chuyến có thể đã `ArrivedDestination`; cho xe rời mốc `DropOff`. Theo lựa chọn của anh, **chi phí tự tính**: khóa mới `Delivery.ExtraKmFeeUsd` (2 USD/km) cho người nhận / địa chỉ khác (km theo bản đồ), chuồng tạm theo `Stable.FeePerHorsePerDayUsd` (tính khi đóng chuyến), chở về = báo giá chiều ngược (bảng giá chưa có chiều ngược thì lấy cước cùng tuyến chiều đi). Quá hạn → `HoldAtStable` (job). Phí chờ + chi phí lựa chọn cộng vào phát sinh khi đóng chuyến (`GetChargesForTripAsync`). Điều phối thực hiện lựa chọn qua sự cố đã mở. Hồ sơ bồi thường khi từ chối vì bị thương / nhầm ngựa: làm ở BE-12.
 Làm:
 - `POST /api/trips/{id}/bookings/{bookingId}/delivery-failed` (đoàn xe): lý do `RecipientAbsent` / `RecipientRefused` / `RefusedInjured` / `RefusedWrongHorse`, ghi chú, ảnh.
 - Phí chờ: giờ chờ = (lúc ký e-POD hoặc lúc ghi không giao được) − lúc check-in điểm trả − `Delivery.FreeWaitingHours`; chỉ tính nếu lúc check-in ≥ `recipient_notified_window_start`; làm tròn lên giờ; tối đa `MaxWaitingHours`; × `WaitingFeePerHourUsd` → cộng vào **khoản phát sinh** của đơn (`ExtraCharges`, luồng thanh toán Extra hiện có).
