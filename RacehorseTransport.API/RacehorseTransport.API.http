@@ -486,3 +486,64 @@ Authorization: Bearer {{customerToken}}
 
 ### [SAI - 401] Không có mã truy cập
 GET {{baseUrl}}/api/lookups/enums
+
+### =====================================================================
+### BE-17 · Chính sách dịch vụ và cấu hình
+### =====================================================================
+
+### [ĐÚNG] Trang Chính sách công khai, không cần đăng nhập
+GET {{baseUrl}}/api/policy
+
+### [ĐÚNG] Nhân sự xem cấu hình chính sách
+GET {{baseUrl}}/api/settings/policy
+Authorization: Bearer {{managerToken}}
+
+### [SAI - 403] Khách hàng không xem màn cấu hình (dùng /api/policy)
+GET {{baseUrl}}/api/settings/policy
+Authorization: Bearer {{customerToken}}
+
+### [ĐÚNG] Quản lý sửa cấu hình chính sách (gửi đủ 15 trường)
+PUT {{baseUrl}}/api/settings/policy
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "policyVersion": "1.0",
+  "quoteAcceptDays": 3,
+  "delayGraceHours": 6,
+  "delayPercentPer12Hours": 5,
+  "delayMaxPercent": 25,
+  "insurancePremiumPercent": 1,
+  "insuranceBaseLiabilityUsd": 5000,
+  "insuranceBaseVetCapUsd": 1000,
+  "insuranceVetCapPercent": 20,
+  "insuranceProofThresholdUsd": 50000,
+  "horseMinAgeMonths": 6,
+  "deliveryFreeWaitingHours": 2,
+  "deliveryWaitingFeePerHourUsd": 40,
+  "deliveryMaxWaitingHours": 24,
+  "deliveryDecisionHours": 24
+}
+
+### [SAI - 400] Phần trăm vượt 100 và thiếu phiên bản
+PUT {{baseUrl}}/api/settings/policy
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "policyVersion": "",
+  "quoteAcceptDays": 3,
+  "delayGraceHours": 6,
+  "delayPercentPer12Hours": 5,
+  "delayMaxPercent": 150,
+  "insurancePremiumPercent": 1,
+  "insuranceBaseLiabilityUsd": 5000,
+  "insuranceBaseVetCapUsd": 1000,
+  "insuranceVetCapPercent": 20,
+  "insuranceProofThresholdUsd": 50000,
+  "horseMinAgeMonths": 6,
+  "deliveryFreeWaitingHours": 2,
+  "deliveryWaitingFeePerHourUsd": 40,
+  "deliveryMaxWaitingHours": 24,
+  "deliveryDecisionHours": 24
+}

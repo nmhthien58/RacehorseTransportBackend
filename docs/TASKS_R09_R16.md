@@ -131,7 +131,7 @@ Làm sau cùng, khi các task kia đã merge.
 
 ## Việc của Thiên
 
-### [ ] BE-17 · Cấu hình mới + API chính sách công khai (Chung) — làm đầu tiên
+### [x] BE-17 · Cấu hình mới + API chính sách công khai (Chung) — làm đầu tiên
 Làm:
 - Thêm các khóa vào `common.system_settings` (seed + script) và vào model cấu hình, có API đọc / sửa cho Admin / Manager như nhóm `Payment.*` hiện có:
   - `Booking.QuoteAcceptDays` = 3
@@ -142,6 +142,8 @@ Làm:
   - `Policy.Version` = "1.0"
 - `GET /api/policy` **không cần đăng nhập**: trả phiên bản chính sách + toàn bộ giá trị cấu hình mà `CHINH_SACH_DICH_VU.md` nhắc tới (kể cả các khóa `Payment.*` đã có), để frontend dựng trang Chính sách.
 - Giá trị không hợp lệ (âm, % > 100…) → 400.
+
+Đã làm: `GET /api/policy` (công khai, có `values` theo đúng tên khóa để thay các chỗ `[...]` trong văn bản), `GET/PUT /api/settings/policy` (đọc: nhân sự; sửa: Manager / Admin). Hằng tên khóa trong `SystemSettingService` (`*Key`), đọc qua `ISystemSettingService.GetPolicySettingsAsync()`. Task sau cần khóa mới (vd `Dossier.SubmitDays`, hệ số thai kỳ) thì thêm vào `PolicySettingsModel` + mảng `PolicyKeys` + seed / script.
 
 ### [ ] BE-01 · Dịch vụ bản đồ (R-11)
 Không dùng Google Maps (Việt Nam và Trung Quốc nằm trong danh sách cấm của Google Maps Platform). Dùng **Goong** trong Việt Nam (đã có `Goong:ApiKey`), **Nominatim** (tìm địa chỉ) + **OSRM** (chỉ đường) ngoài Việt Nam. Thiết kế qua interface để thay nhà cung cấp (vd Mapbox) mà không sửa nơi gọi.
