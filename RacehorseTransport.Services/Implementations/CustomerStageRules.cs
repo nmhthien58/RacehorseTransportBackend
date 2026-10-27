@@ -7,7 +7,7 @@ namespace RacehorseTransport.Services.Implementations
     // Giai đoạn của đơn theo góc nhìn khách (R-07): gộp trạng thái đơn, thanh toán, hồ sơ và trạng thái ngựa trên chuyến
     // thành một bước duy nhất để khách theo dõi kiểu "đơn hàng". Hàm thuần để dễ viết unit test.
     // Đơn cần được nạp kèm BookingHorses -> Dossier, BookingHorses -> TripHorses -> Trip -> Checkpoints.
-    //   Submitted -> PendingReview, AwaitingDeposit -> AwaitingDeposit, Rejected / Cancelled / Expired -> Closed,
+    //   Submitted / PreApproved / RoutePlanned (đang duyệt, lập tuyến) -> PendingReview, AwaitingDeposit -> AwaitingDeposit, Rejected / Cancelled / Expired -> Closed,
     //   AwaitingFinalPayment -> AwaitingPayment, Completed -> Completed (còn nợ phát sinh thì AwaitingPayment).
     //   Đơn Approved xét theo thứ tự (ngựa chưa giao):
     //     có con đang trên xe -> AwaitingHandover nếu xe đã tới điểm trả của đơn, không thì InTransit;
@@ -25,6 +25,8 @@ namespace RacehorseTransport.Services.Implementations
             switch (booking.Status)
             {
                 case BookingStatuses.Submitted:
+                case BookingStatuses.PreApproved:
+                case BookingStatuses.RoutePlanned:
                     return CustomerStages.PendingReview;
                 case BookingStatuses.AwaitingDeposit:
                     return CustomerStages.AwaitingDeposit;

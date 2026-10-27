@@ -15,7 +15,8 @@ namespace RacehorseTransport.Services.Implementations
         // Đơn ở các trạng thái này còn đang chạy: ngựa trong đơn chưa được xóa
         private static readonly string[] OpenBookingStatuses =
         {
-            BookingStatuses.Submitted, BookingStatuses.AwaitingDeposit, BookingStatuses.Approved, BookingStatuses.Assigned
+            BookingStatuses.Submitted, BookingStatuses.PreApproved, BookingStatuses.RoutePlanned,
+            BookingStatuses.AwaitingDeposit, BookingStatuses.Approved, BookingStatuses.Assigned
         };
 
         private readonly IRepository<Horse> _horseRepo;

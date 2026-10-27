@@ -127,6 +127,7 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<IDelayCompensationService, DelayCompensationService>();
             services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IRoutePlanService, RoutePlanService>();
             services.AddScoped<IHorseService, HorseService>();
             services.AddScoped<IHorseDocumentService, HorseDocumentService>();
             services.AddSingleton<ITransitTimeEstimator, TransitTimeEstimator>();

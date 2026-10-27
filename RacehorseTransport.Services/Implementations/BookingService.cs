@@ -18,16 +18,27 @@ namespace RacehorseTransport.Services.Implementations
         // Đơn ở các trạng thái này còn đang chạy: ngựa trong đơn chưa thể vào đơn khác trùng thời gian
         private static readonly string[] OpenStatuses =
         {
-            BookingStatuses.Submitted, BookingStatuses.AwaitingDeposit, BookingStatuses.Approved, BookingStatuses.Assigned
+            BookingStatuses.Submitted, BookingStatuses.PreApproved, BookingStatuses.RoutePlanned,
+            BookingStatuses.AwaitingDeposit, BookingStatuses.Approved, BookingStatuses.Assigned
+        };
+
+        // BE-09: Manager chốt giá trị thỏa thuận trước khi gửi báo giá
+        private static readonly string[] HorseValueEditableStatuses =
+        {
+            BookingStatuses.Submitted, BookingStatuses.PreApproved, BookingStatuses.RoutePlanned
+        };
+
+        // R-10: Manager từ chối được đơn cả sau khi duyệt sơ bộ (ví dụ không lập được tuyến khả thi), trước khi báo giá
+        private static readonly string[] RejectableStatuses =
+        {
+            BookingStatuses.Submitted, BookingStatuses.PreApproved, BookingStatuses.RoutePlanned
         };
 
         // Khách tự hủy được khi đơn còn ở các trạng thái này (và ngựa chưa nằm trên chuyến nào)
-        // BE-09: Manager chốt giá trị thỏa thuận trước khi gửi báo giá (TODO(BE-04): thêm PreApproved, RoutePlanned)
-        private static readonly string[] HorseValueEditableStatuses = { BookingStatuses.Submitted };
-
         private static readonly string[] CancellableStatuses =
         {
-            BookingStatuses.Submitted, BookingStatuses.AwaitingDeposit, BookingStatuses.Approved, BookingStatuses.Assigned
+            BookingStatuses.Submitted, BookingStatuses.PreApproved, BookingStatuses.RoutePlanned,
+            BookingStatuses.AwaitingDeposit, BookingStatuses.Approved, BookingStatuses.Assigned
         };
 
         private readonly IRepository<BookingRequest> _bookingRepo;
@@ -401,38 +412,28 @@ namespace RacehorseTransport.Services.Implementations
 
             var specialist = await GetActiveSpecialistAsync(specialistUserId);
 
-            // R-02: duyệt xong khách phải đặt cọc (% cấu hình, chụp lại vào đơn) rồi mới làm hồ sơ / xếp chuyến
-            var settings = await _settingService.GetPaymentSettingsAsync();
-            decimal depositAmount = Math.Round(booking.EstimatedCost * settings.DepositPercent / 100, 2);
-
+            // R-10: đây là bước DUYỆT SƠ BỘ (đơn khả thi). Chưa thu cọc: Coordinator lập tuyến, Manager duyệt tuyến,
+            // rồi khách nhận báo giá chốt và đặt cọc khi chấp nhận (BE-05).
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
-                booking.Status = BookingStatuses.AwaitingDeposit;
+                booking.Status = BookingStatuses.PreApproved;
                 booking.ReviewedByUserId = currentUser.UserId;
                 booking.ReviewedAt = DateTimeOffset.UtcNow;
                 booking.AssignedSpecialistId = specialist.UserId;
                 booking.RejectionReason = null;
-                booking.DepositPercent = settings.DepositPercent;
-                booking.DepositAmount = depositAmount;
                 await _bookingRepo.UpdateAsync(booking);
-
-                await _notificationService.EmailCustomerAsync(
-                    booking.CustomerUserId,
-                    EmailTemplateNames.BookingApproved,
-                    CustomerPages.Booking(booking.BookingId),
-                    new Dictionary<string, string> { ["BookingCode"] = booking.BookingCode });
-
-                if (depositAmount <= 0)
-                {
-                    // Cấu hình cọc 0%: không cần cọc, mở hồ sơ ngay
-                    await _bookingActivator.ActivateAsync(booking);
-                    return;
-                }
 
                 await _notificationService.SendAsync(
                     booking.CustomerUserId,
-                    $"Booking {booking.BookingCode} approved - deposit required",
-                    $"Your transport request has been approved. Please pay the {settings.DepositPercent:0.##}% deposit of {depositAmount:N2} {booking.CurrencyCode} within {_options.DepositDays} days to confirm it; {specialist.FullName} will then start the quarantine documents.",
+                    $"Booking {booking.BookingCode} passed the first review",
+                    "We are planning the route on the map. You will receive the final quote to accept; no payment is needed yet.",
+                    NotificationReferenceTypes.Booking,
+                    booking.BookingId);
+
+                await _notificationService.SendToRoleAsync(
+                    UserRoles.FleetCoordinator,
+                    $"Plan the route for booking {booking.BookingCode}",
+                    $"{booking.TotalHorses} horse(s) from {booking.PickupCountryCode} to {booking.DropoffCountryCode}, pickup {booking.PickupWindowStart:yyyy-MM-dd} – {booking.PickupWindowEnd:yyyy-MM-dd}. Draw the planned route and submit it for approval.",
                     NotificationReferenceTypes.Booking,
                     booking.BookingId);
             });
@@ -577,7 +578,10 @@ namespace RacehorseTransport.Services.Implementations
         public async Task<BookingDetailModel> RejectBookingAsync(int id, string reason, CurrentUser currentUser)
         {
             var booking = await GetTrackedBookingAsync(id);
-            EnsureStatus(booking, BookingStatuses.Submitted, "rejected");
+            if (!RejectableStatuses.Contains(booking.Status))
+            {
+                throw new BusinessException($"Only a booking that has not been quoted yet can be rejected (current status: {booking.Status}).");
+            }
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {

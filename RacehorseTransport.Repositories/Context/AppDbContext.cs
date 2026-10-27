@@ -19,6 +19,8 @@ namespace RacehorseTransport.Repositories.Context
         public virtual DbSet<Horse> Horses { get; set; } = null!;
         public virtual DbSet<HorseDocument> HorseDocuments { get; set; } = null!;
         public virtual DbSet<BookingRequest> BookingRequests { get; set; } = null!;
+        public virtual DbSet<RoutePlan> RoutePlans { get; set; } = null!;
+        public virtual DbSet<RoutePlanStop> RoutePlanStops { get; set; } = null!;
         public virtual DbSet<BookingHorse> BookingHorses { get; set; } = null!;
         public virtual DbSet<BookingTransitCountry> BookingTransitCountries { get; set; } = null!;
         public virtual DbSet<DocumentType> DocumentTypes { get; set; } = null!;
@@ -104,6 +106,34 @@ namespace RacehorseTransport.Repositories.Context
                 entity.HasOne(e => e.ReviewedBy).WithMany().HasForeignKey(e => e.ReviewedByUserId);
                 entity.HasOne(e => e.AssignedSpecialist).WithMany().HasForeignKey(e => e.AssignedSpecialistId);
                 entity.HasOne(e => e.AssignedCoordinator).WithMany().HasForeignKey(e => e.AssignedCoordinatorId);
+            });
+
+            modelBuilder.Entity<RoutePlan>(entity =>
+            {
+                entity.ToTable("route_plans", "booking");
+                entity.HasKey(e => e.RoutePlanId);
+                entity.Property(e => e.TransitCountryCodes).HasColumnType("jsonb");
+                entity.Property(e => e.Polyline).HasColumnType("jsonb");
+                entity.Property(e => e.TotalDistanceKm).HasPrecision(10, 2);
+                entity.Property(e => e.EstimatedHours).HasPrecision(8, 2);
+
+                entity.HasOne(e => e.Booking).WithMany().HasForeignKey(e => e.BookingId);
+                entity.HasOne(e => e.PlannedBy).WithMany().HasForeignKey(e => e.PlannedByUserId);
+                entity.HasOne(e => e.ReviewedBy).WithMany().HasForeignKey(e => e.ReviewedByUserId);
+            });
+
+            modelBuilder.Entity<RoutePlanStop>(entity =>
+            {
+                entity.ToTable("route_plan_stops", "booking");
+                entity.HasKey(e => e.RoutePlanStopId);
+                entity.Property(e => e.Latitude).HasPrecision(9, 6);
+                entity.Property(e => e.Longitude).HasPrecision(9, 6);
+                entity.Property(e => e.DistanceKmFromPrevious).HasPrecision(10, 2);
+                entity.Property(e => e.DurationHoursFromPrevious).HasPrecision(8, 2);
+
+                entity.HasOne(e => e.RoutePlan)
+                      .WithMany(p => p.Stops)
+                      .HasForeignKey(e => e.RoutePlanId);
             });
 
             modelBuilder.Entity<BookingHorse>(entity =>
