@@ -29,6 +29,10 @@ namespace RacehorseTransport.Services.BusinessModels
         public decimal? DeclaredValue { get; set; }
         public string? SpecialInstructions { get; set; }
 
+        // R-10: khách phải đồng ý Chính sách dịch vụ đúng phiên bản hiện hành khi gửi đơn
+        public bool AcceptPolicy { get; set; }
+        public string? PolicyVersion { get; set; }
+
         // R-10 / R-11: tọa độ điểm đón / trả (đủ 4 số thì quãng đường + nước đi qua lấy từ bản đồ)
         public decimal? PickupLat { get; set; }
         public decimal? PickupLng { get; set; }
@@ -102,6 +106,12 @@ namespace RacehorseTransport.Services.BusinessModels
         public bool RequiresClimateControl { get; set; }
         public decimal? DeclaredValue { get; set; }
         public string? RejectionReason { get; set; }
+        // R-10: báo giá chốt, hạn chấp nhận, chính sách khách đã đồng ý
+        public DateTimeOffset? QuotedAt { get; set; }
+        public DateTimeOffset? QuoteExpiresAt { get; set; }
+        public DateTimeOffset? QuoteAcceptedAt { get; set; }
+        public string? PolicyVersion { get; set; }
+        public DateTimeOffset? PolicyAcceptedAt { get; set; }
         public int? ReviewedByUserId { get; set; }
         public string? ReviewedByName { get; set; }
         public DateTimeOffset? ReviewedAt { get; set; }

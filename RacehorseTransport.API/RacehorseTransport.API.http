@@ -290,6 +290,8 @@ Content-Type: application/json
   "pickupCountryCode": "VN",
   "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
   "dropoffCountryCode": "CN",
+  "acceptPolicy": true,
+  "policyVersion": "1.0",
   "pickupWindowStart": "2026-11-25T00:00:00+07:00",
   "pickupWindowEnd": "2026-11-30T00:00:00+07:00",
   "deliveryDeadline": "2026-12-20T00:00:00+07:00",
@@ -651,9 +653,38 @@ Content-Type: application/json
   "notes": "Qua Hữu Nghị"
 }
 
-### [ĐÚNG] Manager duyệt tuyến (đơn -> RoutePlanned)
+### [ĐÚNG] Manager duyệt tuyến (đơn -> RoutePlanned -> Quoted, server gửi báo giá chốt cho khách)
 POST {{baseUrl}}/api/route-plans/3/approve
 Authorization: Bearer {{managerToken}}
+
+### [ĐÚNG] Khách chấp nhận báo giá chốt (đổi 2 thành mã đơn đang Quoted) -> AwaitingDeposit
+POST {{baseUrl}}/api/bookings/2/accept-quote
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "acceptPolicy": true,
+  "policyVersion": "1.0"
+}
+
+### [SAI - 400] Chấp nhận mà không đồng ý chính sách
+POST {{baseUrl}}/api/bookings/2/accept-quote
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "acceptPolicy": false,
+  "policyVersion": "1.0"
+}
+
+### [ĐÚNG] Khách từ chối báo giá chốt -> Cancelled, không mất phí
+POST {{baseUrl}}/api/bookings/2/decline-quote
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "reason": "Giá cao hơn dự kiến"
+}
 
 ### [ĐÚNG] Manager từ chối tuyến
 POST {{baseUrl}}/api/route-plans/3/reject

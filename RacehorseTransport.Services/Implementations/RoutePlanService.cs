@@ -17,7 +17,8 @@ namespace RacehorseTransport.Services.Implementations
     public class RoutePlanService : IRoutePlanService
     {
         // Đơn được lập tuyến: vừa duyệt sơ bộ, hoặc đã có tuyến duyệt mà cần phiên bản mới
-        private static readonly string[] PlannableBookingStatuses = { BookingStatuses.PreApproved, BookingStatuses.RoutePlanned };
+        // Quoted: khách chưa chấp nhận báo giá, công ty có thể lập lại tuyến -> duyệt bản mới thì báo giá được tính lại (hạn mới)
+        private static readonly string[] PlannableBookingStatuses = { BookingStatuses.PreApproved, BookingStatuses.RoutePlanned, BookingStatuses.Quoted };
 
         // Dịch vụ bản đồ nhận tối đa 25 điểm (đầu + cuối + 23 mốc)
         private const int MaxIntermediateStops = 23;
@@ -28,6 +29,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IBookingService _bookingService;
         private readonly IGeoService _geoService;
         private readonly ITransitTimeEstimator _transitEstimator;
+        private readonly IBookingQuoteService _quoteService;
         private readonly INotificationService _notificationService;
         private readonly IUnitOfWork _unitOfWork;
 
@@ -38,6 +40,7 @@ namespace RacehorseTransport.Services.Implementations
             IBookingService bookingService,
             IGeoService geoService,
             ITransitTimeEstimator transitEstimator,
+            IBookingQuoteService quoteService,
             INotificationService notificationService,
             IUnitOfWork unitOfWork)
         {
@@ -47,6 +50,7 @@ namespace RacehorseTransport.Services.Implementations
             _bookingService = bookingService;
             _geoService = geoService;
             _transitEstimator = transitEstimator;
+            _quoteService = quoteService;
             _notificationService = notificationService;
             _unitOfWork = unitOfWork;
         }
@@ -242,7 +246,9 @@ namespace RacehorseTransport.Services.Implementations
                 booking.EstimatedTransitHours = plan.EstimatedHours;
                 booking.Status = BookingStatuses.RoutePlanned;
                 await _bookingRepo.SaveChangesAsync();
-                // TODO(BE-05): tính báo giá chốt theo tuyến này, đơn -> Quoted, email QuoteReady
+
+                // R-10: báo giá chốt theo tuyến vừa duyệt, đơn -> Quoted, email cho khách
+                await _quoteService.IssueFinalQuoteAsync(booking.BookingId, plan.RoutePlanId);
 
                 await _notificationService.SendAsync(
                     plan.PlannedByUserId,

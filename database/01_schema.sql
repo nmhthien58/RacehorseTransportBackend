@@ -107,12 +107,20 @@ CREATE TABLE booking.booking_requests (
     estimated_cost           numeric(18,2) NOT NULL DEFAULT 0,
     quote_min                numeric(18,2), -- R-10: khoảng giá ước tính lúc tạo đơn
     quote_max                numeric(18,2),
+    -- R-10: báo giá chốt (estimated_cost + quote_breakdown) gửi sau khi duyệt tuyến; khách chấp nhận rồi cọc trong hạn
+    quoted_at                timestamptz,
+    quote_expires_at         timestamptz,
+    quote_reminder_sent_at   timestamptz,
+    quote_accepted_at        timestamptz,
+    -- Phiên bản Chính sách dịch vụ khách đã đồng ý
+    policy_version           varchar(20),
+    policy_accepted_at       timestamptz,
     currency_code            char(3)       NOT NULL DEFAULT 'USD',
     -- Vòng đời: Submitted -> AwaitingDeposit (Manager duyệt, chờ cọc) -> Approved (đã cọc: làm hồ sơ, xếp chuyến)
     --           -> Completed, hoặc -> AwaitingFinalPayment (còn chi phí phát sinh) -> Completed
     --           | Rejected | Expired (quá hạn duyệt / quá hạn cọc) | Cancelled. 'Assigned' là trạng thái cũ, không còn dùng.
     status                   varchar(25)   NOT NULL DEFAULT 'Submitted'
-        CONSTRAINT ck_booking_requests_status CHECK (status IN ('Submitted', 'PreApproved', 'RoutePlanned', 'AwaitingDeposit', 'Approved', 'Assigned', 'AwaitingFinalPayment', 'Completed', 'Rejected', 'Expired', 'Cancelled')),
+        CONSTRAINT ck_booking_requests_status CHECK (status IN ('Submitted', 'PreApproved', 'RoutePlanned', 'Quoted', 'AwaitingDeposit', 'Approved', 'Assigned', 'AwaitingFinalPayment', 'Completed', 'Rejected', 'Expired', 'QuoteExpired', 'Cancelled')),
     rejection_reason         varchar(500),
     reviewed_by_user_id      integer REFERENCES identity.users (user_id),
     reviewed_at              timestamptz,

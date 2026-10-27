@@ -231,6 +231,11 @@ namespace RacehorseTransport.Services.Implementations
             {
                 throw new ForbiddenException("You can only pay for your own bookings.");
             }
+            // R-10: hết hạn báo giá thì không cọc được nữa (job chuyển đơn sang QuoteExpired ở lượt chạy kế tiếp)
+            if (booking.Status == BookingStatuses.AwaitingDeposit && QuoteRules.IsExpired(booking.QuoteExpiresAt, DateTimeOffset.UtcNow))
+            {
+                throw new BusinessException($"The quote for booking {booking.BookingCode} has expired. Please submit a new request.");
+            }
 
             var settings = await _settingService.GetPaymentSettingsAsync();
             var summary = BuildSummary(booking, settings);

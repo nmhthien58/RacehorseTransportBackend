@@ -41,6 +41,14 @@ namespace RacehorseTransport.API.BackgroundJobs
                         _logger.LogInformation("Expired {Count} booking(s) that passed the review / deposit deadline.", expired);
                     }
 
+                    // R-10: báo giá chốt sắp hết hạn -> nhắc; quá hạn chưa chấp nhận / chưa cọc -> QuoteExpired
+                    var quoteService = scope.ServiceProvider.GetRequiredService<IBookingQuoteService>();
+                    int quoted = await quoteService.ProcessQuoteDeadlinesAsync();
+                    if (quoted > 0)
+                    {
+                        _logger.LogInformation("Processed {Count} quote deadline(s) (reminders or expiries).", quoted);
+                    }
+
                     // R-02: nhắc nợ chi phí phát sinh quá hạn (ngày đến hạn, +3, +7)
                     var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentService>();
                     int reminded = await paymentService.SendOverdueRemindersAsync();

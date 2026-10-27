@@ -39,6 +39,8 @@ namespace RacehorseTransport.Repositories.Constants
         public const string Submitted = "Submitted";
         public const string PreApproved = "PreApproved";                   // R-10: Manager duyệt sơ bộ, chờ Coordinator lập tuyến
         public const string RoutePlanned = "RoutePlanned";                 // R-10: Manager đã duyệt tuyến, chờ báo giá chốt
+        public const string Quoted = "Quoted";                             // R-10: đã gửi báo giá chốt, chờ khách chấp nhận (có hạn)
+        public const string QuoteExpired = "QuoteExpired";                 // R-10: quá hạn chấp nhận / đặt cọc, đơn đóng không mất phí
         public const string AwaitingDeposit = "AwaitingDeposit";           // Manager đã duyệt, chờ khách đặt cọc
         public const string Approved = "Approved";                         // đã cọc: làm hồ sơ, xếp chuyến
         public const string Assigned = "Assigned";                         // trạng thái cũ, không còn tạo mới
@@ -50,7 +52,8 @@ namespace RacehorseTransport.Repositories.Constants
 
         public static readonly string[] All =
         {
-            Submitted, PreApproved, RoutePlanned, AwaitingDeposit, Approved, Assigned, AwaitingFinalPayment, Completed, Rejected, Expired, Cancelled
+            Submitted, PreApproved, RoutePlanned, Quoted, AwaitingDeposit, Approved, Assigned, AwaitingFinalPayment, Completed,
+            Rejected, Expired, QuoteExpired, Cancelled
         };
     }
 
@@ -88,6 +91,7 @@ namespace RacehorseTransport.Repositories.Constants
     public static class CustomerStages
     {
         public const string PendingReview = "PendingReview";       // chờ duyệt
+        public const string QuoteReady = "QuoteReady";             // R-10: có báo giá chốt, chờ khách chấp nhận
         public const string AwaitingDeposit = "AwaitingDeposit";   // chờ đặt cọc
         public const string PreparingDossier = "PreparingDossier"; // đang làm hồ sơ kiểm dịch
         public const string AwaitingTrip = "AwaitingTrip";         // hồ sơ xong, chờ xếp chuyến
@@ -100,7 +104,7 @@ namespace RacehorseTransport.Repositories.Constants
 
         public static readonly string[] All =
         {
-            PendingReview, AwaitingDeposit, PreparingDossier, AwaitingTrip, Scheduled, AwaitingPayment, InTransit, AwaitingHandover, Completed, Closed
+            PendingReview, QuoteReady, AwaitingDeposit, PreparingDossier, AwaitingTrip, Scheduled, AwaitingPayment, InTransit, AwaitingHandover, Completed, Closed
         };
     }
 

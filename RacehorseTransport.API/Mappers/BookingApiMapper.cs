@@ -44,6 +44,8 @@ namespace RacehorseTransport.API.Mappers
                 PickupLng = request.PickupLng,
                 DropoffLat = request.DropoffLat,
                 DropoffLng = request.DropoffLng,
+                AcceptPolicy = request.AcceptPolicy,
+                PolicyVersion = request.PolicyVersion?.Trim(),
                 Horses = request.Horses.Select(h => new CreateBookingHorseModel
                 {
                     HorseId = h.HorseId,
@@ -202,6 +204,11 @@ namespace RacehorseTransport.API.Mappers
                 RequiresClimateControl = model.RequiresClimateControl,
                 DeclaredValue = model.DeclaredValue,
                 RejectionReason = model.RejectionReason,
+                QuotedAt = model.QuotedAt,
+                QuoteExpiresAt = model.QuoteExpiresAt,
+                QuoteAcceptedAt = model.QuoteAcceptedAt,
+                PolicyVersion = model.PolicyVersion,
+                PolicyAcceptedAt = model.PolicyAcceptedAt,
                 ReviewedByUserId = model.ReviewedByUserId,
                 ReviewedByName = model.ReviewedByName,
                 ReviewedAt = model.ReviewedAt,
