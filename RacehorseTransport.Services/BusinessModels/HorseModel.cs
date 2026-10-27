@@ -14,6 +14,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public string Color { get; set; } = string.Empty;
         public string? SpecialCareRequirements { get; set; }
         public string? PhotoUrl { get; set; }
+        public bool IsPregnant { get; set; }
+        public DateOnly? ExpectedFoalingDate { get; set; }
+        public DateOnly? LastFoalingDate { get; set; }
         public bool IsActive { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
     }

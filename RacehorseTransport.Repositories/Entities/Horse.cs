@@ -14,6 +14,11 @@ namespace RacehorseTransport.Repositories.Entities
         public string Color { get; set; } = string.Empty;
         public string? SpecialCareRequirements { get; set; }
         public string? PhotoUrl { get; set; }
+
+        // R-12: tình trạng sinh sản, dùng để chặn chở ngựa cái mang thai gần ngày đẻ hoặc vừa đẻ
+        public bool IsPregnant { get; set; }                  // chỉ ngựa cái (Mare)
+        public DateOnly? ExpectedFoalingDate { get; set; }    // bắt buộc khi IsPregnant
+        public DateOnly? LastFoalingDate { get; set; }        // lần đẻ gần nhất
         public bool IsActive { get; set; } = true;
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 

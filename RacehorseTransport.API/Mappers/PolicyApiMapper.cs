@@ -22,6 +22,9 @@ namespace RacehorseTransport.API.Mappers
                 InsuranceVetCapPercent = model.InsuranceVetCapPercent,
                 InsuranceProofThresholdUsd = model.InsuranceProofThresholdUsd,
                 HorseMinAgeMonths = model.HorseMinAgeMonths,
+                HorseGestationDays = model.HorseGestationDays,
+                HorseLatePregnancyPercent = model.HorseLatePregnancyPercent,
+                HorsePostFoalingDays = model.HorsePostFoalingDays,
                 DeliveryFreeWaitingHours = model.DeliveryFreeWaitingHours,
                 DeliveryWaitingFeePerHourUsd = model.DeliveryWaitingFeePerHourUsd,
                 DeliveryMaxWaitingHours = model.DeliveryMaxWaitingHours,
@@ -46,6 +49,9 @@ namespace RacehorseTransport.API.Mappers
                 InsuranceVetCapPercent = request.InsuranceVetCapPercent,
                 InsuranceProofThresholdUsd = request.InsuranceProofThresholdUsd,
                 HorseMinAgeMonths = request.HorseMinAgeMonths,
+                HorseGestationDays = request.HorseGestationDays,
+                HorseLatePregnancyPercent = request.HorseLatePregnancyPercent,
+                HorsePostFoalingDays = request.HorsePostFoalingDays,
                 DeliveryFreeWaitingHours = request.DeliveryFreeWaitingHours,
                 DeliveryWaitingFeePerHourUsd = request.DeliveryWaitingFeePerHourUsd,
                 DeliveryMaxWaitingHours = request.DeliveryMaxWaitingHours,
@@ -84,7 +90,13 @@ namespace RacehorseTransport.API.Mappers
                     VetCapPercent = s.InsuranceVetCapPercent,
                     ProofThresholdUsd = s.InsuranceProofThresholdUsd
                 },
-                Horse = new PolicyHorseSection { MinAgeMonths = s.HorseMinAgeMonths },
+                Horse = new PolicyHorseSection
+                {
+                    MinAgeMonths = s.HorseMinAgeMonths,
+                    GestationDays = s.HorseGestationDays,
+                    LatePregnancyPercent = s.HorseLatePregnancyPercent,
+                    PostFoalingDays = s.HorsePostFoalingDays
+                },
                 Delivery = new PolicyDeliverySection
                 {
                     FreeWaitingHours = s.DeliveryFreeWaitingHours,
@@ -110,6 +122,9 @@ namespace RacehorseTransport.API.Mappers
                     [SystemSettingService.InsuranceVetCapPercentKey] = s.InsuranceVetCapPercent,
                     [SystemSettingService.InsuranceProofThresholdUsdKey] = s.InsuranceProofThresholdUsd,
                     [SystemSettingService.HorseMinAgeMonthsKey] = s.HorseMinAgeMonths,
+                    [SystemSettingService.HorseGestationDaysKey] = s.HorseGestationDays,
+                    [SystemSettingService.HorseLatePregnancyPercentKey] = s.HorseLatePregnancyPercent,
+                    [SystemSettingService.HorsePostFoalingDaysKey] = s.HorsePostFoalingDays,
                     [SystemSettingService.DeliveryFreeWaitingHoursKey] = s.DeliveryFreeWaitingHours,
                     [SystemSettingService.DeliveryWaitingFeePerHourUsdKey] = s.DeliveryWaitingFeePerHourUsd,
                     [SystemSettingService.DeliveryMaxWaitingHoursKey] = s.DeliveryMaxWaitingHours,

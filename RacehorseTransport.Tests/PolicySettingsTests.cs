@@ -24,6 +24,9 @@ public class PolicySettingsTests
         Assert.Equal(20, m.InsuranceVetCapPercent);
         Assert.Equal(50000, m.InsuranceProofThresholdUsd);
         Assert.Equal(6, m.HorseMinAgeMonths);
+        Assert.Equal(340, m.HorseGestationDays);
+        Assert.Equal(90, m.HorseLatePregnancyPercent);
+        Assert.Equal(7, m.HorsePostFoalingDays);
         Assert.Equal(2, m.DeliveryFreeWaitingHours);
         Assert.Equal(40, m.DeliveryWaitingFeePerHourUsd);
         Assert.Equal(24, m.DeliveryMaxWaitingHours);
@@ -60,6 +63,9 @@ public class PolicySettingsTests
         yield return Case("Insurance.VetCapPercent", m => m.InsuranceVetCapPercent = 150);
         yield return Case("Insurance.ProofThresholdUsd", m => m.InsuranceProofThresholdUsd = -100);
         yield return Case("Horse.MinAgeMonths", m => m.HorseMinAgeMonths = -1);
+        yield return Case("Horse.GestationDays", m => m.HorseGestationDays = 100);
+        yield return Case("Horse.LatePregnancyPercent", m => m.HorseLatePregnancyPercent = 120);
+        yield return Case("Horse.PostFoalingDays", m => m.HorsePostFoalingDays = -1);
         yield return Case("Delivery.FreeWaitingHours", m => m.DeliveryFreeWaitingHours = -2);
         yield return Case("Delivery.WaitingFeePerHourUsd", m => m.DeliveryWaitingFeePerHourUsd = -40);
         yield return Case("Delivery.MaxWaitingHours", m => m.DeliveryMaxWaitingHours = 0);

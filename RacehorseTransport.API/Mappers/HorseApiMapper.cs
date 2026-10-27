@@ -32,7 +32,10 @@ namespace RacehorseTransport.API.Mappers
                 Gender = request.Gender.Trim(),
                 DateOfBirth = request.DateOfBirth!.Value,
                 Color = request.Color.Trim(),
-                SpecialCareRequirements = string.IsNullOrWhiteSpace(request.SpecialCareRequirements) ? null : request.SpecialCareRequirements.Trim()
+                SpecialCareRequirements = string.IsNullOrWhiteSpace(request.SpecialCareRequirements) ? null : request.SpecialCareRequirements.Trim(),
+                IsPregnant = request.IsPregnant,
+                ExpectedFoalingDate = request.ExpectedFoalingDate,
+                LastFoalingDate = request.LastFoalingDate
             };
         }
 
@@ -52,6 +55,9 @@ namespace RacehorseTransport.API.Mappers
                 Color = model.Color,
                 SpecialCareRequirements = model.SpecialCareRequirements,
                 PhotoUrl = model.PhotoUrl,
+                IsPregnant = model.IsPregnant,
+                ExpectedFoalingDate = model.ExpectedFoalingDate,
+                LastFoalingDate = model.LastFoalingDate,
                 IsActive = model.IsActive,
                 CreatedAt = model.CreatedAt
             };

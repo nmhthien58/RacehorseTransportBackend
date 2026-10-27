@@ -19,6 +19,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public decimal InsuranceProofThresholdUsd { get; set; } = 50000; // Insurance.ProofThresholdUsd
 
         public int HorseMinAgeMonths { get; set; } = 6;                // Horse.MinAgeMonths
+        public int HorseGestationDays { get; set; } = 340;             // Horse.GestationDays
+        public decimal HorseLatePregnancyPercent { get; set; } = 90;   // Horse.LatePregnancyPercent
+        public int HorsePostFoalingDays { get; set; } = 7;             // Horse.PostFoalingDays
 
         public int DeliveryFreeWaitingHours { get; set; } = 2;         // Delivery.FreeWaitingHours
         public decimal DeliveryWaitingFeePerHourUsd { get; set; } = 40; // Delivery.WaitingFeePerHourUsd

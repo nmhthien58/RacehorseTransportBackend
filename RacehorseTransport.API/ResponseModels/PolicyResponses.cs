@@ -14,6 +14,9 @@ namespace RacehorseTransport.API.ResponseModels
         public decimal InsuranceVetCapPercent { get; set; }
         public decimal InsuranceProofThresholdUsd { get; set; }
         public int HorseMinAgeMonths { get; set; }
+        public int HorseGestationDays { get; set; }
+        public decimal HorseLatePregnancyPercent { get; set; }
+        public int HorsePostFoalingDays { get; set; }
         public int DeliveryFreeWaitingHours { get; set; }
         public decimal DeliveryWaitingFeePerHourUsd { get; set; }
         public int DeliveryMaxWaitingHours { get; set; }
@@ -73,6 +76,9 @@ namespace RacehorseTransport.API.ResponseModels
     public class PolicyHorseSection
     {
         public int MinAgeMonths { get; set; }
+        public int GestationDays { get; set; }
+        public decimal LatePregnancyPercent { get; set; }
+        public int PostFoalingDays { get; set; }
     }
 
     public class PolicyDeliverySection

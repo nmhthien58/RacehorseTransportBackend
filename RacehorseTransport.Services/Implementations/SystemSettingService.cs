@@ -39,6 +39,9 @@ namespace RacehorseTransport.Services.Implementations
         public const string InsuranceVetCapPercentKey = "Insurance.VetCapPercent";
         public const string InsuranceProofThresholdUsdKey = "Insurance.ProofThresholdUsd";
         public const string HorseMinAgeMonthsKey = "Horse.MinAgeMonths";
+        public const string HorseGestationDaysKey = "Horse.GestationDays";
+        public const string HorseLatePregnancyPercentKey = "Horse.LatePregnancyPercent";
+        public const string HorsePostFoalingDaysKey = "Horse.PostFoalingDays";
         public const string DeliveryFreeWaitingHoursKey = "Delivery.FreeWaitingHours";
         public const string DeliveryWaitingFeePerHourUsdKey = "Delivery.WaitingFeePerHourUsd";
         public const string DeliveryMaxWaitingHoursKey = "Delivery.MaxWaitingHours";
@@ -78,6 +81,12 @@ namespace RacehorseTransport.Services.Implementations
                 m => Num(m.InsuranceProofThresholdUsd), (m, v) => m.InsuranceProofThresholdUsd = ParseDec(v, m.InsuranceProofThresholdUsd)),
             new(HorseMinAgeMonthsKey, "Tuổi tối thiểu (tháng) của ngựa, tính tới ngày cuối của khoảng đón",
                 m => Num(m.HorseMinAgeMonths), (m, v) => m.HorseMinAgeMonths = ParseInt(v, m.HorseMinAgeMonths)),
+            new(HorseGestationDaysKey, "Số ngày thai kỳ trung bình của ngựa",
+                m => Num(m.HorseGestationDays), (m, v) => m.HorseGestationDays = ParseInt(v, m.HorseGestationDays)),
+            new(HorseLatePregnancyPercentKey, "Không chở ngựa cái đã quá % thai kỳ này (tính tại ngày cuối của khoảng đón)",
+                m => Num(m.HorseLatePregnancyPercent), (m, v) => m.HorseLatePregnancyPercent = ParseDec(v, m.HorseLatePregnancyPercent)),
+            new(HorsePostFoalingDaysKey, "Không chở ngựa cái vừa đẻ trong số ngày này",
+                m => Num(m.HorsePostFoalingDays), (m, v) => m.HorsePostFoalingDays = ParseInt(v, m.HorsePostFoalingDays)),
             new(DeliveryFreeWaitingHoursKey, "Số giờ xe chờ miễn phí tại điểm giao",
                 m => Num(m.DeliveryFreeWaitingHours), (m, v) => m.DeliveryFreeWaitingHours = ParseInt(v, m.DeliveryFreeWaitingHours)),
             new(DeliveryWaitingFeePerHourUsdKey, "Phí chờ (USD / giờ) sau thời gian chờ miễn phí",
@@ -307,6 +316,9 @@ namespace RacehorseTransport.Services.Implementations
             NonNegative(model.InsuranceProofThresholdUsd, InsuranceProofThresholdUsdKey);
 
             Between(model.HorseMinAgeMonths, 0, 240, HorseMinAgeMonthsKey);
+            Between(model.HorseGestationDays, 300, 400, HorseGestationDaysKey);
+            Percent(model.HorseLatePregnancyPercent, HorseLatePregnancyPercentKey);
+            Between(model.HorsePostFoalingDays, 0, 60, HorsePostFoalingDaysKey);
 
             Between(model.DeliveryFreeWaitingHours, 0, 72, DeliveryFreeWaitingHoursKey);
             NonNegative(model.DeliveryWaitingFeePerHourUsd, DeliveryWaitingFeePerHourUsdKey);

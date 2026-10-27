@@ -100,7 +100,10 @@ namespace RacehorseTransport.Services.Implementations
                 DateOfBirth = model.DateOfBirth,
                 Color = model.Color,
                 SpecialCareRequirements = model.SpecialCareRequirements,
-                PhotoUrl = photoPath
+                PhotoUrl = photoPath,
+                IsPregnant = model.IsPregnant,
+                ExpectedFoalingDate = model.IsPregnant ? model.ExpectedFoalingDate : null,
+                LastFoalingDate = model.LastFoalingDate
             };
 
             await _horseRepo.AddAsync(horse);
@@ -122,6 +125,9 @@ namespace RacehorseTransport.Services.Implementations
             horse.DateOfBirth = model.DateOfBirth;
             horse.Color = model.Color;
             horse.SpecialCareRequirements = model.SpecialCareRequirements;
+            horse.IsPregnant = model.IsPregnant;
+            horse.ExpectedFoalingDate = model.IsPregnant ? model.ExpectedFoalingDate : null;
+            horse.LastFoalingDate = model.LastFoalingDate;
 
             if (photo != null)
             {
@@ -207,9 +213,24 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Gender '{model.Gender}' is invalid. Allowed values: {string.Join(", ", HorseGenders.All)}.");
             }
 
-            if (model.DateOfBirth >= DateOnly.FromDateTime(DateTime.UtcNow))
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            if (model.DateOfBirth >= today)
             {
                 throw new BusinessException("DateOfBirth must be in the past.");
+            }
+
+            // R-12: tình trạng sinh sản chỉ áp cho ngựa cái
+            if (model.Gender != HorseGenders.Mare && (model.IsPregnant || model.LastFoalingDate.HasValue))
+            {
+                throw new BusinessException("Only a mare can be pregnant or have a foaling date.");
+            }
+            if (model.IsPregnant && !model.ExpectedFoalingDate.HasValue)
+            {
+                throw new BusinessException("ExpectedFoalingDate is required when the mare is pregnant.");
+            }
+            if (model.LastFoalingDate.HasValue && (model.LastFoalingDate > today || model.LastFoalingDate <= model.DateOfBirth))
+            {
+                throw new BusinessException("LastFoalingDate must be after DateOfBirth and not in the future.");
             }
         }
 
