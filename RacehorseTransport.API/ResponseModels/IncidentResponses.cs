@@ -23,10 +23,15 @@ namespace RacehorseTransport.API.ResponseModels
         public string? RevisedRouteNotes { get; set; }
         public decimal AdditionalCost { get; set; }
         public string? RejectionReason { get; set; }
+        public string? FaultParty { get; set; }   // Company | Customer | ForceMajeure, có khi sự cố đã đóng
+        public string? FaultNote { get; set; }
         public int? ApprovedByUserId { get; set; }
         public string? ApprovedByName { get; set; }
         public DateTimeOffset? ApprovedAt { get; set; }
         public DateTimeOffset? ResolvedAt { get; set; }
+        public bool EmergencyOffload { get; set; }        // tài xế đã dỡ con ngựa ngay lúc báo sự cố
+        public string? OffloadOutcome { get; set; }       // hướng xử lý tiếp của phương án OffloadHorse
+        public string? VetReportUrl { get; set; }         // link xem biên bản thú y (có hạn)
     }
 
     // Thay đổi tuyến của phương án. AppliedAt có giá trị khi tuyến đã được áp vào lộ trình (lúc Manager duyệt).

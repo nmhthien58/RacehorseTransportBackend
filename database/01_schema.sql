@@ -137,7 +137,7 @@ CREATE TABLE booking.booking_horses (
     horse_id          integer     NOT NULL REFERENCES racehorse.horses (horse_id),
     notes             varchar(300),
     status            varchar(20) NOT NULL DEFAULT 'Pending'
-        CONSTRAINT ck_booking_horses_status CHECK (status IN ('Pending', 'Approved', 'Cancelled')),
+        CONSTRAINT ck_booking_horses_status CHECK (status IN ('Pending', 'Approved', 'Cancelled', 'Deceased')), -- Deceased: chết trên đường (R-12)
     stall_class       varchar(10) NOT NULL DEFAULT 'Shared' -- Hạng chuồng (hệ số nhân cước)
         CONSTRAINT ck_booking_horses_stall CHECK (stall_class IN ('Shared', 'Comfort', 'Private')),
     CONSTRAINT uq_booking_horses UNIQUE (booking_id, horse_id)
@@ -308,12 +308,16 @@ CREATE TABLE fleet.trip_horses (
     escort_user_id     integer REFERENCES identity.users (user_id), -- Escort phụ trách con này (R-06), tối đa 3 con / escort
     -- Trạng thái riêng của từng con trên chuyến (R-05); trạng thái chuyến là trạng thái của xe
     status             varchar(20) NOT NULL DEFAULT 'Planned'
-        CONSTRAINT ck_trip_horses_status CHECK (status IN ('Planned', 'InTransit', 'Delivered', 'Offloaded', 'Cancelled')),
+        CONSTRAINT ck_trip_horses_status CHECK (status IN ('Planned', 'InTransit', 'Delivered', 'Offloaded', 'Deceased', 'Cancelled')),
     picked_up_at       timestamptz,   -- lúc xe rời điểm đón của con ngựa
     delivered_at       timestamptz,   -- lúc ký biên bản bàn giao
     handover_id        integer,       -- biên bản e-POD (khóa ngoại thêm sau khi tạo bảng handover_acceptances)
-    offloaded_at       timestamptz,   -- rớt lại giữa đường (sự cố / thú y), quay về hàng chờ xếp chuyến
+    offloaded_at       timestamptz,   -- rời chuyến giữa đường, chỉ qua sự cố (R-12)
     offload_reason     varchar(300),
+    -- Hướng xử lý tiếp khi rời chuyến; NULL = tài xế dỡ khẩn cấp, chờ phương án được duyệt.
+    -- Chỉ WaitRecover đưa con ngựa về hàng chờ xếp chuyến.
+    offload_outcome    varchar(20)
+        CONSTRAINT ck_trip_horses_offload_outcome CHECK (offload_outcome IN ('WaitRecover', 'ReturnToOrigin', 'HandOverHere', 'Deceased')),
     CONSTRAINT uq_trip_horses UNIQUE (trip_id, booking_horse_id),
     CONSTRAINT uq_trip_horses_stall UNIQUE (trip_id, stall_slot_number) -- Hai ngựa không chung một ô chuồng
 );
@@ -399,7 +403,16 @@ CREATE TABLE incident.trip_incidents (
     severity                varchar(10)   NOT NULL DEFAULT 'Moderate'
         CONSTRAINT ck_trip_incidents_severity CHECK (severity IN ('Minor', 'Moderate', 'Major', 'Critical')),
     affected_trip_horse_id  integer REFERENCES fleet.trip_horses (trip_horse_id),
-    resolved_at             timestamptz
+    resolved_at             timestamptz,
+    -- Phương án OffloadHorse (R-12): hướng xử lý tiếp + biên bản thú y (bắt buộc khi Deceased)
+    offload_outcome         varchar(20)
+        CONSTRAINT ck_trip_incidents_offload_outcome CHECK (offload_outcome IN ('WaitRecover', 'ReturnToOrigin', 'HandOverHere', 'Deceased')),
+    vet_report_path         varchar(500),
+    emergency_offload       boolean       NOT NULL DEFAULT false, -- tài xế đã dỡ con ngựa ngay lúc báo sự cố
+    -- R-09: nguyên nhân, bắt buộc khi đóng sự cố; quyết định ai chịu chi phí và có bồi thường giao trễ không
+    fault_party             varchar(15)
+        CONSTRAINT ck_trip_incidents_fault_party CHECK (fault_party IN ('Company', 'Customer', 'ForceMajeure')),
+    fault_note              varchar(500)
 );
 
 -- =====================================================================================
@@ -420,9 +433,11 @@ CREATE TABLE acceptance.handover_acceptances (
         CONSTRAINT ck_handover_acceptances_condition CHECK (overall_condition IN ('Excellent', 'NormalFatigue', 'Injured')),
     remarks                text,
     driver_user_id         integer      NOT NULL REFERENCES identity.users (user_id),
-    checkpoint_id          integer REFERENCES fleet.route_checkpoints (checkpoint_id), -- mốc ký nhận (DropOff của đơn hoặc Destination)
-    CONSTRAINT uq_handover_acceptances_trip_booking UNIQUE (trip_id, booking_id)
+    checkpoint_id          integer REFERENCES fleet.route_checkpoints (checkpoint_id) -- mốc ký nhận (DropOff của đơn hoặc Destination; giao tại chỗ: mốc gần nhất lúc dỡ ngựa)
 );
+
+-- Một đơn có thể có nhiều biên bản trên cùng chuyến: giao tại chỗ con ngựa rời chuyến (R-12) + giao ở điểm trả
+CREATE INDEX ix_handover_acceptances_trip_booking ON acceptance.handover_acceptances (trip_id, booking_id);
 
 ALTER TABLE fleet.trip_horses ADD CONSTRAINT fk_trip_horses_handover
     FOREIGN KEY (handover_id) REFERENCES acceptance.handover_acceptances (handover_id);
@@ -528,6 +543,27 @@ CREATE TABLE billing.payments (
     paid_at                timestamptz,
     raw_response           jsonb,
     CONSTRAINT ck_payments_refund_link CHECK ((payment_type = 'Refund') = (refund_of_payment_id IS NOT NULL))
+);
+
+-- Bồi thường giao trễ (R-09): tính khi đóng chuyến cho từng đơn giao trễ do lỗi công ty; Manager duyệt / sửa / từ chối.
+-- Duyệt xong, tiền được hoàn qua các dòng Refund của billing.payments.
+CREATE TABLE billing.delay_compensations (
+    delay_compensation_id  integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    booking_id             integer       NOT NULL REFERENCES booking.booking_requests (booking_id),
+    trip_id                integer       NOT NULL REFERENCES fleet.trips (trip_id),
+    delay_hours            numeric(10,2) NOT NULL,
+    freight_amount         numeric(18,2) NOT NULL,  -- báo giá - bảo hiểm - phí thủ tục
+    percent                numeric(5,2)  NOT NULL,
+    calculated_amount      numeric(18,2) NOT NULL CONSTRAINT ck_delay_compensations_calculated CHECK (calculated_amount >= 0),
+    approved_amount        numeric(18,2) CONSTRAINT ck_delay_compensations_approved CHECK (approved_amount >= 0),
+    currency_code          char(3)       NOT NULL DEFAULT 'USD',
+    status                 varchar(20)   NOT NULL DEFAULT 'AwaitingApproval'
+        CONSTRAINT ck_delay_compensations_status CHECK (status IN ('AwaitingApproval', 'Approved', 'Rejected')),
+    review_reason          varchar(500),
+    reviewed_by_user_id    integer REFERENCES identity.users (user_id),
+    reviewed_at            timestamptz,
+    created_at             timestamptz   NOT NULL DEFAULT now(),
+    CONSTRAINT uq_delay_compensations_booking_trip UNIQUE (booking_id, trip_id)
 );
 
 CREATE INDEX ix_payments_booking ON billing.payments (booking_id, created_at DESC);

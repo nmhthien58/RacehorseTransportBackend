@@ -97,6 +97,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset? DeliveredAt { get; set; }
         public DateTimeOffset? OffloadedAt { get; set; }
         public string? OffloadReason { get; set; }
+        public string? OffloadOutcome { get; set; }
     }
 
     public class TripCheckpointModel
