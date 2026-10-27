@@ -234,7 +234,9 @@ Làm:
 - Email `ClaimDecision`. Endpoint cho khách (xem, mở, nộp chứng từ) và Manager (danh sách, duyệt, từ chối, đánh dấu đã trả).
 - Test các trần chi trả và điều kiện "chỉ khi lỗi công ty".
 
-### [ ] BE-13 · `fault_party` + bồi thường giao trễ (R-09)
+### [x] BE-13 · `fault_party` + bồi thường giao trễ (R-09)
+Đã làm: `resolve` bắt buộc `faultParty` (+ `faultNote`); đóng chuyến bị chặn khi còn sự cố `Approved` chưa đóng. "Lỗi công ty" = không có sự cố được chấp nhận hoặc có ít nhất một sự cố `Company` (dùng cho cả KPI và bồi thường). Sự cố `Company` không cộng chi phí vào phát sinh của khách (Chính sách 9.1). Bồi thường lưu ở bảng riêng `billing.delay_compensations` (chờ duyệt → duyệt / từ chối); duyệt thì tạo các dòng `Refund` qua `IPaymentService.RefundAmountAsync` (dùng lại cho BE-12 / BE-14b). Phí thủ tục = `FEE_DOCS`, `FEE_CLEARANCE`, `FEE_QUARANTINE`, `FEE_TRANSIT`; `FEE_PICKUP` tính là cước.
+
 Làm:
 - `incident.trip_incidents`: thêm `fault_party` (`Company` / `Customer` / `ForceMajeure`), bắt buộc khi đóng sự cố (`ResolveIncidentAsync` nhận thêm tham số).
 - KPI: `DelayedForceMajeure` chỉ khi các sự cố đã duyệt có `fault_party = ForceMajeure` (thay cách hiện tại "có sự cố là bất khả kháng").

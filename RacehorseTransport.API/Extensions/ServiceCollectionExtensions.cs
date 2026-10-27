@@ -113,6 +113,7 @@ namespace RacehorseTransport.API.Extensions
             // Nghiệp vụ
             services.AddHttpClient<IDistanceService, DistanceService>(client => client.Timeout = TimeSpan.FromSeconds(5));
             services.AddScoped<IAuthService, AuthService>();
+            services.AddScoped<IDelayCompensationService, DelayCompensationService>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IHorseService, HorseService>();
             services.AddScoped<IHorseDocumentService, HorseDocumentService>();

@@ -717,12 +717,18 @@ namespace RacehorseTransport.Services.Implementations
             };
         }
 
-        public async Task<IncidentModel> ResolveIncidentAsync(int incidentId, CurrentUser currentUser)
+        public async Task<IncidentModel> ResolveIncidentAsync(int incidentId, string faultParty, string? faultNote, CurrentUser currentUser)
         {
             var incident = await GetTrackedIncidentAsync(incidentId);
             var trip = incident.Trip!;
 
-            // Phải có phương án đã duyệt: sự cố Resolved được tính là bất khả kháng khi chốt KPI (T-26)
+            // R-09: nguyên nhân quyết định ai chịu chi phí, hoàn tiền và bồi thường giao trễ (Chính sách mục 9.1)
+            if (!FaultParties.All.Contains(faultParty))
+            {
+                throw new BusinessException($"FaultParty '{faultParty}' is invalid. Allowed values: {string.Join(", ", FaultParties.All)}.");
+            }
+
+            // Phải có phương án đã duyệt; nguyên nhân dùng khi chốt KPI và bồi thường giao trễ lúc đóng chuyến
             if (incident.Status != IncidentStatuses.Approved)
             {
                 throw new BusinessException($"Only an incident with an approved plan can be resolved (current status: {incident.Status}).");
@@ -734,6 +740,8 @@ namespace RacehorseTransport.Services.Implementations
             {
                 incident.Status = IncidentStatuses.Resolved;
                 incident.ResolvedAt = DateTimeOffset.UtcNow;
+                incident.FaultParty = faultParty;
+                incident.FaultNote = string.IsNullOrWhiteSpace(faultNote) ? null : faultNote.Trim();
                 await _incidentRepo.UpdateAsync(incident);
 
                 // Chuyến trở lại hành trình bình thường khi không còn sự cố nào khác đang xử lý theo phương án đã duyệt

@@ -33,6 +33,10 @@ namespace RacehorseTransport.Repositories.Entities
         // Tài xế đã dỡ con ngựa ngay lúc báo sự cố (thú y yêu cầu); phương án OffloadHorse vẫn phải được duyệt sau
         public bool EmergencyOffload { get; set; }
 
+        // R-09: nguyên nhân, bắt buộc khi đóng sự cố (FaultParties) + giải thích ngắn
+        public string? FaultParty { get; set; }
+        public string? FaultNote { get; set; }
+
         // Navigation properties
         public virtual Trip? Trip { get; set; }
         public virtual User? ReportedBy { get; set; }

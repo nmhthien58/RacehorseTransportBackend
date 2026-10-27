@@ -31,6 +31,8 @@ namespace RacehorseTransport.Services.Mappers
                 RevisedRouteNotes = entity.RevisedRouteNotes,
                 AdditionalCost = entity.AdditionalCost,
                 RejectionReason = entity.RejectionReason,
+                FaultParty = entity.FaultParty,
+                FaultNote = entity.FaultNote,
                 ApprovedByUserId = entity.ApprovedByUserId,
                 ApprovedByName = entity.ApprovedBy?.FullName,
                 ApprovedAt = entity.ApprovedAt,

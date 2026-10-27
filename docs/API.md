@@ -29,6 +29,7 @@ Tài liệu này hướng dẫn gọi API của hệ thống vận chuyển ng�
 17. [Bảng giá](#17-bảng-giá)
 18. [Danh mục giá trị cho dropdown](#18-danh-mục-giá-trị-cho-dropdown)
 19. [Thanh toán (đặt cọc, phần còn lại, phát sinh, hoàn tiền)](#19-thanh-toán-đặt-cọc-phần-còn-lại-phát-sinh-hoàn-tiền)
+19b. [Bồi thường giao trễ](#19b-bồi-thường-giao-trễ)
 20. [Chính sách dịch vụ và cấu hình](#20-chính-sách-dịch-vụ-và-cấu-hình)
 21. [Những phần chưa có API](#21-những-phần-chưa-có-api)
 22. [Bảng tra nhanh mọi endpoint](#22-bảng-tra-nhanh-mọi-endpoint)
@@ -432,6 +433,7 @@ Các trường dưới đây chỉ nhận đúng những giá trị liệt kê, 
 | `stressLevel` | `Calm` bình tĩnh · `MildStress` hơi căng thẳng · `Agitated` kích động |
 | `incidentType` (loại sự cố) | `MechanicalBreakdown` hỏng xe · `BorderCongestion` tắc biên · `EquineHealthIssue` sức khỏe ngựa · `Weather` thời tiết · `ClimateControlFailure` hỏng điều hòa · `CustomsHold` bị giữ ở hải quan · `Other` khác |
 | `severity` (mức độ sự cố) | `Minor` nhẹ · `Moderate` vừa · `Major` nặng · `Critical` nghiêm trọng |
+| Nguyên nhân sự cố (`faultParty`) | `Company` lỗi công ty · `Customer` lỗi khách · `ForceMajeure` bất khả kháng. Chọn khi đóng sự cố; quyết định ai chịu chi phí và có bồi thường giao trễ không (Chính sách mục 9.1) |
 | Trạng thái sự cố | `Reported` mới báo · `PlanProposed` đã có phương án chờ duyệt · `Approved` phương án được duyệt · `Rejected` phương án bị từ chối · `Resolved` đã xử lý xong |
 | `overallCondition` (tình trạng khi bàn giao) | `Excellent` tốt · `NormalFatigue` mệt bình thường · `Injured` bị thương |
 | `onTimeStatus` (kết quả đúng giờ của chuyến) | `OnTime` đúng giờ · `Delayed_AcceptableForceMajeure` trễ do bất khả kháng · `Delayed_OperationalFault` trễ do lỗi vận hành |
@@ -4244,6 +4246,8 @@ Một sự cố (`incident`) có dạng:
   "revisedRouteNotes": "Đã liên hệ trạm thú y Bằng Tường",
   "additionalCost": 650,
   "rejectionReason": "Chi phí quá cao, tìm phương án rẻ hơn.",
+  "faultParty": null,
+  "faultNote": null,
   "approvedByUserId": null,
   "approvedByName": null,
   "approvedAt": null,
@@ -4267,6 +4271,7 @@ Một sự cố (`incident`) có dạng:
 | `rejectionReason` | Lý do quản lý từ chối phương án gần nhất. Được giữ lại khi điều phối đề xuất lại, và xóa (`null`) khi phương án được duyệt |
 | `approvedByName`, `approvedAt` | Quản lý duyệt phương án |
 | `resolvedAt` | Thời điểm đóng sự cố |
+| `faultParty`, `faultNote` | Nguyên nhân chọn khi đóng sự cố (`Company`, `Customer`, `ForceMajeure`) và giải thích; `null` khi sự cố chưa đóng |
 | `emergencyOffload` | `true` khi tài xế đã dỡ con ngựa `affectedTripHorseId` xuống ngay lúc báo sự cố |
 | `offloadOutcome` | Hướng xử lý tiếp của phương án `OffloadHorse` (`WaitRecover`, `ReturnToOrigin`, `HandOverHere`, `Deceased`); `null` với phương án khác |
 | `vetReportUrl` | Link xem biên bản thú y (có hạn, mục 2.5); có khi phương án kèm biên bản |
@@ -4617,10 +4622,18 @@ Lỗi thường gặp:
 
 ### POST /api/incidents/{id}/resolve — Đóng sự cố
 
-Ghi nhận sự cố đã xử lý xong. Chỉ đóng được sự cố có phương án đã duyệt (`Approved`). Nếu chuyến đang `EmergencyRerouting` và không còn sự cố nào khác đang xử lý, chuyến trở lại `InTransit`.
+Ghi nhận sự cố đã xử lý xong và **chọn nguyên nhân** (bắt buộc). Chỉ đóng được sự cố có phương án đã duyệt (`Approved`). Nếu chuyến đang `EmergencyRerouting` và không còn sự cố nào khác đang xử lý, chuyến trở lại `InTransit`.
+
+Nguyên nhân quyết định tiền (Chính sách mục 9.1), nên frontend nên hiện ngay dưới ô chọn hệ quả của từng lựa chọn:
+
+| `faultParty` | Ví dụ | Chi phí phát sinh của sự cố | Bồi thường giao trễ |
+|---|---|---|---|
+| `Company` (lỗi công ty) | Xe hỏng do bảo dưỡng kém, thiếu giấy do chuyên viên, đi sai tuyến | **Công ty chịu**: không cộng vào phát sinh của khách | Có, nếu chuyến giao trễ (mục 19b) |
+| `Customer` (lỗi khách) | Giấy sai / giả, khai sai tình trạng ngựa | Khách chịu (cộng vào phát sinh khi đóng chuyến) | Không |
+| `ForceMajeure` (bất khả kháng) | Đóng biên, thiên tai, dịch bệnh, tai nạn do bên thứ ba | Khách chịu (cộng vào phát sinh khi đóng chuyến) | Không |
 
 - **Ai gọi được:** FleetCoordinator, Admin
-- **Dữ liệu gửi lên:** không có (không cần body)
+- **Dữ liệu gửi lên:** JSON
 
 Tham số trên đường dẫn:
 
@@ -4628,12 +4641,28 @@ Tham số trên đường dẫn:
 |---|---|
 | `id` | Mã sự cố |
 
-Response `200`: sự cố với `status` là `Resolved`, có `resolvedAt`; `tripStatus` cho biết trạng thái mới của chuyến.
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `faultParty` | chuỗi | Có | `Company`, `Customer` hoặc `ForceMajeure` |
+| `faultNote` | chuỗi | Không | Giải thích ngắn, tối đa 500 ký tự |
+
+Ví dụ request:
+
+```json
+{
+  "faultParty": "Company",
+  "faultNote": "Phanh không được bảo dưỡng đúng hạn"
+}
+```
+
+Response `200`: sự cố với `status` là `Resolved`, có `resolvedAt`, `faultParty`, `faultNote`; `tripStatus` cho biết trạng thái mới của chuyến.
 
 Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
+| 400 | `Validation failed` (`FaultParty is required.`) | Không chọn nguyên nhân |
+| 400 | `FaultParty 'Weather' is invalid. Allowed values: Company, Customer, ForceMajeure.` | Sai giá trị |
 | 400 | `Only an incident with an approved plan can be resolved (current status: Reported).` | Phương án chưa được duyệt, hoặc sự cố đã đóng rồi |
 
 ---
@@ -4827,6 +4856,13 @@ Lỗi thường gặp:
 
 Đóng một chuyến đã tới đích sau khi **mọi con ngựa trên chuyến đã xong**: đã ký biên bản bàn giao, hoặc đã rời chuyến theo phương án `OffloadHorse` được duyệt (R-12). Con ngựa đang chờ phương án (dỡ khẩn cấp) hoặc chờ ký e-POD tại chỗ (`HandOverHere`) sẽ chặn việc đóng chuyến. Hệ thống tự tính và lưu kết quả; không sửa lại được.
 
+Quy tắc mới (R-09):
+
+- Mọi sự cố đã duyệt phương án phải được **đóng** (chọn nguyên nhân) trước khi đóng chuyến.
+- KPI: chuyến trễ chỉ được ghi `Delayed_AcceptableForceMajeure` khi **mọi** sự cố được chấp nhận đều do bất khả kháng hoặc do khách; còn lại (không có sự cố, hoặc có sự cố do công ty) là `Delayed_OperationalFault`.
+- Chi phí phát sinh của sự cố do lỗi công ty **không** cộng vào phát sinh của khách.
+- Chuyến trễ do lỗi công ty: với từng đơn ký e-POD sau hạn giao quá `Delay.GraceHours` giờ, hệ thống tạo một khoản **bồi thường giao trễ chờ Manager duyệt** (mục 19b) và báo các Manager.
+
 - **Ai gọi được:** LogisticsManager, Admin
 - **Dữ liệu gửi lên:** JSON
 
@@ -4877,6 +4913,7 @@ Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
+| 400 | `Resolve incident(s) INC-2026-0007 and choose their cause before closing the trip.` | Còn sự cố đã duyệt phương án mà chưa đóng |
 | 400 | `The trip cannot be closed: Sakura Wind (BKG-2026-0002): handover is not signed.` | Còn con ngựa chưa xong; `message` liệt kê từng con, mã đơn và lý do: `handover is not signed` (còn trên xe), `offloaded in an emergency, waiting for an approved OffloadHorse plan`, `on-site handover is not signed` |
 | 400 | `Only a trip that has arrived at the destination can be closed (current status: InTransit).` | Chuyến chưa tới đích, hoặc đã đóng rồi |
 
@@ -7002,6 +7039,113 @@ Response `200`: `data` là cấu hình sau khi lưu (dạng giống GET).
 
 ---
 
+## 19b. Bồi thường giao trễ
+
+Chính sách mục 7: giao trễ quá `Delay.GraceHours` (6) giờ so với hạn giao **do lỗi công ty** thì công ty hoàn `Delay.PercentPer12Hours` (5)% **tiền cước** cho mỗi 12 giờ trễ (chưa đủ 12 giờ tính tròn lên), tối đa `Delay.MaxPercent` (25)%.
+
+- **Giờ trễ** = lúc ký e-POD của đơn − hạn giao của đơn.
+- **Tiền cước** = báo giá − bảo hiểm (`INS_*`) − phí thủ tục (`FEE_DOCS`, `FEE_CLEARANCE`, `FEE_QUARANTINE`, `FEE_TRANSIT`). Đơn cũ không có chi tiết báo giá thì lấy cả tổng báo giá.
+- **Do lỗi công ty**: chuyến không có sự cố nào được chấp nhận, hoặc có ít nhất một sự cố có `faultParty = Company`.
+
+Ví dụ: tiền cước 2.528,80 USD, trễ 20 giờ → (20 − 6) / 12 = 1,17 → tròn lên 2 bậc → 10% → 252,88 USD.
+
+Luồng: Manager đóng chuyến → hệ thống tạo khoản bồi thường `AwaitingApproval` và báo các Manager → Manager **duyệt** (có thể sửa số tiền kèm lý do) hoặc **từ chối** → khi duyệt, tiền được hoàn vào phương thức thanh toán của khách: hệ thống tạo các dòng `Refund` (xem `GET /api/bookings/{id}/payments`), hoàn qua VNPay; khoản khách trả ngoài hệ thống thì Manager hoàn tay rồi bấm `mark-refunded`. Khách nhận thông báo + email.
+
+Một khoản bồi thường (`delayCompensation`) có dạng:
+
+```json
+{
+  "delayCompensationId": 1,
+  "bookingId": 100,
+  "bookingCode": "BKG-2026-0012",
+  "customerName": "Hoàng Minh Châu",
+  "tripId": 100,
+  "tripCode": "TRP-2026-0009",
+  "delayHours": 20.0,
+  "freightAmount": 7500.0,
+  "percent": 10.0,
+  "calculatedAmount": 750.0,
+  "approvedAmount": 150.0,
+  "currencyCode": "USD",
+  "status": "Approved",
+  "reviewReason": "Một phần thời gian trễ do kẹt biên",
+  "reviewedByName": "Trần Quốc Bảo",
+  "reviewedAt": "2026-10-27T07:42:11.120+00:00",
+  "createdAt": "2026-10-27T07:41:58.004+00:00"
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `delayHours` | Số giờ ký e-POD sau hạn giao |
+| `freightAmount` | Tiền cước dùng để tính |
+| `percent`, `calculatedAmount` | % và số tiền hệ thống tính |
+| `approvedAmount` | Số tiền Manager duyệt (`null` khi chưa duyệt / bị từ chối) |
+| `status` | `AwaitingApproval` chờ duyệt · `Approved` đã duyệt (tiền đang / đã hoàn) · `Rejected` từ chối |
+| `reviewReason` | Lý do khi sửa số tiền hoặc từ chối |
+
+### GET /api/delay-compensations — Danh sách bồi thường giao trễ (Manager)
+
+- **Ai gọi được:** LogisticsManager, Admin
+
+| Tham số query | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `status` | chuỗi | Không | `AwaitingApproval`, `Approved` hoặc `Rejected`; bỏ trống = tất cả |
+
+Ví dụ: `GET /api/delay-compensations?status=AwaitingApproval`
+
+Response `200`: `data` là mảng bồi thường (dạng như trên), mới nhất trước.
+
+### GET /api/bookings/{bookingId}/delay-compensations — Bồi thường của một đơn
+
+Khách xem trên trang đơn: bị trễ bao lâu, được bồi thường bao nhiêu, trạng thái.
+
+- **Ai gọi được:** Khách của đơn, nhân sự xem được đơn
+
+Response `200`: `data` là mảng bồi thường của đơn (thường 0 hoặc 1 phần tử).
+
+| HTTP | Khi nào |
+|---|---|
+| 403 | Đơn không phải của mình |
+| 404 | Không có đơn |
+
+### POST /api/delay-compensations/{id}/approve — Duyệt bồi thường
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `amount` | số | Có | Số tiền hoàn, lớn hơn 0. Thường gửi lại `calculatedAmount` |
+| `reason` | chuỗi | Có khi `amount` khác `calculatedAmount` | Lý do sửa số tiền, tối đa 500 ký tự |
+
+Ví dụ request:
+
+```json
+{
+  "amount": 150,
+  "reason": "Một phần thời gian trễ do kẹt biên"
+}
+```
+
+Response `200`: khoản bồi thường với `status` = `Approved`. Các dòng hoàn tiền xem ở `GET /api/bookings/{id}/payments`.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Give a reason when the amount differs from the calculated 750.00 USD.` | Sửa số tiền mà không có lý do |
+| 400 | `Booking BKG-2026-0012 has only 2,000.00 USD that can still be refunded.` | Số tiền vượt quá số khách đã trả mà chưa hoàn |
+| 400 | `This delay compensation has already been reviewed (status: Approved).` | Đã duyệt / từ chối rồi |
+| 404 | `Delay compensation with ID 99 was not found.` | Không có |
+
+### POST /api/delay-compensations/{id}/reject — Từ chối bồi thường
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON `{ "reason": "..." }` (bắt buộc, tối đa 500 ký tự)
+
+Response `200`: khoản bồi thường với `status` = `Rejected`, `reviewReason` là lý do.
+
+---
+
 ## 20. Chính sách dịch vụ và cấu hình
 
 Trang **Chính sách dịch vụ** cho khách xem các quy tắc: thanh toán, hủy đơn, giao trễ, bảo hiểm, điều kiện ngựa, giao nhận. Văn bản chính sách nằm ở `docs/CHINH_SACH_DICH_VU.md`; các con số trong ngoặc vuông của văn bản (ví dụ `[Delay.GraceHours = 6]`) là **giá trị cấu hình**, frontend phải đọc từ API dưới đây thay vì viết cứng. Quản lý sửa được các giá trị này; trang Chính sách tự hiện đúng giá trị mới.
@@ -7313,7 +7457,11 @@ Tổng cộng 121 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/incidents/{id}/approve` | Duyệt phương án | LogisticsManager, Admin |
 | POST | `/api/incidents/{id}/reject` | Từ chối phương án | LogisticsManager, Admin |
 | POST | `/api/incidents/{id}/apply-reroute` | Nắn tuyến | FleetCoordinator, Admin |
-| POST | `/api/incidents/{id}/resolve` | Đóng sự cố | FleetCoordinator, Admin |
+| POST | `/api/incidents/{id}/resolve` | Đóng sự cố, chọn nguyên nhân (`faultParty`) | FleetCoordinator, Admin |
+| GET | `/api/delay-compensations` | Danh sách bồi thường giao trễ | LogisticsManager, Admin |
+| GET | `/api/bookings/{bookingId}/delay-compensations` | Bồi thường giao trễ của một đơn | Khách của đơn, nhân sự |
+| POST | `/api/delay-compensations/{id}/approve` | Duyệt bồi thường (có thể sửa số tiền) | LogisticsManager, Admin |
+| POST | `/api/delay-compensations/{id}/reject` | Từ chối bồi thường | LogisticsManager, Admin |
 
 **12. Flow 6 – Bàn giao, đóng chuyến và báo cáo**
 

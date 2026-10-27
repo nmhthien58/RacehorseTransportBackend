@@ -322,6 +322,26 @@ namespace RacehorseTransport.Repositories.Constants
         public static readonly string[] All = { WaitAndContinue, RepairAndContinue, Reroute, VeterinaryCare, OffloadHorse, Other };
     }
 
+    // Nguyên nhân sự cố, chọn khi đóng sự cố (R-09): quyết định ai chịu chi phí và có bồi thường giao trễ không
+    public static class FaultParties
+    {
+        public const string Company = "Company";           // lỗi công ty: hoàn cước phần chưa đi, công ty chịu phát sinh, có bồi thường trễ
+        public const string Customer = "Customer";         // lỗi khách: không hoàn, khách chịu phát sinh
+        public const string ForceMajeure = "ForceMajeure"; // bất khả kháng: hoàn theo quãng đường chưa đi, không bồi thường trễ
+
+        public static readonly string[] All = { Company, Customer, ForceMajeure };
+    }
+
+    // Bồi thường giao trễ (R-09): hệ thống tính khi đóng chuyến, Manager duyệt (có thể sửa số tiền) hoặc từ chối
+    public static class DelayCompensationStatuses
+    {
+        public const string AwaitingApproval = "AwaitingApproval";
+        public const string Approved = "Approved";   // đã duyệt, tiền hoàn qua các dòng Refund
+        public const string Rejected = "Rejected";
+
+        public static readonly string[] All = { AwaitingApproval, Approved, Rejected };
+    }
+
     public static class IncidentSeverities
     {
         public const string Minor = "Minor";

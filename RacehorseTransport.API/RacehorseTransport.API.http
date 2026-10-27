@@ -317,6 +317,54 @@ DELETE {{baseUrl}}/api/country-doc-requirements/999999
 Authorization: Bearer {{accessToken}}
 
 ### =====================================================================
+### BE-13 · Nguyên nhân sự cố + bồi thường giao trễ
+### =====================================================================
+
+### [SAI - 400] Đóng sự cố mà không chọn nguyên nhân (đổi 1 thành sự cố đang Approved)
+POST {{baseUrl}}/api/incidents/1/resolve
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{}
+
+### [ĐÚNG] Đóng sự cố, lỗi công ty
+POST {{baseUrl}}/api/incidents/1/resolve
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "faultParty": "Company",
+  "faultNote": "Phanh không được bảo dưỡng đúng hạn"
+}
+
+### [ĐÚNG] Manager xem các khoản bồi thường chờ duyệt
+GET {{baseUrl}}/api/delay-compensations?status=AwaitingApproval
+Authorization: Bearer {{managerToken}}
+
+### [SAI - 403] Khách không xem danh sách chung
+GET {{baseUrl}}/api/delay-compensations
+Authorization: Bearer {{customerToken}}
+
+### [ĐÚNG] Duyệt với số tiền khác số tính (bắt buộc lý do)
+POST {{baseUrl}}/api/delay-compensations/1/approve
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "amount": 150,
+  "reason": "Một phần thời gian trễ do kẹt biên"
+}
+
+### [ĐÚNG] Từ chối
+POST {{baseUrl}}/api/delay-compensations/1/reject
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "reason": "Khách đổi người nhận sát giờ giao"
+}
+
+### =====================================================================
 ### B-03 · Bảng giá
 ### Chạy yêu cầu tạo trước các yêu cầu dùng {{createdPriceItemId}}.
 ### =====================================================================

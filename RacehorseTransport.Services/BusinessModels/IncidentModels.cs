@@ -70,6 +70,8 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? RevisedRouteNotes { get; set; }
         public decimal AdditionalCost { get; set; }
         public string? RejectionReason { get; set; } // lý do của lần từ chối gần nhất; xóa khi phương án được duyệt
+        public string? FaultParty { get; set; }      // nguyên nhân chọn khi đóng sự cố (R-09)
+        public string? FaultNote { get; set; }
         public int? ApprovedByUserId { get; set; }
         public string? ApprovedByName { get; set; }
         public DateTimeOffset? ApprovedAt { get; set; }

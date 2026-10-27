@@ -103,6 +103,8 @@ namespace RacehorseTransport.API.Mappers
                 RevisedRouteNotes = model.RevisedRouteNotes,
                 AdditionalCost = model.AdditionalCost,
                 RejectionReason = model.RejectionReason,
+                FaultParty = model.FaultParty,
+                FaultNote = model.FaultNote,
                 ApprovedByUserId = model.ApprovedByUserId,
                 ApprovedByName = model.ApprovedByName,
                 ApprovedAt = model.ApprovedAt,
