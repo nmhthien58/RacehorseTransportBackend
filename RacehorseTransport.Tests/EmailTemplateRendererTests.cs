@@ -48,6 +48,8 @@ public class EmailTemplateRendererTests
         ["DecisionDeadline"] = "2026-11-03 09:45",
         ["DelayHours"] = "14",
         ["ClaimCode"] = "CLM-2026-0001",
+        ["ContractCode"] = "HD-2026-0001",
+        ["Version"] = "1",
         ["Decision"] = "Chấp thuận bồi thường",
     };
 

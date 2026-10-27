@@ -124,6 +124,14 @@ namespace RacehorseTransport.API.RequestModels
     // R-10: khách chấp nhận báo giá chốt (đồng ý Chính sách dịch vụ đúng phiên bản hiện hành)
     public class AcceptQuoteRequest
     {
+        // R-17: bản hợp đồng khách đang xem (GET /api/bookings/{id}/contract) và mã băm của nó
+        [Range(1, int.MaxValue, ErrorMessage = "ContractId is required.")]
+        public int ContractId { get; set; }
+
+        [Required(ErrorMessage = "ContractSha256 is required.")]
+        [MaxLength(64, ErrorMessage = "ContractSha256 cannot exceed 64 characters.")]
+        public string ContractSha256 { get; set; } = string.Empty;
+
         public bool AcceptPolicy { get; set; }
 
         [Required(ErrorMessage = "PolicyVersion is required.")]

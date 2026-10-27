@@ -200,6 +200,18 @@ namespace RacehorseTransport.Services.Implementations
         // Cấu hình Chính sách dịch vụ (BE-17)
         // =============================================================================================
 
+        // R-17: khóa cấu hình -> giá trị (dạng invariant) để thay các giá trị [Khóa = ...] trong văn bản chính sách
+        public static Dictionary<string, string> ConfigValues(PaymentSettingsModel payment, PolicySettingsModel policy)
+        {
+            var values = PolicyKeys.ToDictionary(k => k.Key, k => k.Get(policy));
+            values[DepositPercentKey] = Num(payment.DepositPercent);
+            values[CancelRefundPercentKey] = Num(payment.CancelRefundPercent);
+            values[UsdVndRateKey] = Num(payment.UsdVndRate);
+            values[BalanceDueDaysKey] = Num(payment.BalanceDueDaysBeforeDeparture);
+            values[ExtraDueDaysKey] = Num(payment.ExtraPaymentDueDays);
+            return values;
+        }
+
         public async Task<PolicySettingsModel> GetPolicySettingsAsync()
         {
             var keys = PolicyKeys.Select(k => k.Key).ToList();

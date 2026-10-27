@@ -27,6 +27,10 @@ namespace RacehorseTransport.Repositories.Entities
         public string? ExecutiveRemarks { get; set; }
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+        // R-17: vận đơn hàng không (chuyến chở ngựa của đơn Air), Coordinator nhập số và tải file lên
+        public string? AirWaybillNumber { get; set; }
+        public string? AirWaybillFilePath { get; set; }
+
         // Duyệt kế hoạch (Flow 3)
         public int? PlannedByUserId { get; set; }
         public int? ApprovedByUserId { get; set; }

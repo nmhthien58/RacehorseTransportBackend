@@ -8,7 +8,8 @@ namespace RacehorseTransport.Services.Interfaces
         // Gọi trong transaction duyệt tuyến: tính báo giá chốt theo tuyến, đơn -> Quoted, email QuoteReady
         Task IssueFinalQuoteAsync(int bookingId, int routePlanId);
 
-        Task<BookingDetailModel> AcceptQuoteAsync(int bookingId, bool acceptPolicy, string policyVersion, CurrentUser currentUser);
+        // R-17: chấp nhận cùng lúc báo giá + bản hợp đồng nháp khách đang xem (contractId + mã băm), lưu bằng chứng giao kết
+        Task<BookingDetailModel> AcceptQuoteAsync(int bookingId, ContractAcceptanceModel acceptance, CurrentUser currentUser);
         Task<BookingDetailModel> DeclineQuoteAsync(int bookingId, string? reason, CurrentUser currentUser);
 
         // Job định kỳ: nhắc khi còn 1 ngày, quá hạn (chưa chấp nhận hoặc chưa cọc) -> QuoteExpired. Trả về số đơn đã xử lý.
