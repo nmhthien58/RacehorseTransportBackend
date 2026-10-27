@@ -21,6 +21,7 @@ namespace RacehorseTransport.Repositories.Entities
         public int? HandoverId { get; set; }
         public DateTimeOffset? OffloadedAt { get; set; }
         public string? OffloadReason { get; set; }
+        public string? OffloadOutcome { get; set; } // OffloadOutcomes; null khi tài xế dỡ khẩn cấp và phương án chưa duyệt
 
         // Navigation properties
         public virtual Trip? Trip { get; set; }

@@ -292,18 +292,20 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
-        /// Take one horse off the trip on the way (vet / incident). The trip goes on; the horse returns to the planning queue.
+        /// Removed (R-12). A horse now leaves a trip only through an incident: report an incident for the horse
+        /// (set emergencyOffload = true if the vet requires it off the vehicle at once), then propose and approve an OffloadHorse plan.
+        /// Always returns 410 Gone.
         /// </summary>
         [HttpPost("{id:int}/horses/{tripHorseId:int}/offload")]
         [Authorize(Roles = UserRoles.DriverEscort + "," + PlanningRoles)]
-        [ProducesResponseType(typeof(ApiResponse<TripDetailResponse>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
-        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> OffloadHorse(int id, int tripHorseId, [FromBody] OffloadHorseRequest request)
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status410Gone)]
+        public IActionResult OffloadHorse(int id, int tripHorseId)
         {
-            var trip = await _executionService.OffloadHorseAsync(id, tripHorseId, new OffloadHorseModel { Reason = request.Reason }, User.ToCurrentUser());
-            return Ok(ApiResponse<TripDetailResponse>.SuccessResult(trip.ToResponse(), "Horse offloaded successfully"));
+            // Giữ đường dẫn cũ để app bản cũ nhận thông báo rõ thay vì 404
+            return StatusCode(
+                StatusCodes.Status410Gone,
+                ApiResponse<object>.ErrorResult(
+                    $"This endpoint was removed. To take a horse off trip {id}, report an incident for trip horse {tripHorseId} (POST /api/trips/{id}/incidents, emergencyOffload = true if it must leave the vehicle now); a coordinator then proposes an OffloadHorse plan for a manager to approve."));
         }
 
         /// <summary>

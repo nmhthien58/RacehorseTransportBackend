@@ -12,8 +12,12 @@ namespace RacehorseTransport.Services.Implementations
 {
     // Flow 6 (có ghép nhiều đơn, R-04 / R-05):
     //   Mỗi đơn ký một biên bản e-POD ở mốc trả của mình (DropOff của đơn, không có thì Destination).
-    //   Ký xong: ngựa của đơn -> Delivered; mọi ngựa của đơn đã giao -> đơn Completed ngay (không chờ đóng chuyến).
+    //   Ký xong: ngựa của đơn -> Delivered; mọi ngựa của đơn đã xong -> đơn Completed ngay (không chờ đóng chuyến).
+    //   R-12: con ngựa rời chuyến với hướng xử lý HandOverHere ký e-POD riêng tại nơi dỡ (TripHorseId), nên một đơn
+    //   có thể có nhiều biên bản trên cùng chuyến. Ngựa chết / đưa về nơi đi cũng được tính là đã xong với đơn.
     //   Tới Destination + đủ biên bản -> Manager đóng chuyến, chốt KPI, chia chi phí phát sinh cho các đơn.
+    //   R-09: mọi sự cố đã duyệt phải đóng (có nguyên nhân) trước; chuyến trễ do lỗi công ty thì tính bồi thường giao trễ
+    //   cho từng đơn, chờ Manager duyệt (DelayCompensationService).
     public class TripCompletionService : ITripCompletionService
     {
         // Chuyến đang chạy: ký e-POD ở mốc DropOff giữa đường được
@@ -32,6 +36,8 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IRepository<HandoverAcceptance> _handoverRepo;
         private readonly IRepository<BookingRequest> _bookingRepo;
         private readonly IRepository<TransportAsset> _assetRepo;
+        private readonly IRepository<DelayCompensation> _compensationRepo;
+        private readonly IPricingService _pricingService;
         private readonly ITripService _tripService;
         private readonly IBookingService _bookingService;
         private readonly ITrackingService _trackingService;
@@ -45,6 +51,8 @@ namespace RacehorseTransport.Services.Implementations
             IRepository<HandoverAcceptance> handoverRepo,
             IRepository<BookingRequest> bookingRepo,
             IRepository<TransportAsset> assetRepo,
+            IRepository<DelayCompensation> compensationRepo,
+            IPricingService pricingService,
             ITripService tripService,
             IBookingService bookingService,
             ITrackingService trackingService,
@@ -57,6 +65,8 @@ namespace RacehorseTransport.Services.Implementations
             _handoverRepo = handoverRepo;
             _bookingRepo = bookingRepo;
             _assetRepo = assetRepo;
+            _compensationRepo = compensationRepo;
+            _pricingService = pricingService;
             _tripService = tripService;
             _bookingService = bookingService;
             _trackingService = trackingService;
@@ -96,27 +106,44 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Booking with ID {model.BookingId} has no horses on trip {trip.TripCode}.");
             }
             var booking = bookingHorsesOnTrip[0].BookingHorse!.Booking!;
-
-            if (trip.Handovers.Any(h => h.BookingId == model.BookingId))
-            {
-                throw new BusinessException($"Booking {booking.BookingCode} has already been handed over on trip {trip.TripCode}.");
-            }
-
-            // R-04: chỉ ký được khi xe đang đứng ở mốc trả của đơn (DropOff riêng, hoặc Destination)
             var route = trip.Checkpoints.Where(c => c.IsActive).OrderBy(c => c.SequenceOrder).ToList();
-            var dropoff = TripRouteRules.DropoffCheckpoint(route, model.BookingId);
-            if (dropoff == null || dropoff.Status != CheckpointStatuses.Arrived)
-            {
-                throw new BusinessException(dropoff == null
-                    ? $"Trip {trip.TripCode} has no drop-off point for booking {booking.BookingCode}."
-                    : $"Booking {booking.BookingCode} is handed over at '{dropoff.CheckpointName}'; record the arrival there first (status: {dropoff.Status}).");
-            }
 
-            // Ngựa còn trên xe phải giao (con đã rớt lại giữa đường thì không giao ở đây)
-            var horses = bookingHorsesOnTrip.Where(th => th.Status == TripHorseStatuses.InTransit).ToList();
-            if (horses.Count == 0)
+            RouteCheckpoint? signedAt;
+            List<TripHorse> horses;
+            if (model.TripHorseId.HasValue)
             {
-                throw new BusinessException($"Booking {booking.BookingCode} has no horses on board to hand over.");
+                // R-12: giao tại chỗ con ngựa đã rời chuyến (HandOverHere), ghi nhận ở mốc gần nhất đoàn xe đã tới lúc dỡ ngựa
+                var offloaded = bookingHorsesOnTrip.FirstOrDefault(th => th.TripHorseId == model.TripHorseId.Value)
+                    ?? throw new BusinessException($"Trip horse with ID {model.TripHorseId} does not belong to booking {booking.BookingCode} on trip {trip.TripCode}.");
+                if (offloaded.Status != TripHorseStatuses.Offloaded || offloaded.OffloadOutcome != OffloadOutcomes.HandOverHere)
+                {
+                    throw new BusinessException($"{offloaded.BookingHorse!.Horse!.Name} can only be handed over on site after an OffloadHorse plan with {OffloadOutcomes.HandOverHere} is approved (status: {offloaded.Status}).");
+                }
+                signedAt = route.LastOrDefault(c => c.ActualArrivalTime != null && c.ActualArrivalTime <= offloaded.OffloadedAt);
+                horses = new List<TripHorse> { offloaded };
+            }
+            else
+            {
+                // R-04: chỉ ký được khi xe đang đứng ở mốc trả của đơn (DropOff riêng, hoặc Destination)
+                var dropoff = TripRouteRules.DropoffCheckpoint(route, model.BookingId);
+                if (dropoff == null || dropoff.Status != CheckpointStatuses.Arrived)
+                {
+                    throw new BusinessException(dropoff == null
+                        ? $"Trip {trip.TripCode} has no drop-off point for booking {booking.BookingCode}."
+                        : $"Booking {booking.BookingCode} is handed over at '{dropoff.CheckpointName}'; record the arrival there first (status: {dropoff.Status}).");
+                }
+                if (trip.Handovers.Any(h => h.BookingId == model.BookingId && h.CheckpointId == dropoff.CheckpointId))
+                {
+                    throw new BusinessException($"Booking {booking.BookingCode} has already been handed over at '{dropoff.CheckpointName}' on trip {trip.TripCode}.");
+                }
+
+                // Ngựa còn trên xe phải giao (con đã rời chuyến giữa đường thì không giao ở đây)
+                horses = bookingHorsesOnTrip.Where(th => th.Status == TripHorseStatuses.InTransit).ToList();
+                if (horses.Count == 0)
+                {
+                    throw new BusinessException($"Booking {booking.BookingCode} has no horses on board to hand over.");
+                }
+                signedAt = dropoff;
             }
 
             // Đối chiếu mã vi mạch quét được với các con ngựa phải giao
@@ -153,13 +180,13 @@ namespace RacehorseTransport.Services.Implementations
                 OverallCondition = model.OverallCondition,
                 Remarks = model.Remarks,
                 DriverUserId = currentUser.UserId,
-                CheckpointId = dropoff.CheckpointId
+                CheckpointId = signedAt?.CheckpointId
             };
 
-            // Đây có phải biên bản cuối cùng của chuyến không (đơn có ngựa rớt lại hết thì không cần biên bản)
-            var bookingIdsToHandOver = BookingsNeedingHandover(trip);
+            // Đây có phải biên bản cuối cùng của chuyến không: ngoài các con giao lần này, không con nào còn việc trên chuyến
+            var handedNow = horses.Select(th => th.TripHorseId).ToHashSet();
             bool allHandedOver = trip.OverallStatus == TripStatuses.ArrivedDestination
-                && bookingIdsToHandOver.All(id => id == model.BookingId || trip.Handovers.Any(h => h.BookingId == id));
+                && trip.TripHorses.Where(th => !handedNow.Contains(th.TripHorseId)).All(th => !OffloadRules.IsPendingOnTrip(th));
 
             var now = DateTimeOffset.UtcNow;
             BookingRequest? completedBooking = null;
@@ -243,23 +270,30 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Only a trip that has arrived at the destination can be closed (current status: {trip.OverallStatus}).");
             }
 
-            // Mọi đơn trên chuyến phải đã ký biên bản bàn giao (trừ đơn có ngựa rớt lại hết giữa đường)
-            var needHandover = BookingsNeedingHandover(trip);
-            var notHandedOver = trip.TripHorses
-                .Select(th => th.BookingHorse!.Booking!)
-                .DistinctBy(b => b.BookingId)
-                .Where(b => needHandover.Contains(b.BookingId) && !trip.Handovers.Any(h => h.BookingId == b.BookingId))
-                .Select(b => b.BookingCode)
+            // Mọi con ngựa phải xong việc trên chuyến: đã ký e-POD, hoặc đã rời chuyến theo phương án được duyệt (R-12)
+            var pending = trip.TripHorses
+                .Where(OffloadRules.IsPendingOnTrip)
+                .Select(th => $"{th.BookingHorse!.Horse!.Name} ({th.BookingHorse.Booking!.BookingCode}): {PendingReason(th)}")
                 .ToList();
 
-            if (notHandedOver.Count > 0)
+            if (pending.Count > 0)
             {
-                throw new BusinessException($"The trip cannot be closed: handover is not signed for {string.Join(", ", notHandedOver)}.");
+                throw new BusinessException($"The trip cannot be closed: {string.Join("; ", pending)}.");
+            }
+
+            // R-09: nguyên nhân sự cố quyết định KPI và bồi thường trễ, nên sự cố đã duyệt phải được đóng trước
+            var unresolved = trip.Incidents.Where(i => i.Status == IncidentStatuses.Approved).Select(i => i.IncidentCode).ToList();
+            if (unresolved.Count > 0)
+            {
+                throw new BusinessException($"Resolve incident(s) {string.Join(", ", unresolved)} and choose their cause before closing the trip.");
             }
 
             var acceptedIncidents = trip.Incidents.Where(i => AcceptedIncidentStatuses.Contains(i.Status)).ToList();
+            bool companyFault = DelayCompensationRules.IsCompanyFault(acceptedIncidents.Select(i => i.FaultParty).ToList());
             var now = DateTimeOffset.UtcNow;
-            var kpi = TripKpiCalculator.Calculate(trip.PlannedEndDate, trip.ActualEndDate ?? now, acceptedIncidents.Count > 0);
+            // Trễ chỉ được miễn (DelayedForceMajeure) khi mọi sự cố đều do bất khả kháng / khách
+            var kpi = TripKpiCalculator.Calculate(trip.PlannedEndDate, trip.ActualEndDate ?? now, hasForceMajeure: !companyFault);
+            var compensations = companyFault ? await BuildDelayCompensationsAsync(trip) : new List<DelayCompensation>();
 
             var bookingIds = trip.TripHorses.Select(th => th.BookingHorse!.BookingId).Distinct().ToList();
             var customerIds = trip.TripHorses.Select(th => th.BookingHorse!.Booking!.CustomerUserId).Distinct().ToList();
@@ -288,6 +322,21 @@ namespace RacehorseTransport.Services.Implementations
 
                 var (completedBookings, awaitingPayment) = await CompleteFinishedBookingsAsync(
                     bookingIds, extras, paymentSettings.ExtraPaymentDueDays);
+
+                if (compensations.Count > 0)
+                {
+                    await _compensationRepo.AddRangeAsync(compensations);
+                    foreach (var compensation in compensations)
+                    {
+                        var booking = trip.TripHorses.Select(th => th.BookingHorse!.Booking!).First(b => b.BookingId == compensation.BookingId);
+                        await _notificationService.SendToRoleAsync(
+                            UserRoles.LogisticsManager,
+                            $"Delay compensation to approve: {booking.BookingCode}",
+                            $"Trip {trip.TripCode} delivered {compensation.DelayHours:0.##} hour(s) late. Suggested compensation: {compensation.CalculatedAmount:N2} {compensation.CurrencyCode} ({compensation.Percent:0.##}% of freight).",
+                            NotificationReferenceTypes.Booking,
+                            booking.BookingId);
+                    }
+                }
 
                 var recipients = new List<int>(trip.Crew.Select(c => c.UserId));
                 if (trip.PlannedByUserId.HasValue)
@@ -364,7 +413,7 @@ namespace RacehorseTransport.Services.Implementations
                     continue;
                 }
 
-                if (AllHorsesDelivered(booking))
+                if (AllHorsesFinished(booking))
                 {
                     booking.Status = booking.ExtraCharges > ExtraPaid(booking)
                         ? BookingStatuses.AwaitingFinalPayment
@@ -381,7 +430,7 @@ namespace RacehorseTransport.Services.Implementations
         private async Task<BookingRequest?> CompleteIfDeliveredAsync(int bookingId)
         {
             var booking = await LoadBookingsForCompletion().FirstAsync(b => b.BookingId == bookingId);
-            if (!OpenBookingStatuses.Contains(booking.Status) || !AllHorsesDelivered(booking))
+            if (!OpenBookingStatuses.Contains(booking.Status) || !AllHorsesFinished(booking))
             {
                 return null;
             }
@@ -401,13 +450,14 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(b => b.BookingHorses).ThenInclude(bh => bh.TripHorses).ThenInclude(th => th.Trip);
         }
 
-        // R-05: mọi con ngựa chưa hủy của đơn đã được giao (Delivered) trên một chuyến còn hiệu lực
-        private static bool AllHorsesDelivered(BookingRequest booking)
+        // R-05 / R-12: mọi con ngựa chưa hủy của đơn đã xong trên một chuyến còn hiệu lực
+        // (đã giao, kể cả giao tại chỗ; chết; hoặc được đưa về nơi đi)
+        private static bool AllHorsesFinished(BookingRequest booking)
         {
             var activeHorses = booking.BookingHorses.Where(bh => bh.Status != BookingHorseStatuses.Cancelled).ToList();
             return activeHorses.Count > 0
-                && activeHorses.All(bh => bh.TripHorses.Any(th =>
-                    th.Status == TripHorseStatuses.Delivered && th.Trip!.OverallStatus != TripStatuses.Cancelled));
+                && activeHorses.All(bh => bh.Status == BookingHorseStatuses.Deceased
+                    || bh.TripHorses.Any(th => th.Trip!.OverallStatus != TripStatuses.Cancelled && OffloadRules.IsFinished(th)));
         }
 
         private static decimal ExtraPaid(BookingRequest booking)
@@ -417,13 +467,60 @@ namespace RacehorseTransport.Services.Implementations
                 .Sum(p => p.Amount);
         }
 
-        // Đơn phải ký biên bản trên chuyến: còn ít nhất một con ngựa không bị rớt lại
-        private static HashSet<int> BookingsNeedingHandover(Trip trip)
+        // R-09: bồi thường giao trễ cho từng đơn đã ký e-POD trên chuyến (chuyến đã xác định là trễ do lỗi công ty).
+        // Đơn tạo trước khi có thanh toán (DepositPercent = null) và đơn đã có bồi thường cho chuyến này thì bỏ qua.
+        private async Task<List<DelayCompensation>> BuildDelayCompensationsAsync(Trip trip)
         {
-            return trip.TripHorses
-                .Where(th => th.Status != TripHorseStatuses.Offloaded && th.Status != TripHorseStatuses.Cancelled)
-                .Select(th => th.BookingHorse!.BookingId)
-                .ToHashSet();
+            var settings = await _settingService.GetPolicySettingsAsync();
+            var result = new List<DelayCompensation>();
+
+            var bookings = trip.TripHorses.Select(th => th.BookingHorse!.Booking!).DistinctBy(b => b.BookingId).ToList();
+            foreach (var booking in bookings.Where(b => b.DepositPercent.HasValue))
+            {
+                var deliveredAt = trip.Handovers.Where(h => h.BookingId == booking.BookingId).Select(h => (DateTimeOffset?)h.HandoverDateTime).Max();
+                if (deliveredAt == null)
+                {
+                    continue;
+                }
+
+                double lateMinutes = (deliveredAt.Value - booking.DeliveryDeadline).TotalMinutes;
+                decimal percent = DelayCompensationRules.Percent(lateMinutes, settings);
+                if (percent <= 0)
+                {
+                    continue;
+                }
+
+                decimal freight = DelayCompensationRules.FreightAmount(_pricingService.ParseLines(booking.QuoteBreakdown), booking.EstimatedCost);
+                decimal amount = DelayCompensationRules.Amount(freight, percent);
+                if (amount <= 0 || await _compensationRepo.ExistsAsync(c => c.BookingId == booking.BookingId && c.TripId == trip.TripId))
+                {
+                    continue;
+                }
+
+                result.Add(new DelayCompensation
+                {
+                    BookingId = booking.BookingId,
+                    TripId = trip.TripId,
+                    DelayHours = DelayCompensationRules.DelayHours(deliveredAt.Value, booking.DeliveryDeadline),
+                    FreightAmount = freight,
+                    Percent = percent,
+                    CalculatedAmount = amount,
+                    CurrencyCode = booking.CurrencyCode,
+                    Status = DelayCompensationStatuses.AwaitingApproval
+                });
+            }
+            return result;
+        }
+
+        private static string PendingReason(TripHorse tripHorse)
+        {
+            if (tripHorse.Status != TripHorseStatuses.Offloaded)
+            {
+                return "handover is not signed";
+            }
+            return tripHorse.OffloadOutcome == null
+                ? "offloaded in an emergency, waiting for an approved OffloadHorse plan"
+                : "on-site handover is not signed";
         }
 
         // Chia chi phí phát sinh của các sự cố được chấp nhận cho từng đơn trên chuyến:
@@ -436,7 +533,8 @@ namespace RacehorseTransport.Services.Implementations
             void Add(int bookingId, decimal amount) =>
                 result[bookingId] = (result.TryGetValue(bookingId, out var current) ? current : 0) + amount;
 
-            foreach (var incident in acceptedIncidents.Where(i => i.AdditionalCost > 0))
+            // Chính sách 9.1: sự cố do lỗi công ty thì công ty chịu chi phí, không tính vào phát sinh của khách
+            foreach (var incident in acceptedIncidents.Where(i => i.AdditionalCost > 0 && i.FaultParty != FaultParties.Company))
             {
                 var affected = incident.AffectedTripHorseId.HasValue
                     ? trip.TripHorses.FirstOrDefault(th => th.TripHorseId == incident.AffectedTripHorseId.Value)
@@ -522,6 +620,16 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(h => h.Trip!).ThenInclude(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Horse);
         }
 
+        // Các con ngựa của một biên bản. Biên bản cũ (trước R-05) chưa gắn với con nào thì lấy các con chưa gắn biên bản của đơn.
+        private static IEnumerable<TripHorse> HorsesOf(HandoverAcceptance handover)
+        {
+            var bookingHorses = (handover.Trip?.TripHorses ?? Enumerable.Empty<TripHorse>())
+                .Where(th => th.BookingHorse?.BookingId == handover.BookingId)
+                .ToList();
+            var linked = bookingHorses.Where(th => th.HandoverId == handover.HandoverId).ToList();
+            return linked.Count > 0 ? linked : bookingHorses.Where(th => th.HandoverId == null);
+        }
+
         private async Task<List<HandoverModel>> ToModelsAsync(IEnumerable<HandoverAcceptance> handovers)
         {
             var models = handovers.Select(h => new HandoverModel
@@ -543,9 +651,7 @@ namespace RacehorseTransport.Services.Implementations
                 DriverUserId = h.DriverUserId,
                 DriverName = h.Driver?.FullName,
                 CheckpointId = h.CheckpointId,
-                Horses = (h.Trip?.TripHorses ?? Enumerable.Empty<TripHorse>())
-                    .Where(th => th.BookingHorse?.BookingId == h.BookingId
-                        && (th.HandoverId == null || th.HandoverId == h.HandoverId))
+                Horses = HorsesOf(h)
                     .OrderBy(th => th.StallSlotNumber)
                     .Select(th => new HandoverHorseModel
                     {

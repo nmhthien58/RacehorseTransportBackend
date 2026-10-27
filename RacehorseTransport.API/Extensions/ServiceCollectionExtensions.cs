@@ -125,6 +125,7 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<IRoutingProvider>(sp => sp.GetRequiredService<OsrmRoutingProvider>());
             services.AddScoped<IGeoService, GeoService>();
             services.AddScoped<IAuthService, AuthService>();
+            services.AddScoped<IDelayCompensationService, DelayCompensationService>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IRoutePlanService, RoutePlanService>();
             services.AddScoped<IHorseService, HorseService>();
