@@ -139,6 +139,52 @@ DELETE {{baseUrl}}/api/document-types/5
 Authorization: Bearer {{accessToken}}
 
 ### =====================================================================
+### BE-01 · Bản đồ (Goong trong VN, Nominatim + OSRM ngoài VN)
+### =====================================================================
+
+### [ĐÚNG] Gợi ý địa chỉ ở Việt Nam
+GET {{baseUrl}}/api/geo/search?q=Tr%C6%B0%E1%BB%9Dng%20%C4%91ua%20Ph%C3%BA%20Th%E1%BB%8D&country=VN
+Authorization: Bearer {{customerToken}}
+
+### [ĐÚNG] Gợi ý địa chỉ khắp nơi
+GET {{baseUrl}}/api/geo/search?q=Nanning
+Authorization: Bearer {{customerToken}}
+
+### [SAI - 400] Từ khóa quá ngắn
+GET {{baseUrl}}/api/geo/search?q=a
+Authorization: Bearer {{customerToken}}
+
+### [ĐÚNG] Tọa độ -> địa chỉ
+GET {{baseUrl}}/api/geo/reverse?lat=10.7769&lng=106.7009
+Authorization: Bearer {{customerToken}}
+
+### [SAI - 404] Giữa biển Đông
+GET {{baseUrl}}/api/geo/reverse?lat=12&lng=112
+Authorization: Bearer {{customerToken}}
+
+### [ĐÚNG] Chỉ đường Hà Nội -> Nam Ninh kèm các nước đi qua
+POST {{baseUrl}}/api/geo/route
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "points": [
+    { "lat": 21.0285, "lng": 105.8542, "countryCode": "VN" },
+    { "lat": 22.817, "lng": 108.3665, "countryCode": "CN" }
+  ],
+  "includeCountries": true
+}
+
+### [SAI - 400] Chỉ có một điểm
+POST {{baseUrl}}/api/geo/route
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "points": [ { "lat": 21.0285, "lng": 105.8542 } ]
+}
+
+### =====================================================================
 ### B-01 · Quản lý phương tiện
 ### Chạy yêu cầu tạo trước các yêu cầu dùng {{createdAssetId}}.
 ### =====================================================================
