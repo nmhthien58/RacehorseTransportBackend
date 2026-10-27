@@ -6,6 +6,7 @@ namespace RacehorseTransport.API.ResponseModels
         public string PolicyVersion { get; set; } = string.Empty;
         public int QuoteAcceptDays { get; set; }
         public int DossierSubmitDays { get; set; }
+        public decimal StableFeePerHorsePerDayUsd { get; set; }
         public int DelayGraceHours { get; set; }
         public decimal DelayPercentPer12Hours { get; set; }
         public decimal DelayMaxPercent { get; set; }
@@ -85,6 +86,7 @@ namespace RacehorseTransport.API.ResponseModels
 
     public class PolicyDeliverySection
     {
+        public decimal StableFeePerHorsePerDayUsd { get; set; }
         public int FreeWaitingHours { get; set; }
         public decimal WaitingFeePerHourUsd { get; set; }
         public int MaxWaitingHours { get; set; }

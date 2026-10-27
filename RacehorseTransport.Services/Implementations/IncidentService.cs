@@ -38,6 +38,12 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ICodeGenerator _codeGenerator;
         private readonly INotificationService _notificationService;
         private readonly IFileStorageService _fileStorage;
+        private readonly IRepository<IncidentConsent> _consentRepo;
+        private readonly IRepository<BookingRequest> _bookingRepo;
+        private readonly IPaymentService _paymentService;
+        private readonly IPricingService _pricingService;
+        private readonly ISystemSettingService _settingService;
+        private readonly IContractService _contractService;
         private readonly IUnitOfWork _unitOfWork;
 
         public IncidentService(
@@ -50,6 +56,12 @@ namespace RacehorseTransport.Services.Implementations
             ICodeGenerator codeGenerator,
             INotificationService notificationService,
             IFileStorageService fileStorage,
+            IRepository<IncidentConsent> consentRepo,
+            IRepository<BookingRequest> bookingRepo,
+            IPaymentService paymentService,
+            IPricingService pricingService,
+            ISystemSettingService settingService,
+            IContractService contractService,
             IUnitOfWork unitOfWork)
         {
             _incidentRepo = incidentRepo;
@@ -61,6 +73,12 @@ namespace RacehorseTransport.Services.Implementations
             _codeGenerator = codeGenerator;
             _notificationService = notificationService;
             _fileStorage = fileStorage;
+            _consentRepo = consentRepo;
+            _bookingRepo = bookingRepo;
+            _paymentService = paymentService;
+            _pricingService = pricingService;
+            _settingService = settingService;
+            _contractService = contractService;
             _unitOfWork = unitOfWork;
         }
 
@@ -330,6 +348,25 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"A horse was offloaded in an emergency on this incident, so the plan must be {IncidentResponseActions.OffloadHorse} with the next step for that horse.");
             }
 
+            // R-14: quay về nơi đi -> tuyến về do hệ thống dựng lúc duyệt, không kèm thay đổi tuyến tự nhập
+            bool hasRouteInput = model.RouteChange != null && (model.RouteChange.DeactivateCheckpointIds.Count > 0 || model.RouteChange.NewCheckpoints.Count > 0);
+            if (model.ResponseAction == IncidentResponseActions.ReturnToOrigin)
+            {
+                EnsureOnTheRoad(trip);
+                if (hasRouteInput)
+                {
+                    throw new BusinessException("A ReturnToOrigin plan builds the return route automatically; do not send RouteChange.");
+                }
+            }
+            if (model.ExtraCostForCustomer < 0)
+            {
+                throw new BusinessException("ExtraCostForCustomer cannot be negative.");
+            }
+            if (model.ExtraCostForCustomer > 0 && model.ResponseAction != IncidentResponseActions.Reroute)
+            {
+                throw new BusinessException("ExtraCostForCustomer is only used with a Reroute plan (a detour the customers must agree to).");
+            }
+
             // Thay đổi tuyến đi kèm: kiểm tra ngay trên lộ trình hiện tại để Manager duyệt đúng tuyến sẽ đi
             var change = model.RouteChange;
             bool hasChange = change != null && (change.DeactivateCheckpointIds.Count > 0 || change.NewCheckpoints.Count > 0);
@@ -352,6 +389,7 @@ namespace RacehorseTransport.Services.Implementations
                 incident.RouteChange = IncidentMapper.SerializeRouteChange(plan == null ? null : ToRouteChange(plan, change!.InsertAfterCheckpointId));
                 incident.RevisedRouteNotes = model.RevisedRouteNotes;
                 incident.AdditionalCost = model.AdditionalCost;
+                incident.ExtraCostForCustomer = model.ExtraCostForCustomer;
                 incident.OffloadOutcome = offloadHorse == null ? null : model.OffloadOutcome;
                 incident.VetReportPath = offloadHorse == null || string.IsNullOrWhiteSpace(model.VetReportPath) ? null : model.VetReportPath.Trim();
                 if (offloadHorse != null)
@@ -415,12 +453,47 @@ namespace RacehorseTransport.Services.Implementations
                 }
             }
 
+            // R-14: đi đường vòng tốn thêm tiền -> chưa áp tuyến, chờ các khách có ngựa trên xe đồng ý
+            if (plan != null && incident.ExtraCostForCustomer > 0)
+            {
+                await _unitOfWork.ExecuteInTransactionAsync(async () =>
+                {
+                    incident.Status = IncidentStatuses.AwaitingConsent;
+                    incident.RejectionReason = null;
+                    incident.ApprovedByUserId = currentUser.UserId;
+                    incident.ApprovedAt = DateTimeOffset.UtcNow;
+                    await _incidentRepo.UpdateAsync(incident);
+
+                    await _notificationService.SendToUsersAsync(
+                        OnBoardCustomerIds(trip),
+                        $"Your agreement is needed for trip {trip.TripCode}",
+                        $"Incident {incident.IncidentCode}: {incident.ProposedAction} The detour ({DescribeRouteChange(plan.Removed, plan.Added)}) costs {incident.ExtraCostForCustomer:N2} USD more in total, shared by the horses on board. Accept or decline it in the app; if anyone declines, the convoy returns to the origin.",
+                        NotificationReferenceTypes.Incident,
+                        incident.IncidentId,
+                        emailCustomers: true);
+                    await _notificationService.SendToUsersAsync(
+                        WithPlanner(CrewIds(trip), trip),
+                        $"Detour for incident {incident.IncidentCode} waits for the customers",
+                        "The plan is approved but costs the customers extra; the route changes once every customer with horses on board agrees.",
+                        NotificationReferenceTypes.Incident,
+                        incident.IncidentId);
+                });
+                await _trackingService.InvalidateTripAsync(trip.TripId);
+                return await GetIncidentByIdAsync(incidentId, currentUser);
+            }
+
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 incident.Status = IncidentStatuses.Approved;
                 incident.RejectionReason = null;
                 incident.ApprovedByUserId = currentUser.UserId;
                 incident.ApprovedAt = DateTimeOffset.UtcNow;
+
+                // R-14: quay về nơi đi: dựng tuyến về từ các mốc đã đi
+                if (incident.ResponseAction == IncidentResponseActions.ReturnToOrigin)
+                {
+                    await ApplyReturnToOriginAsync(trip, incident);
+                }
 
                 if (plan != null)
                 {
@@ -735,11 +808,23 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             var customerIds = await GetCustomerIdsAsync(trip.TripId);
+            var now = DateTimeOffset.UtcNow;
+
+            // R-14: gửi chuồng tạm -> phí chuồng (ngày × số ngựa trên xe × phí / con / ngày) cộng vào chi phí phát sinh của sự cố;
+            // ai trả theo nguyên nhân (lỗi công ty thì không thu khách, xem lúc đóng chuyến)
+            decimal stableFee = 0;
+            if (incident.ResponseAction == IncidentResponseActions.HoldAtStable && incident.ApprovedAt.HasValue)
+            {
+                var policy = await _settingService.GetPolicySettingsAsync();
+                int horses = trip.TripHorses.Count(th => TripHorseStatuses.OnBoard.Contains(th.Status));
+                stableFee = ReturnRouteRules.StableFee(incident.ApprovedAt.Value, now, horses, policy.StableFeePerHorsePerDayUsd);
+            }
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 incident.Status = IncidentStatuses.Resolved;
-                incident.ResolvedAt = DateTimeOffset.UtcNow;
+                incident.ResolvedAt = now;
+                incident.AdditionalCost += stableFee;
                 incident.FaultParty = faultParty;
                 incident.FaultNote = string.IsNullOrWhiteSpace(faultNote) ? null : faultNote.Trim();
                 await _incidentRepo.UpdateAsync(incident);
@@ -757,14 +842,267 @@ namespace RacehorseTransport.Services.Implementations
                 await _notificationService.SendToUsersAsync(
                     CrewIds(trip).Concat(customerIds),
                     $"Incident {incident.IncidentCode} on trip {trip.TripCode} is resolved",
-                    "The incident has been handled and the trip continues.",
+                    stableFee > 0
+                        ? $"The incident has been handled. Temporary stable: {stableFee:N2} USD (charged according to the cause)."
+                        : "The incident has been handled and the trip continues.",
                     NotificationReferenceTypes.Incident,
                     incident.IncidentId);
             });
 
+            // R-14: quay về nơi đi -> hoàn tiền từng đơn theo nguyên nhân (gọi cổng thanh toán, ngoài transaction)
+            if (incident.ResponseAction == IncidentResponseActions.ReturnToOrigin)
+            {
+                await RefundReturnedBookingsAsync(incident, faultParty, currentUser);
+            }
+            // R-12 / R-14: một con ngựa rời chuyến (không phải chờ hồi phục) -> hoàn phần cước chưa đi của con đó
+            else if (incident.ResponseAction == IncidentResponseActions.OffloadHorse
+                && incident.OffloadOutcome != null && incident.OffloadOutcome != OffloadOutcomes.WaitRecover)
+            {
+                await RefundOffloadedHorseAsync(trip, incident, faultParty, currentUser);
+            }
+
             await _trackingService.InvalidateTripAsync(trip.TripId);
             return await GetIncidentByIdAsync(incidentId, currentUser);
         }
+
+        // =============================================================================================
+        // Quay về nơi đi, hỏi ý khách khi đi đường vòng (R-14, BE-14b)
+        // =============================================================================================
+
+        public async Task<IncidentModel> RecordCustomerConsentAsync(int incidentId, bool accept, CurrentUser currentUser)
+        {
+            var incident = await GetTrackedIncidentAsync(incidentId);
+            var trip = incident.Trip!;
+            if (incident.Status != IncidentStatuses.AwaitingConsent)
+            {
+                throw new BusinessException($"This incident is not waiting for your agreement (status: {incident.Status}).");
+            }
+
+            var myBookingIds = trip.TripHorses
+                .Where(th => TripHorseStatuses.OnBoard.Contains(th.Status) && th.BookingHorse!.Booking!.CustomerUserId == currentUser.UserId)
+                .Select(th => th.BookingHorse!.BookingId)
+                .Distinct()
+                .ToList();
+            if (myBookingIds.Count == 0)
+            {
+                throw new ForbiddenException("Only customers with horses on this trip can answer.");
+            }
+
+            var existing = await _consentRepo.GetQueryable().Where(c => c.IncidentId == incidentId).ToListAsync();
+            var now = DateTimeOffset.UtcNow;
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                foreach (int bookingId in myBookingIds)
+                {
+                    var consent = existing.FirstOrDefault(c => c.BookingId == bookingId);
+                    if (consent == null)
+                    {
+                        consent = new IncidentConsent { IncidentId = incidentId, BookingId = bookingId, CustomerUserId = currentUser.UserId };
+                        await _consentRepo.AddAsync(consent);
+                        existing.Add(consent);
+                    }
+                    consent.Accepted = accept;
+                    consent.DecidedAt = now;
+                }
+                await _consentRepo.SaveChangesAsync();
+
+                var onBoardBookingIds = trip.TripHorses
+                    .Where(th => TripHorseStatuses.OnBoard.Contains(th.Status))
+                    .Select(th => th.BookingHorse!.BookingId)
+                    .Distinct()
+                    .ToList();
+
+                if (!accept)
+                {
+                    // Một khách không đồng ý -> cả đoàn quay về (Chính sách 9.4), không thu tiền đi vòng
+                    incident.ResponseAction = IncidentResponseActions.ReturnToOrigin;
+                    incident.ProposedAction = $"Return to the origin: a customer declined the detour. ({incident.ProposedAction})";
+                    incident.RouteChange = null;
+                    incident.ExtraCostForCustomer = 0;
+                    incident.Status = IncidentStatuses.Approved;
+                    await ApplyReturnToOriginAsync(trip, incident);
+                    await _incidentRepo.UpdateAsync(incident);
+                    await NotifyEveryoneAsync(trip, incident, $"Trip {trip.TripCode} returns to the origin",
+                        "A customer declined the detour, so the convoy returns to the origin. Refunds follow the service policy (section 9).");
+                    return;
+                }
+
+                bool everyoneAccepted = onBoardBookingIds.All(id => existing.Any(c => c.BookingId == id && c.Accepted));
+                if (!everyoneAccepted)
+                {
+                    return;
+                }
+
+                // Mọi khách đồng ý -> áp tuyến đi vòng, tiền đi vòng thành chi phí phát sinh (chia theo số ngựa lúc đóng chuyến)
+                var routeChange = IncidentMapper.ParseRouteChange(incident.RouteChange)
+                    ?? throw new BusinessException("The detour route is missing; reject the plan so the coordinator can propose it again.");
+                RoutePlan plan;
+                try
+                {
+                    EnsureOnTheRoad(trip);
+                    plan = BuildRoutePlan(trip, ToRerouteModel(routeChange));
+                }
+                catch (BusinessException ex)
+                {
+                    throw new BusinessException($"The detour no longer fits the current route: {ex.Message} The logistics team will propose a new plan.");
+                }
+                await ApplyRoutePlanAsync(trip, plan);
+                for (int i = 0; i < plan.Added.Count; i++)
+                {
+                    routeChange.NewCheckpoints[i].CheckpointId = plan.Added[i].CheckpointId;
+                }
+                routeChange.AppliedAt = now;
+                incident.RouteChange = IncidentMapper.SerializeRouteChange(routeChange);
+                incident.AdditionalCost += incident.ExtraCostForCustomer;
+                incident.Status = IncidentStatuses.Approved;
+                await _incidentRepo.UpdateAsync(incident);
+                await NotifyEveryoneAsync(trip, incident, $"Trip {trip.TripCode} takes the detour",
+                    $"Every customer agreed. Route changed: {DescribeRouteChange(plan.Removed, plan.Added)}");
+            });
+
+            // R-17: đi đường vòng có tính thêm tiền -> bản hợp đồng mới cho các đơn đã giao kết hợp đồng
+            if (accept && incident.Status == IncidentStatuses.Approved && incident.ResponseAction == IncidentResponseActions.Reroute)
+            {
+                var bookingIds = trip.TripHorses.Where(th => TripHorseStatuses.OnBoard.Contains(th.Status))
+                    .Select(th => th.BookingHorse!.BookingId).Distinct().ToList();
+                foreach (int bookingId in bookingIds)
+                {
+                    try
+                    {
+                        await _contractService.CreateAmendmentAsync(bookingId, ContractReasons.DetourAccepted);
+                    }
+                    catch (BusinessException)
+                    {
+                        // Đơn chưa giao kết hợp đồng (đơn cũ): không có bản sửa đổi
+                    }
+                }
+            }
+
+            await _trackingService.InvalidateTripAsync(trip.TripId);
+            return await GetIncidentByIdAsync(incidentId, currentUser);
+        }
+
+        // Dựng tuyến về (gọi trong transaction): bỏ mọi mốc chưa tới, thêm các mốc đã đi theo chiều ngược, kết thúc ở điểm xuất phát
+        // (thành điểm giao cuối, e-POD ký ở đó). Ngựa chưa được đón rời chuyến. Lưu tỉ lệ quãng đường chưa đi của từng đơn để hoàn tiền.
+        private async Task ApplyReturnToOriginAsync(Trip trip, TripIncident incident)
+        {
+            var route = trip.Checkpoints.Where(c => c.IsActive).OrderBy(c => c.SequenceOrder).ToList();
+            var returnPlan = ReturnRouteRules.Build(route, DateTimeOffset.UtcNow);
+
+            // Tỉ lệ chưa đi tính trên lộ trình trước khi đổi
+            var ratios = trip.TripHorses
+                .Select(th => th.BookingHorse!.BookingId)
+                .Distinct()
+                .ToDictionary(
+                    bookingId => bookingId,
+                    bookingId => ReturnRouteRules.UnusedRatio(route,
+                        TripRouteRules.PickupCheckpoint(route, bookingId),
+                        TripRouteRules.DropoffCheckpoint(route, bookingId),
+                        returnPlan.TurnAround));
+
+            var added = returnPlan.NewStops.Select(stop => new RouteCheckpoint
+            {
+                TripId = trip.TripId,
+                CheckpointName = stop.Name.Length > 100 ? stop.Name[..100] : stop.Name,
+                CheckpointType = stop.CheckpointType,
+                Address = stop.Address,
+                Latitude = stop.Latitude,
+                Longitude = stop.Longitude,
+                DistanceKmFromPrevious = stop.DistanceKmFromPrevious,
+                PlannedTime = stop.PlannedTime,
+                MandatoryRestMinutes = stop.MandatoryRestMinutes,
+                Status = CheckpointStatuses.Pending,
+                IsActive = true
+            }).ToList();
+            var newRoute = route.Except(returnPlan.Deactivate).ToList();
+            newRoute.InsertRange(newRoute.IndexOf(returnPlan.TurnAround) + 1, added);
+            var plan = new RoutePlan { Removed = returnPlan.Deactivate, Added = added, Anchor = returnPlan.TurnAround, NewRoute = newRoute };
+
+            await ApplyRoutePlanAsync(trip, plan);
+
+            // Ngựa chưa lên xe (mốc đón của đơn đã bị bỏ) rời chuyến, được xếp chuyến khác
+            foreach (var tripHorse in trip.TripHorses.Where(th => th.Status == TripHorseStatuses.Planned))
+            {
+                tripHorse.Status = TripHorseStatuses.Cancelled;
+            }
+            await _tripRepo.SaveChangesAsync();
+
+            var change = ToRouteChange(plan, returnPlan.TurnAround.CheckpointId);
+            change.AppliedAt = DateTimeOffset.UtcNow;
+            change.ReturnUnusedRatios = ratios;
+            change.TurnAroundCheckpointId = returnPlan.TurnAround.CheckpointId;
+            incident.RouteChange = IncidentMapper.SerializeRouteChange(change);
+        }
+
+        private async Task RefundReturnedBookingsAsync(TripIncident incident, string faultParty, CurrentUser currentUser)
+        {
+            var ratios = IncidentMapper.ParseRouteChange(incident.RouteChange)?.ReturnUnusedRatios;
+            if (ratios == null || ratios.Count == 0)
+            {
+                return;
+            }
+            foreach (var (bookingId, ratio) in ratios)
+            {
+                var booking = await _bookingRepo.GetQueryable().FirstOrDefaultAsync(b => b.BookingId == bookingId);
+                if (booking == null)
+                {
+                    continue;
+                }
+                decimal refundable = await _paymentService.GetRefundableAmountAsync(bookingId);
+                decimal freight = DelayCompensationRules.FreightAmount(_pricingService.ParseLines(booking.QuoteBreakdown), booking.EstimatedCost);
+                decimal amount = ReturnRouteRules.RefundAmount(faultParty, freight, refundable, ratio);
+                if (amount > 0)
+                {
+                    await _paymentService.RefundAmountAsync(booking, amount,
+                        $"Return to origin (incident {incident.IncidentCode}, {faultParty}): {ratio:P0} of the journey not travelled", currentUser);
+                }
+            }
+        }
+
+        private async Task RefundOffloadedHorseAsync(Trip trip, TripIncident incident, string faultParty, CurrentUser currentUser)
+        {
+            var tripHorse = trip.TripHorses.FirstOrDefault(th => th.TripHorseId == incident.AffectedTripHorseId);
+            if (tripHorse?.OffloadedAt == null)
+            {
+                return;
+            }
+            var booking = await _bookingRepo.GetQueryable()
+                .Include(b => b.BookingHorses)
+                .FirstAsync(b => b.BookingId == tripHorse.BookingHorse!.BookingId);
+            var route = trip.Checkpoints.Where(c => c.IsActive).OrderBy(c => c.SequenceOrder).ToList();
+            // Nơi dỡ ngựa: mốc gần nhất đoàn xe đã tới lúc dỡ
+            var offloadedAt = route.LastOrDefault(c => c.ActualArrivalTime != null && c.ActualArrivalTime <= tripHorse.OffloadedAt) ?? route.FirstOrDefault();
+            if (offloadedAt == null)
+            {
+                return;
+            }
+            decimal ratio = ReturnRouteRules.UnusedRatio(route,
+                TripRouteRules.PickupCheckpoint(route, booking.BookingId),
+                TripRouteRules.DropoffCheckpoint(route, booking.BookingId),
+                offloadedAt);
+            decimal freight = DelayCompensationRules.FreightAmount(_pricingService.ParseLines(booking.QuoteBreakdown), booking.EstimatedCost);
+            int horses = booking.BookingHorses.Count(bh => bh.Status != BookingHorseStatuses.Cancelled || bh.BookingHorseId == tripHorse.BookingHorseId);
+            decimal refundable = await _paymentService.GetRefundableAmountAsync(booking.BookingId);
+            decimal amount = ReturnRouteRules.OffloadRefundAmount(faultParty, freight, horses, ratio, refundable);
+            if (amount > 0)
+            {
+                await _paymentService.RefundAmountAsync(booking, amount,
+                    $"Unused fare of {tripHorse.BookingHorse!.Horse?.Name} (incident {incident.IncidentCode}, {faultParty}): {ratio:P0} of the journey not travelled", currentUser);
+            }
+        }
+
+        private async Task NotifyEveryoneAsync(Trip trip, TripIncident incident, string title, string message)
+        {
+            await _notificationService.SendToUsersAsync(WithPlanner(CrewIds(trip), trip), title, message, NotificationReferenceTypes.Incident, incident.IncidentId);
+            await _notificationService.SendToUsersAsync(await GetCustomerIdsAsync(trip.TripId), title, message, NotificationReferenceTypes.Incident, incident.IncidentId, emailCustomers: true);
+            await _notificationService.SendToRoleAsync(UserRoles.LogisticsManager, title, message, NotificationReferenceTypes.Incident, incident.IncidentId);
+        }
+
+        private static List<int> OnBoardCustomerIds(Trip trip) =>
+            trip.TripHorses.Where(th => TripHorseStatuses.OnBoard.Contains(th.Status))
+                .Select(th => th.BookingHorse!.Booking!.CustomerUserId)
+                .Distinct()
+                .ToList();
 
         // =============================================================================================
         // Ngựa rời chuyến qua sự cố (R-12)
@@ -812,7 +1150,7 @@ namespace RacehorseTransport.Services.Implementations
                 bookingHorse.Status = BookingHorseStatuses.Deceased;
                 // TODO(BE-12): tự mở hồ sơ bồi thường bảo hiểm cho con ngựa này
             }
-            // TODO(BE-14b): hoàn phần cước chưa đi của con ngựa theo fault_party (trừ WaitRecover vì con ngựa còn đi chuyến sau)
+            // R-14: phần cước chưa đi của con ngựa được hoàn khi đóng sự cố (biết nguyên nhân), trừ WaitRecover vì con ngựa còn đi chuyến sau
 
             var (title, message) = outcome switch
             {
@@ -867,7 +1205,8 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(i => i.Trip)
                 .Include(i => i.ReportedBy)
                 .Include(i => i.ApprovedBy)
-                .Include(i => i.AffectedTripHorse!).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Horse);
+                .Include(i => i.AffectedTripHorse!).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Horse)
+                .Include(i => i.Consents).ThenInclude(c => c.Booking);
         }
 
         // Khách: sự cố trên chuyến có ngựa của mình. Tài xế / áp tải: chuyến mình có tên trong đoàn. Các role vận hành: tất cả.
@@ -891,6 +1230,7 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(i => i.Trip!).ThenInclude(t => t.Checkpoints)
                 .Include(i => i.Trip!).ThenInclude(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Horse)
                 .Include(i => i.Trip!).ThenInclude(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Booking)
+                .Include(i => i.Consents)
                 .AsSplitQuery()
                 .FirstOrDefaultAsync(i => i.IncidentId == incidentId);
 

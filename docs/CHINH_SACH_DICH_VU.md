@@ -152,6 +152,8 @@ Từ lúc ngựa được đưa lên xe tại điểm đón đến lúc người
 | **Lỗi Khách** | Giấy sai / giả, khai sai tình trạng ngựa, người nhận vắng mặt / từ chối | Không hoàn | Khách chịu | Không |
 | **Bất khả kháng** | Đóng biên giới, đổi chính sách nhập khẩu, thiên tai, dịch bệnh, tai nạn do bên thứ ba | Hoàn theo tỉ lệ quãng đường chưa đi, trừ phí thủ tục đã nộp không lấy lại được | Công ty chịu chi phí xe và nhân sự; Khách chịu chuồng tạm và thú y | Không |
 
+Phí chuồng tạm và chăm sóc ngựa trong lúc chờ (biên giới đóng, bổ sung giấy, người nhận vắng mặt...): `[Stable.FeePerHorsePerDayUsd = 50]` USD mỗi con mỗi ngày (chưa đủ ngày tính tròn một ngày), do bên chịu chi phí theo bảng trên trả.
+
 Khi có sự cố, Khách được thông báo ngay trên ứng dụng và qua email: nguyên nhân, phương án xử lý đã được duyệt, thay đổi tuyến (nếu có). Mọi chi phí Khách phải chịu được báo trước khi thực hiện, trừ trường hợp khẩn cấp để bảo vệ tính mạng ngựa.
 
 ### 9.2 Xe hỏng, nhân sự không thể tiếp tục

@@ -38,6 +38,14 @@ namespace RacehorseTransport.Services.Mappers
                 ApprovedAt = entity.ApprovedAt,
                 ResolvedAt = entity.ResolvedAt,
                 EmergencyOffload = entity.EmergencyOffload,
+                ExtraCostForCustomer = entity.ExtraCostForCustomer,
+                Consents = entity.Consents.Select(c => new IncidentConsentModel
+                {
+                    BookingId = c.BookingId,
+                    BookingCode = c.Booking?.BookingCode ?? string.Empty,
+                    Accepted = c.Accepted,
+                    DecidedAt = c.DecidedAt
+                }).ToList(),
                 OffloadOutcome = entity.OffloadOutcome,
                 VetReportPath = entity.VetReportPath
             };

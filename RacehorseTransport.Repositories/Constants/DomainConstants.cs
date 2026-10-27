@@ -364,9 +364,18 @@ namespace RacehorseTransport.Repositories.Constants
         public const string Weather = "Weather";
         public const string ClimateControlFailure = "ClimateControlFailure";
         public const string CustomsHold = "CustomsHold";
+        // R-14 (BE-14b)
+        public const string BorderRejected = "BorderRejected";             // cửa khẩu từ chối cho qua
+        public const string BorderClosed = "BorderClosed";                 // biên giới đóng
+        public const string CrewUnavailable = "CrewUnavailable";           // tài xế / người áp tải không thể tiếp tục
+        public const string RecipientUnavailable = "RecipientUnavailable"; // người nhận vắng mặt / từ chối (BE-16)
         public const string Other = "Other";
 
-        public static readonly string[] All = { MechanicalBreakdown, BorderCongestion, EquineHealthIssue, Weather, ClimateControlFailure, CustomsHold, Other };
+        public static readonly string[] All =
+        {
+            MechanicalBreakdown, BorderCongestion, EquineHealthIssue, Weather, ClimateControlFailure, CustomsHold,
+            BorderRejected, BorderClosed, CrewUnavailable, RecipientUnavailable, Other
+        };
     }
 
     // Loại hành động trong phương án xử lý sự cố
@@ -377,9 +386,12 @@ namespace RacehorseTransport.Repositories.Constants
         public const string Reroute = "Reroute";                     // đổi tuyến: bắt buộc kèm thay đổi tuyến
         public const string VeterinaryCare = "VeterinaryCare";       // dừng chăm sóc thú y
         public const string OffloadHorse = "OffloadHorse";           // cho ngựa rời chuyến
+        // R-14 (BE-14b)
+        public const string ReturnToOrigin = "ReturnToOrigin";       // cả đoàn quay về nơi đi: hệ thống dựng tuyến về, e-POD ký ở nơi đi
+        public const string HoldAtStable = "HoldAtStable";           // gửi ngựa ở chuồng tạm chờ (biên giới mở lại, bổ sung giấy...)
         public const string Other = "Other";
 
-        public static readonly string[] All = { WaitAndContinue, RepairAndContinue, Reroute, VeterinaryCare, OffloadHorse, Other };
+        public static readonly string[] All = { WaitAndContinue, RepairAndContinue, Reroute, VeterinaryCare, OffloadHorse, ReturnToOrigin, HoldAtStable, Other };
     }
 
     // Nguyên nhân sự cố, chọn khi đóng sự cố (R-09): quyết định ai chịu chi phí và có bồi thường giao trễ không
@@ -419,8 +431,10 @@ namespace RacehorseTransport.Repositories.Constants
         public const string Approved = "Approved";
         public const string Rejected = "Rejected";
         public const string Resolved = "Resolved";
+        // R-14 (BE-14b): Manager đã duyệt đi đường vòng tốn thêm tiền, chờ các khách có ngựa trên xe đồng ý
+        public const string AwaitingConsent = "AwaitingConsent";
 
-        public static readonly string[] All = { Reported, PlanProposed, Approved, Rejected, Resolved };
+        public static readonly string[] All = { Reported, PlanProposed, Approved, Rejected, Resolved, AwaitingConsent };
     }
 
     public static class HandoverConditions

@@ -35,6 +35,10 @@ namespace RacehorseTransport.Repositories.Entities
 
         // R-09: nguyên nhân, bắt buộc khi đóng sự cố (FaultParties) + giải thích ngắn
         public string? FaultParty { get; set; }
+
+        // R-14 (BE-14b): đi đường vòng tốn thêm tiền cho khách (tổng, chia cho các đơn theo số ngựa); > 0 thì phải hỏi ý khách
+        public decimal ExtraCostForCustomer { get; set; }
+        public virtual ICollection<IncidentConsent> Consents { get; set; } = new List<IncidentConsent>();
         public string? FaultNote { get; set; }
 
         // Navigation properties

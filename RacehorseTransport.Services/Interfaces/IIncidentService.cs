@@ -17,6 +17,9 @@ namespace RacehorseTransport.Services.Interfaces
 
         Task<TripDetailModel> ApplyRerouteAsync(int incidentId, ApplyRerouteModel model, CurrentUser currentUser);
         // R-09: đóng sự cố bắt buộc chọn nguyên nhân (FaultParties)
+        // R-14 (BE-14b): khách có ngựa trên xe đồng ý / từ chối đi đường vòng tốn thêm tiền
+        Task<IncidentModel> RecordCustomerConsentAsync(int incidentId, bool accept, CurrentUser currentUser);
+
         Task<IncidentModel> ResolveIncidentAsync(int incidentId, string faultParty, string? faultNote, CurrentUser currentUser);
     }
 }
