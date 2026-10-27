@@ -102,6 +102,22 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
+        /// Set the agreed value of each horse (default = the declared value) before the quote is sent.
+        /// Insurance and compensation use the agreed value.
+        /// </summary>
+        [HttpPut("{id:int}/horse-values")]
+        [Authorize(Roles = ReviewRoles)]
+        [ProducesResponseType(typeof(ApiResponse<BookingDetailResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UpdateHorseValues(int id, [FromBody] UpdateHorseValuesRequest request)
+        {
+            var booking = await _bookingService.UpdateHorseValuesAsync(id, request.ToBusinessModel(), User.ToCurrentUser());
+            return Ok(ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse(), "Agreed horse values updated successfully"));
+        }
+
+        /// <summary>
         /// Reject a submitted booking with a reason.
         /// </summary>
         [HttpPost("{id:int}/reject")]

@@ -45,8 +45,24 @@ namespace RacehorseTransport.API.Mappers
                 {
                     HorseId = h.HorseId,
                     StallClass = h.StallClass.Trim(),
-                    Notes = string.IsNullOrWhiteSpace(h.Notes) ? null : h.Notes.Trim()
+                    Notes = string.IsNullOrWhiteSpace(h.Notes) ? null : h.Notes.Trim(),
+                    DeclaredValue = h.DeclaredValue,
+                    ValueProofPath = string.IsNullOrWhiteSpace(h.ValueProofPath) ? null : h.ValueProofPath.Trim(),
+                    InsurancePlan = string.IsNullOrWhiteSpace(h.InsurancePlan) ? null : h.InsurancePlan.Trim()
                 }).ToList()
+            };
+        }
+
+        public static UpdateHorseValuesModel ToBusinessModel(this UpdateHorseValuesRequest request)
+        {
+            return new UpdateHorseValuesModel
+            {
+                Horses = request.Horses.Select(h => new HorseAgreedValueModel
+                {
+                    BookingHorseId = h.BookingHorseId,
+                    AgreedValue = h.AgreedValue
+                }).ToList(),
+                Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim()
             };
         }
 
@@ -191,6 +207,10 @@ namespace RacehorseTransport.API.Mappers
                     StallClass = h.StallClass,
                     Status = h.Status,
                     Notes = h.Notes,
+                    DeclaredValue = h.DeclaredValue,
+                    AgreedValue = h.AgreedValue,
+                    ValueProofUrl = h.ValueProofUrl,
+                    InsurancePlan = h.InsurancePlan,
                     DossierId = h.DossierId,
                     DossierCode = h.DossierCode,
                     DossierStatus = h.DossierStatus,
