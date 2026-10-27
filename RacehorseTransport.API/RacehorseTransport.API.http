@@ -555,6 +555,30 @@ Content-Type: application/json
 {}
 
 ### =====================================================================
+### BE-03 · Khoảng giá ước tính (tọa độ từ bản đồ, khách không nhập nước quá cảnh)
+### Đổi ngày cho đúng: pickupWindowStart phải từ earliestPickupDate trở đi
+### =====================================================================
+
+### [ĐÚNG] Xem khoảng giá Hà Nội -> Bangkok (lần đầu có thể mất vài chục giây)
+POST {{baseUrl}}/api/bookings/quote-preview
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "transportMode": "Ground",
+  "pickupCountryCode": "VN",
+  "dropoffCountryCode": "TH",
+  "pickupLat": 21.0285,
+  "pickupLng": 105.8542,
+  "dropoffLat": 13.7563,
+  "dropoffLng": 100.5018,
+  "pickupWindowStart": "2026-12-15T00:00:00+07:00",
+  "pickupWindowEnd": "2026-12-17T00:00:00+07:00",
+  "deliveryDeadline": "2027-01-10T00:00:00+07:00",
+  "horses": [ { "stallClass": "Shared" } ]
+}
+
+### =====================================================================
 ### B-04 · Kiểm tra tài khoản dữ liệu mẫu bổ sung
 ### =====================================================================
 

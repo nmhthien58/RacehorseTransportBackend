@@ -40,7 +40,10 @@ namespace RacehorseTransport.API.Mappers
                 RequiresClimateControl = request.RequiresClimateControl,
                 DeclaredValue = request.DeclaredValue,
                 SpecialInstructions = string.IsNullOrWhiteSpace(request.SpecialInstructions) ? null : request.SpecialInstructions.Trim(),
-                TransitCountryCodes = request.TransitCountryCodes ?? new List<string>(),
+                PickupLat = request.PickupLat,
+                PickupLng = request.PickupLng,
+                DropoffLat = request.DropoffLat,
+                DropoffLng = request.DropoffLng,
                 Horses = request.Horses.Select(h => new CreateBookingHorseModel
                 {
                     HorseId = h.HorseId,
@@ -83,7 +86,10 @@ namespace RacehorseTransport.API.Mappers
                 PickupWindowStart = request.PickupWindowStart,
                 PickupWindowEnd = request.PickupWindowEnd,
                 DeliveryDeadline = request.DeliveryDeadline,
-                TransitCountryCodes = request.TransitCountryCodes ?? new List<string>(),
+                PickupLat = request.PickupLat,
+                PickupLng = request.PickupLng,
+                DropoffLat = request.DropoffLat,
+                DropoffLng = request.DropoffLng,
                 StallClasses = request.Horses.Select(h => h.StallClass.Trim()).ToList()
             };
         }
@@ -144,7 +150,10 @@ namespace RacehorseTransport.API.Mappers
                 EarliestPickupDate = model.EarliestPickupDate,
                 ExpressUntilDate = model.ExpressUntilDate,
                 EarliestDeliveryDeadline = model.EarliestDeliveryDeadline,
-                Transit = model.Transit.ToResponse()
+                Transit = model.Transit.ToResponse(),
+                QuoteMin = model.QuoteMin,
+                QuoteMax = model.QuoteMax,
+                RouteIsEstimate = model.RouteIsEstimate
             };
         }
 
@@ -250,6 +259,8 @@ namespace RacehorseTransport.API.Mappers
             response.TransportMode = model.TransportMode;
             response.TotalHorses = model.TotalHorses;
             response.EstimatedCost = model.EstimatedCost;
+            response.QuoteMin = model.QuoteMin;
+            response.QuoteMax = model.QuoteMax;
             response.CurrencyCode = model.CurrencyCode;
             response.Status = model.Status;
             response.CustomerStage = model.CustomerStage;

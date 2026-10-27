@@ -7,6 +7,9 @@ namespace RacehorseTransport.Services.Interfaces
         // Tính báo giá từ bảng pricing.price_items. Không ghi gì vào DB.
         Task<QuoteModel> CalculateQuoteAsync(QuoteInputModel input);
 
+        // R-10: khoảng giá ước tính (QuoteMin / QuoteMax) cho khách khi tạo đơn / xem giá
+        Task<QuoteModel> CalculateQuoteRangeAsync(QuoteInputModel input);
+
         // Chuyển các dòng báo giá sang / từ JSON lưu ở booking_requests.quote_breakdown
         string SerializeLines(IEnumerable<QuoteLineModel> lines);
         List<QuoteLineModel> ParseLines(string? quoteBreakdownJson);

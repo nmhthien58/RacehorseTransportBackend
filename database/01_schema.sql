@@ -105,6 +105,8 @@ CREATE TABLE booking.booking_requests (
     total_horses             integer       NOT NULL CONSTRAINT ck_booking_requests_total CHECK (total_horses > 0),
     special_instructions     text,
     estimated_cost           numeric(18,2) NOT NULL DEFAULT 0,
+    quote_min                numeric(18,2), -- R-10: khoảng giá ước tính lúc tạo đơn
+    quote_max                numeric(18,2),
     currency_code            char(3)       NOT NULL DEFAULT 'USD',
     -- Vòng đời: Submitted -> AwaitingDeposit (Manager duyệt, chờ cọc) -> Approved (đã cọc: làm hồ sơ, xếp chuyến)
     --           -> Completed, hoặc -> AwaitingFinalPayment (còn chi phí phát sinh) -> Completed

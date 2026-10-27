@@ -96,6 +96,8 @@ namespace RacehorseTransport.Repositories.Context
                 entity.Property(e => e.PickupLng).HasPrecision(9, 6);
                 entity.Property(e => e.DropoffLat).HasPrecision(9, 6);
                 entity.Property(e => e.DropoffLng).HasPrecision(9, 6);
+                entity.Property(e => e.QuoteMin).HasPrecision(18, 2);
+                entity.Property(e => e.QuoteMax).HasPrecision(18, 2);
                 entity.Property(e => e.QuoteBreakdown).HasColumnType("jsonb");
 
                 entity.HasOne(e => e.Customer).WithMany().HasForeignKey(e => e.CustomerUserId);

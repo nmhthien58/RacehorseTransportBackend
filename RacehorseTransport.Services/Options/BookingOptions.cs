@@ -32,6 +32,13 @@ namespace RacehorseTransport.Services.Options
         // ... hoặc hạn giao chỉ dư ít hơn bấy nhiêu giờ so với thời gian vận chuyển chậm nhất
         public int TightDeadlineHours { get; set; } = 24;
 
+        // ---------- Khoảng giá ước tính khi tạo đơn (R-10) ----------
+        // Giá cao nhất: quãng đường A -> B × hệ số này (tuyến chốt thường dài hơn đường ngắn nhất: vòng qua cửa khẩu, trạm nghỉ)
+        public decimal QuoteRangeDistanceFactor { get; set; } = 1.25m;
+
+        // ... và cộng phí thủ tục quá cảnh cho các nước đường A -> B đi qua, tối đa bấy nhiêu nước (giá thấp nhất không tính phí này)
+        public int QuoteMaxTransitCountries { get; set; } = 2;
+
         // Số ngày cần tính từ lúc DUYỆT đơn tới ngày pickup, với thời gian làm hồ sơ của tuyến (R-03)
         public int ApprovalLeadDaysFor(int clearanceDays) => DepositDays + clearanceDays + PlanningBufferDays;
 

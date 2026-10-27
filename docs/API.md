@@ -1731,12 +1731,19 @@ Response `200` — phần `data`:
 
 ### POST /api/bookings/quote-preview — Xem giá trước khi gửi đơn
 
-Tính giá cho một đơn dự kiến. Không lưu gì vào hệ thống, gọi bao nhiêu lần cũng được. Nếu không gửi `distanceKm` cho đơn đường bộ, server tự động tính quãng đường dựa trên điểm đón và trả.
+Tính **khoảng giá ước tính** cho một đơn dự kiến. Không lưu gì vào hệ thống, gọi bao nhiêu lần cũng được.
+
+**Khoảng giá (R-10).** Lúc khách gửi yêu cầu, công ty chưa lập tuyến nên chỉ báo **khoảng giá** `quoteMin` → `quoteMax`; **giá chốt** gửi sau khi công ty lập tuyến (khách chưa phải thanh toán gì). Form nên hiện: "Giá ước tính: {quoteMin} – {quoteMax} USD. Giá chốt gửi sau khi công ty lập tuyến; chưa phải thanh toán."
+
+- Đường bộ, có tọa độ điểm đón / trả (`pickupLat`, `pickupLng`, `dropoffLat`, `dropoffLng` từ component bản đồ): quãng đường thật A → B và **các nước đường đi qua** lấy từ bản đồ (mục 6b). `quoteMin` = giá theo quãng đường thật, **chưa có** phí quá cảnh; `quoteMax` = quãng đường × 1,25 (đi vòng, mốc nghỉ) + phí thủ tục cho các nước đường A → B đi qua (tối đa 2 nước).
+- **Khách không còn nhập nước quá cảnh** (`transitCountryCodes` bị bỏ khỏi request; gửi lên cũng bị bỏ qua). Không có tọa độ (app cũ) thì quãng đường tính như trước (`distanceKm` hoặc theo tên thành phố) và không tính nước quá cảnh.
+- Lần đầu tính một tuyến mới có thể mất **10–40 giây** (phải tra nước theo từng đoạn đường, nhà cung cấp chỉ cho 1 lượt / giây); các lần sau trả về ngay. Nên hiện vòng xoay "Đang tính giá..." và tránh gọi lại khi người dùng chưa đổi điểm.
+- Đường hàng không: `quoteMin` = `quoteMax`.
 
 **Khách không chọn ngày khởi hành.** Khách chỉ cho biết ngựa sẵn sàng được đón trong khoảng ngày nào (`pickupWindowStart` → `pickupWindowEnd`) và hạn giao trễ nhất (`deliveryDeadline`). Ngày chạy thật do điều phối viên chốt khi lập chuyến.
 
 - **Ngày pickup sớm nhất:** hôm nay + `leadTimeDays` ngày = 2 ngày duyệt + 2 ngày đặt cọc + **số ngày làm hồ sơ của tuyến** (`clearanceDays`) + 3 ngày xếp chuyến. `clearanceDays` = giấy lâu nhất trong các quy định của nước đi (Export), các nước quá cảnh (Transit) và nước đến (Import), ví dụ VN → Campuchia 7 ngày, VN → Trung Quốc 21 ngày; tuyến chưa có số liệu thì 14 ngày. Server trả về `earliestPickupDate`; form nên khóa các ngày sớm hơn.
-- **Nước quá cảnh** (`transitCountryCodes`): đi đường bộ qua nước khác (ví dụ VN → Trung Quốc → Nga) thì liệt kê các nước đi qua theo thứ tự. Mỗi nước thêm một dòng phí `FEE_TRANSIT`, thêm một lần qua cửa khẩu trong thời gian vận chuyển, và có thể làm `clearanceDays` dài hơn. Đi thẳng thì bỏ trống.
+- **Nước quá cảnh** (`transitCountryCodes` trong response): server tự xác định từ bản đồ. Mỗi nước thêm một dòng phí `FEE_TRANSIT`, thêm một lần qua cửa khẩu trong thời gian vận chuyển, và có thể làm `clearanceDays` dài hơn.
 - **Thời gian vận chuyển** do server ước tính từ quãng đường và phương thức (`transit`), không lấy từ ngày khách nhập. Hạn giao phải từ `earliestDeliveryDeadline` trở đi (= đầu khoảng pickup + thời gian vận chuyển chậm nhất).
 - **Phụ phí gấp (Express):** khi đầu khoảng pickup trước `expressUntilDate` (sát ngày sớm nhất, phải làm hồ sơ gấp) hoặc hạn giao dư ít hơn 24 giờ so với `earliestDeliveryDeadline`.
 - Chưa chọn ngày thì cứ bỏ trống 3 trường ngày: server vẫn trả về `earliestPickupDate`, `expressUntilDate` và thời gian vận chuyển để form hiển thị gợi ý.
@@ -1760,7 +1767,8 @@ Các trường gửi lên:
 | `pickupWindowStart` | ngày giờ | Không | Ngày đầu của khoảng ngựa sẵn sàng được đón; không sớm hơn `earliestPickupDate` |
 | `pickupWindowEnd` | ngày giờ | Không | Ngày cuối của khoảng đón; không trước `pickupWindowStart`, khoảng dài tối đa 30 ngày. Bỏ trống thì bằng `pickupWindowStart` |
 | `deliveryDeadline` | ngày giờ | Không | Hạn giao trễ nhất; không sớm hơn `earliestDeliveryDeadline` |
-| `transitCountryCodes` | mảng chuỗi | Không | Nước đi qua theo thứ tự, mã 2 chữ cái, ví dụ `["CN"]`; tối đa 5 nước, không trùng nhau, không trùng nước đi / nước đến |
+| `pickupLat`, `pickupLng` | số | Không (nên gửi) | Tọa độ điểm đón chọn trên bản đồ (`GET /api/geo/search` / `reverse`). Gửi đủ 4 tọa độ thì quãng đường và các nước đi qua lấy từ bản đồ |
+| `dropoffLat`, `dropoffLng` | số | Không (nên gửi) | Tọa độ điểm trả |
 | `horses` | mảng | Có | Mỗi phần tử là một con ngựa, chỉ cần `stallClass`: `Shared`, `Comfort` hoặc `Private` |
 
 Gửi `pickupWindowEnd` hoặc `deliveryDeadline` thì phải gửi kèm `pickupWindowStart`.
@@ -1823,6 +1831,9 @@ Response `200` — phần `data`:
     }
   ],
   "total": 6788.48,
+  "quoteMin": 6788.48,
+  "quoteMax": 8120.6,
+  "routeIsEstimate": false,
   "currencyCode": "USD",
   "horseCount": 2,
   "groomCount": 1,
@@ -1830,7 +1841,7 @@ Response `200` — phần `data`:
   "isExpress": false,
   "distanceKm": 900,
   "estimatedHours": 35.9,
-  "routeSummary": null,
+  "routeSummary": "1354 km (VN → LA → TH)",
   "leadTimeDays": 28,
   "clearanceDays": 21,
   "transitCountryCodes": [],
@@ -1856,12 +1867,15 @@ Response `200` — phần `data`:
 | Trường | Ý nghĩa |
 |---|---|
 | `lines[]` | Các dòng của bảng giá: `name` (tên hiển thị), `quantity`, `unitPrice`, `amount` (thành tiền). Dòng có `amount` âm là chiết khấu |
-| `total` | Tổng tiền |
+| `total` | Tổng tiền theo quãng đường thật, chưa có phí quá cảnh (bằng `quoteMin`) |
+| `quoteMin`, `quoteMax` | **Khoảng giá ước tính** để hiện cho khách (xem đầu mục) |
+| `routeIsEstimate` | `true` khi nhà cung cấp bản đồ lỗi và quãng đường là ước tính theo đường chim bay; nên ghi chú "quãng đường ước tính" |
 | `currencyCode` | Đơn vị tiền (`USD`) |
 | `horseCount`, `groomCount` | Số ngựa và số người áp tải được tính |
 | `transitDays` | Số ngày vận chuyển ước tính (dùng tính phí áp tải theo ngày) |
 | `isExpress` | `true` nếu có phụ phí gấp (xem đầu mục). Server tự xác định |
-| `distanceKm`, `routeSummary` | Quãng đường đường bộ và mô tả tuyến khi server tự tính |
+| `distanceKm`, `routeSummary` | Quãng đường đường bộ và mô tả tuyến, ví dụ `1354 km (VN → LA → TH)` |
+| `transitCountryCodes` | Các nước quá cảnh server xác định từ bản đồ (mảng rỗng khi đi thẳng hoặc không gửi tọa độ) |
 | `estimatedHours` | Tổng thời gian vận chuyển dự kiến (giờ), bằng `transit.totalHours` |
 | `leadTimeDays` | Số ngày cần từ hôm nay tới ngày pickup sớm nhất của tuyến này |
 | `earliestPickupDate` | Ngày pickup sớm nhất được chọn (dạng `yyyy-MM-dd`) |
@@ -1890,6 +1904,8 @@ Lỗi thường gặp:
 
 Tạo đơn mới ở trạng thái `Submitted`. Server tự tính giá và lưu kèm đơn; các quản lý nhận thông báo có đơn mới.
 
+R-10: server tính **khoảng giá ước tính** như `quote-preview` (gửi tọa độ để lấy quãng đường và các nước đi qua từ bản đồ) và lưu `quoteMin`, `quoteMax` vào đơn. Khách không nhập nước quá cảnh nữa; server ghi các nước đi qua tìm được vào `transitCountryCodes` của đơn (Manager vẫn sửa được khi duyệt). Giá chốt gửi sau khi công ty lập tuyến; tạm thời `estimatedCost` bằng `quoteMax` cho tới khi có bước báo giá chốt.
+
 - **Ai gọi được:** Customer
 - **Dữ liệu gửi lên:** JSON
 
@@ -1911,7 +1927,8 @@ Các trường gửi lên:
 | `pickupWindowEnd` | ngày giờ | Có | Ngày cuối của khoảng đón; từ `pickupWindowStart` trở đi, khoảng dài tối đa 30 ngày |
 | `deliveryDeadline` | ngày giờ | Có | Hạn giao trễ nhất; không sớm hơn `earliestDeliveryDeadline` của xem giá |
 | `specialInstructions` | chuỗi | Không | Ghi chú cho công ty, tối đa 2000 ký tự |
-| `transitCountryCodes` | mảng chuỗi | Không | Nước đi qua theo thứ tự (khách gợi ý, Manager xác nhận khi duyệt bằng `PUT /api/bookings/{id}/transit-countries`). Quy tắc như ở xem giá |
+| `pickupLat`, `pickupLng` | số | Không (nên gửi) | Tọa độ điểm đón chọn trên bản đồ (`GET /api/geo/search` / `reverse`). Gửi đủ 4 tọa độ thì quãng đường và các nước đi qua lấy từ bản đồ |
+| `dropoffLat`, `dropoffLng` | số | Không (nên gửi) | Tọa độ điểm trả |
 | `horses` | mảng | Có | Ít nhất 1 phần tử, xem bảng dưới |
 
 Mỗi phần tử của `horses`:
@@ -2228,6 +2245,7 @@ Ngoài các trường của danh sách, chi tiết có thêm:
 | `reviewedByName`, `reviewedAt` | Ai duyệt / từ chối và lúc nào |
 | `quoteLines[]` | Các dòng báo giá đã lưu, dạng giống `lines` của xem giá |
 | `horses[]` | Từng con ngựa trong đơn |
+| `quoteMin`, `quoteMax` | Khoảng giá ước tính lúc khách gửi đơn (R-10); `null` với đơn cũ |
 | `horses[].bookingHorseId` | Mã "ngựa trong đơn", dùng khi xếp chuyến và khi Manager chốt giá trị |
 | `horses[].declaredValue` | Giá trị khách khai báo (USD); `null` với đơn cũ chỉ khai một giá trị cho cả đơn |
 | `horses[].agreedValue` | Giá trị thỏa thuận Manager chốt (mặc định bằng giá trị khai báo). **Bảo hiểm và bồi thường tính trên giá trị này** |

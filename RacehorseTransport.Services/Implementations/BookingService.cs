@@ -277,7 +277,8 @@ namespace RacehorseTransport.Services.Implementations
 
             // Báo giá trước: đồng thời kiểm tra phương thức, hạng chuồng, tuyến có giá, DistanceKm,
             // khoảng pickup (đủ xa, không quá dài) và hạn giao (đủ thời gian vận chuyển)
-            var quote = await _pricingService.CalculateQuoteAsync(new QuoteInputModel
+            // R-10: khoảng giá ước tính; quãng đường + nước đi qua lấy từ bản đồ khi có tọa độ
+            var quote = await _pricingService.CalculateQuoteRangeAsync(new QuoteInputModel
             {
                 TransportMode = model.TransportMode,
                 DropoffCountryCode = model.DropoffCountryCode,
@@ -292,7 +293,10 @@ namespace RacehorseTransport.Services.Implementations
                 PickupWindowStart = model.PickupWindowStart,
                 PickupWindowEnd = model.PickupWindowEnd,
                 DeliveryDeadline = model.DeliveryDeadline,
-                TransitCountryCodes = model.TransitCountryCodes,
+                PickupLat = model.PickupLat,
+                PickupLng = model.PickupLng,
+                DropoffLat = model.DropoffLat,
+                DropoffLng = model.DropoffLng,
                 StallClasses = model.Horses.Select(h => h.StallClass).ToList()
             });
 
@@ -324,8 +328,12 @@ namespace RacehorseTransport.Services.Implementations
                     CustomerUserId = currentUser.UserId,
                     PickupAddress = model.PickupAddress,
                     PickupCountryCode = model.PickupCountryCode,
+                    PickupLat = model.PickupLat,
+                    PickupLng = model.PickupLng,
                     DropoffAddress = model.DropoffAddress,
                     DropoffCountryCode = model.DropoffCountryCode,
+                    DropoffLat = model.DropoffLat,
+                    DropoffLng = model.DropoffLng,
                     PickupWindowStart = model.PickupWindowStart,
                     PickupWindowEnd = model.PickupWindowEnd,
                     DeliveryDeadline = model.DeliveryDeadline,
@@ -337,7 +345,10 @@ namespace RacehorseTransport.Services.Implementations
                     IsExpress = quote.IsExpress,
                     RequiresClimateControl = model.RequiresClimateControl,
                     DeclaredValue = model.DeclaredValue,
-                    EstimatedCost = quote.Total,
+                    QuoteMin = quote.QuoteMin,
+                    QuoteMax = quote.QuoteMax,
+                    // TODO(BE-05): để trống tới khi có báo giá chốt. Tạm lấy giá cao nhất để luồng duyệt / cọc hiện tại vẫn chạy.
+                    EstimatedCost = quote.QuoteMax,
                     CurrencyCode = quote.CurrencyCode,
                     QuoteBreakdown = _pricingService.SerializeLines(quote.Lines),
                     Status = BookingStatuses.Submitted,

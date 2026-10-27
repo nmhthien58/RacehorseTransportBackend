@@ -16,6 +16,10 @@ namespace RacehorseTransport.Repositories.Entities
         public string DropoffCountryCode { get; set; } = string.Empty;
         public decimal? DropoffLat { get; set; }
         public decimal? DropoffLng { get; set; }
+
+        // R-10: khoảng giá ước tính lúc tạo đơn (giá chốt nằm ở EstimatedCost sau khi lập tuyến)
+        public decimal? QuoteMin { get; set; }
+        public decimal? QuoteMax { get; set; }
         // Khoảng ngày ngựa sẵn sàng được đón và hạn giao trễ nhất; ngày chạy thật nằm ở chuyến
         public DateTimeOffset PickupWindowStart { get; set; }
         public DateTimeOffset PickupWindowEnd { get; set; }
