@@ -80,7 +80,8 @@ Công ty **không giới hạn tuổi tối đa**. Thay vào đó, **mọi con n
 
 ## 6. Giấy tờ và thủ tục
 
-- Khách cung cấp giấy tờ của ngựa (hộ chiếu ngựa, vi mạch, kết quả xét nghiệm, tiêm phòng…) theo danh sách chuyên viên yêu cầu cho từng nước đi, quá cảnh và đến.
+- Khách cung cấp giấy tờ của ngựa (hộ chiếu ngựa, vi mạch, kết quả xét nghiệm, tiêm phòng…) theo danh sách chuyên viên yêu cầu cho từng nước đi, quá cảnh và đến, trong vòng `[Dossier.SubmitDays = 7]` ngày kể từ khi đặt cọc. Hệ thống nhắc qua email khi còn 3 ngày và 1 ngày. Quá hạn mà còn thiếu giấy, đơn bị hủy và hoàn tiền theo mục 4 (như Khách tự hủy sau khi cọc).
+- Nếu công ty đổi tuyến sau khi Khách đã chấp nhận báo giá và tuyến mới đi qua nước mới, Khách được báo danh sách giấy cần thêm cùng hạn nộp mới; nếu không lo được giấy, Khách được hủy đơn và **hoàn 100%** số tiền đã trả (mục 2).
 - Công ty thay mặt Khách xin giấy phép nhập khẩu / quá cảnh và chứng nhận kiểm dịch với cơ quan chức năng.
 - **Giấy phép trước khi đi không bảo đảm chắc chắn qua được cửa khẩu.** Tại cửa khẩu, cơ quan thú y và hải quan vẫn kiểm tra thực tế và có quyền từ chối (xem mục 9.3).
 - Giấy tờ phải **còn hiệu lực tại giờ xuất phát thực tế**. Nếu chuyến bị lùi làm giấy hết hạn:

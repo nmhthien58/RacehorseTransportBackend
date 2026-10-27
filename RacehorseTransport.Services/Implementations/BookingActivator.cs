@@ -15,17 +15,20 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IRepository<BookingRequest> _bookingRepo;
         private readonly IRepository<DigitalDossier> _dossierRepo;
         private readonly ICodeGenerator _codeGenerator;
+        private readonly ISystemSettingService _settingService;
         private readonly INotificationService _notificationService;
 
         public BookingActivator(
             IRepository<BookingRequest> bookingRepo,
             IRepository<DigitalDossier> dossierRepo,
             ICodeGenerator codeGenerator,
+            ISystemSettingService settingService,
             INotificationService notificationService)
         {
             _bookingRepo = bookingRepo;
             _dossierRepo = dossierRepo;
             _codeGenerator = codeGenerator;
+            _settingService = settingService;
             _notificationService = notificationService;
         }
 
@@ -42,6 +45,11 @@ namespace RacehorseTransport.Services.Implementations
 
             int specialistId = booking.AssignedSpecialistId.Value;
             booking.Status = BookingStatuses.Approved;
+
+            // R-10 (BE-06): hạn nộp giấy tính từ lúc cọc; giấy cần nộp theo nước đi + các nước quá cảnh của tuyến đã duyệt + nước đến
+            var policy = await _settingService.GetPolicySettingsAsync();
+            booking.DocsDueAt = DocumentDeadlineRules.DueAt(DateTimeOffset.UtcNow, policy.DossierSubmitDays);
+            booking.DocsRemindersSent = 0;
 
             var dossiers = new List<DigitalDossier>();
             foreach (var bookingHorse in booking.BookingHorses.Where(bh => bh.Status != BookingHorseStatuses.Cancelled))
@@ -62,7 +70,7 @@ namespace RacehorseTransport.Services.Implementations
             await _notificationService.SendAsync(
                 booking.CustomerUserId,
                 $"Booking {booking.BookingCode} is confirmed",
-                "Your booking is confirmed. The quarantine specialist will now prepare the clearance dossiers; please upload the requested documents.",
+                $"Your booking is confirmed. The quarantine specialist will now prepare the clearance dossiers; please upload the requested documents within {policy.DossierSubmitDays} days.",
                 NotificationReferenceTypes.Booking,
                 booking.BookingId);
 

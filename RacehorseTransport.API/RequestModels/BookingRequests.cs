@@ -121,6 +121,38 @@ namespace RacehorseTransport.API.RequestModels
         public string? InsurancePlan { get; set; }
     }
 
+    // R-10 (BE-06): khách đổi điểm đón / trả (chưa trả tiền) -> lập tuyến + báo giá lại
+    public class ChangeLocationsRequest
+    {
+        [Required(ErrorMessage = "PickupAddress is required.")]
+        [MaxLength(255, ErrorMessage = "PickupAddress cannot exceed 255 characters.")]
+        public string PickupAddress { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "PickupCountryCode is required.")]
+        [RegularExpression("^[A-Za-z]{2}$", ErrorMessage = "PickupCountryCode must be a 2-letter country code.")]
+        public string PickupCountryCode { get; set; } = string.Empty;
+
+        [Range(-90, 90, ErrorMessage = "PickupLat must be between -90 and 90.")]
+        public decimal? PickupLat { get; set; }
+
+        [Range(-180, 180, ErrorMessage = "PickupLng must be between -180 and 180.")]
+        public decimal? PickupLng { get; set; }
+
+        [Required(ErrorMessage = "DropoffAddress is required.")]
+        [MaxLength(255, ErrorMessage = "DropoffAddress cannot exceed 255 characters.")]
+        public string DropoffAddress { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "DropoffCountryCode is required.")]
+        [RegularExpression("^[A-Za-z]{2}$", ErrorMessage = "DropoffCountryCode must be a 2-letter country code.")]
+        public string DropoffCountryCode { get; set; } = string.Empty;
+
+        [Range(-90, 90, ErrorMessage = "DropoffLat must be between -90 and 90.")]
+        public decimal? DropoffLat { get; set; }
+
+        [Range(-180, 180, ErrorMessage = "DropoffLng must be between -180 and 180.")]
+        public decimal? DropoffLng { get; set; }
+    }
+
     // R-10: khách chấp nhận báo giá chốt (đồng ý Chính sách dịch vụ đúng phiên bản hiện hành)
     public class AcceptQuoteRequest
     {

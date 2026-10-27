@@ -106,6 +106,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public bool RequiresClimateControl { get; set; }
         public decimal? DeclaredValue { get; set; }
         public string? RejectionReason { get; set; }
+        // R-10 (BE-06): hạn nộp giấy; công ty đổi tuyến thêm nước mới thì khách được hủy hoàn 100% tới RouteChangeCancelUntil
+        public DateTimeOffset? DocsDueAt { get; set; }
+        public DateTimeOffset? RouteChangeCancelUntil { get; set; }
         // R-10: báo giá chốt, hạn chấp nhận, chính sách khách đã đồng ý
         public DateTimeOffset? QuotedAt { get; set; }
         public DateTimeOffset? QuoteExpiresAt { get; set; }
@@ -158,5 +161,18 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset PlannedEndDate { get; set; }
         public DateTimeOffset? PickedUpAt { get; set; }
         public DateTimeOffset? DeliveredAt { get; set; }
+    }
+
+    // R-10 (BE-06): khách đổi điểm đón / trả
+    public class ChangeLocationsModel
+    {
+        public string PickupAddress { get; set; } = string.Empty;
+        public string PickupCountryCode { get; set; } = string.Empty;
+        public decimal? PickupLat { get; set; }
+        public decimal? PickupLng { get; set; }
+        public string DropoffAddress { get; set; } = string.Empty;
+        public string DropoffCountryCode { get; set; } = string.Empty;
+        public decimal? DropoffLat { get; set; }
+        public decimal? DropoffLng { get; set; }
     }
 }

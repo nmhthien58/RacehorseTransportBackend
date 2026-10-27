@@ -30,6 +30,7 @@ namespace RacehorseTransport.Services.Implementations
         // BE-17: các khóa của Chính sách dịch vụ
         public const string PolicyVersionKey = "Policy.Version";
         public const string QuoteAcceptDaysKey = "Booking.QuoteAcceptDays";
+        public const string DossierSubmitDaysKey = "Dossier.SubmitDays";
         public const string DelayGraceHoursKey = "Delay.GraceHours";
         public const string DelayPercentPer12HoursKey = "Delay.PercentPer12Hours";
         public const string DelayMaxPercentKey = "Delay.MaxPercent";
@@ -63,6 +64,8 @@ namespace RacehorseTransport.Services.Implementations
                 m => m.PolicyVersion, (m, v) => m.PolicyVersion = v),
             new(QuoteAcceptDaysKey, "Số ngày khách được xem và chấp nhận báo giá chốt + đặt cọc",
                 m => Num(m.QuoteAcceptDays), (m, v) => m.QuoteAcceptDays = ParseInt(v, m.QuoteAcceptDays)),
+            new(DossierSubmitDaysKey, "Số ngày khách có để nộp đủ giấy tờ, tính từ lúc đặt cọc",
+                m => Num(m.DossierSubmitDays), (m, v) => m.DossierSubmitDays = ParseInt(v, m.DossierSubmitDays)),
             new(DelayGraceHoursKey, "Số giờ trễ được miễn bồi thường",
                 m => Num(m.DelayGraceHours), (m, v) => m.DelayGraceHours = ParseInt(v, m.DelayGraceHours)),
             new(DelayPercentPer12HoursKey, "% tiền cước bồi thường cho mỗi 12 giờ trễ sau ân hạn",
@@ -316,6 +319,7 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             Between(model.QuoteAcceptDays, 1, 30, QuoteAcceptDaysKey);
+            Between(model.DossierSubmitDays, 1, 60, DossierSubmitDaysKey);
 
             Between(model.DelayGraceHours, 0, 168, DelayGraceHoursKey);
             Percent(model.DelayPercentPer12Hours, DelayPercentPer12HoursKey);

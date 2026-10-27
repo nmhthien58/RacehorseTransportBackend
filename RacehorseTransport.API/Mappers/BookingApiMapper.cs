@@ -204,6 +204,8 @@ namespace RacehorseTransport.API.Mappers
                 RequiresClimateControl = model.RequiresClimateControl,
                 DeclaredValue = model.DeclaredValue,
                 RejectionReason = model.RejectionReason,
+                DocsDueAt = model.DocsDueAt,
+                RouteChangeCancelUntil = model.RouteChangeCancelUntil,
                 QuotedAt = model.QuotedAt,
                 QuoteExpiresAt = model.QuoteExpiresAt,
                 QuoteAcceptedAt = model.QuoteAcceptedAt,

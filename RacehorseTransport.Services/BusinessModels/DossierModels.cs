@@ -70,6 +70,15 @@ namespace RacehorseTransport.Services.BusinessModels
         public DossierDocumentModel? LatestDocument { get; set; }
     }
 
+    // R-10 (BE-06): giấy bắt buộc khách còn phải nộp cho một ngựa
+    public class MissingDocumentsModel
+    {
+        public int DossierId { get; set; }
+        public int BookingHorseId { get; set; }
+        public string HorseName { get; set; } = string.Empty;
+        public List<string> DocumentNames { get; set; } = new();
+    }
+
     public static class ChecklistStates
     {
         public const string Missing = "Missing";

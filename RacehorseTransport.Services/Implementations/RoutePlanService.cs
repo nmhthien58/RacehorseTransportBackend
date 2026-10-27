@@ -18,7 +18,16 @@ namespace RacehorseTransport.Services.Implementations
     {
         // Đơn được lập tuyến: vừa duyệt sơ bộ, hoặc đã có tuyến duyệt mà cần phiên bản mới
         // Quoted: khách chưa chấp nhận báo giá, công ty có thể lập lại tuyến -> duyệt bản mới thì báo giá được tính lại (hạn mới)
-        private static readonly string[] PlannableBookingStatuses = { BookingStatuses.PreApproved, BookingStatuses.RoutePlanned, BookingStatuses.Quoted };
+        // AwaitingDeposit / Approved / Assigned (BE-06): công ty đổi tuyến sau khi khách đã chấp nhận -> giá chốt giữ nguyên
+        private static readonly string[] PlannableBookingStatuses =
+        {
+            BookingStatuses.PreApproved, BookingStatuses.RoutePlanned, BookingStatuses.Quoted,
+            BookingStatuses.AwaitingDeposit, BookingStatuses.Approved, BookingStatuses.Assigned
+        };
+        private static readonly string[] AcceptedQuoteStatuses =
+        {
+            BookingStatuses.AwaitingDeposit, BookingStatuses.Approved, BookingStatuses.Assigned
+        };
 
         // Dịch vụ bản đồ nhận tối đa 25 điểm (đầu + cuối + 23 mốc)
         private const int MaxIntermediateStops = 23;
@@ -30,6 +39,8 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IGeoService _geoService;
         private readonly ITransitTimeEstimator _transitEstimator;
         private readonly IBookingQuoteService _quoteService;
+        private readonly IRepository<TripHorse> _tripHorseRepo;
+        private readonly ISystemSettingService _settingService;
         private readonly INotificationService _notificationService;
         private readonly IUnitOfWork _unitOfWork;
 
@@ -41,6 +52,8 @@ namespace RacehorseTransport.Services.Implementations
             IGeoService geoService,
             ITransitTimeEstimator transitEstimator,
             IBookingQuoteService quoteService,
+            IRepository<TripHorse> tripHorseRepo,
+            ISystemSettingService settingService,
             INotificationService notificationService,
             IUnitOfWork unitOfWork)
         {
@@ -51,6 +64,8 @@ namespace RacehorseTransport.Services.Implementations
             _geoService = geoService;
             _transitEstimator = transitEstimator;
             _quoteService = quoteService;
+            _tripHorseRepo = tripHorseRepo;
+            _settingService = settingService;
             _notificationService = notificationService;
             _unitOfWork = unitOfWork;
         }
@@ -108,6 +123,7 @@ namespace RacehorseTransport.Services.Implementations
             {
                 throw new BusinessException($"A route can only be planned after the booking passes the first review (current status: {booking.Status}).");
             }
+            await EnsureNotDepartedAsync(booking);
 
             var open = await _planRepo.GetQueryable()
                 .Where(p => p.BookingId == bookingId && (RoutePlanStatuses.Editable.Contains(p.Status) || p.Status == RoutePlanStatuses.Submitted))
@@ -171,6 +187,15 @@ namespace RacehorseTransport.Services.Implementations
 
             var booking = await GetBookingAsync(plan.BookingId);
 
+            // BE-06: khách đã đổi điểm đón / trả sau khi tuyến được lưu -> phải lưu lại (PUT) để tính theo điểm mới
+            var origin = plan.Stops.FirstOrDefault(s => s.StopType == RouteStopTypes.Origin);
+            var destination = plan.Stops.FirstOrDefault(s => s.StopType == RouteStopTypes.Destination);
+            if ((booking.PickupLat.HasValue && origin != null && (origin.Latitude != booking.PickupLat || origin.Longitude != booking.PickupLng))
+                || (booking.DropoffLat.HasValue && destination != null && (destination.Latitude != booking.DropoffLat || destination.Longitude != booking.DropoffLng)))
+            {
+                throw new BusinessException("The pickup / drop-off of this booking changed after the route was saved. Save the route again (PUT) before submitting.");
+            }
+
             // Tính lại cảnh báo trên tuyến đã lưu (kết quả bản đồ lấy từ bộ nhớ đệm nên nhanh)
             var computed = await ComputeAsync(booking, ToSaveModel(plan));
             if (computed.Model.Warnings.Count > 0)
@@ -211,6 +236,12 @@ namespace RacehorseTransport.Services.Implementations
             {
                 throw new BusinessException($"The route of booking {booking.BookingCode} cannot be approved in status {booking.Status}.");
             }
+            await EnsureNotDepartedAsync(booking);
+
+            // BE-06: khách đã chấp nhận báo giá -> đây là đổi tuyến do công ty: giá chốt giữ nguyên
+            bool companyChange = AcceptedQuoteStatuses.Contains(booking.Status);
+            var oldTransit = booking.TransitCountries.OrderBy(t => t.SequenceOrder).Select(t => t.CountryCode).ToList();
+            var policy = await _settingService.GetPolicySettingsAsync();
 
             var previous = await _planRepo.GetQueryable()
                 .Where(p => p.BookingId == plan.BookingId && p.Status == RoutePlanStatuses.Approved && p.RoutePlanId != plan.RoutePlanId)
@@ -244,11 +275,19 @@ namespace RacehorseTransport.Services.Implementations
                 }
                 booking.DistanceKm = (int)Math.Ceiling(plan.TotalDistanceKm);
                 booking.EstimatedTransitHours = plan.EstimatedHours;
-                booking.Status = BookingStatuses.RoutePlanned;
-                await _bookingRepo.SaveChangesAsync();
 
-                // R-10: báo giá chốt theo tuyến vừa duyệt, đơn -> Quoted, email cho khách
-                await _quoteService.IssueFinalQuoteAsync(booking.BookingId, plan.RoutePlanId);
+                if (companyChange)
+                {
+                    await ApplyCompanyRouteChangeAsync(booking, oldTransit, transit, policy.DossierSubmitDays);
+                }
+                else
+                {
+                    booking.Status = BookingStatuses.RoutePlanned;
+                    await _bookingRepo.SaveChangesAsync();
+
+                    // R-10: báo giá chốt theo tuyến vừa duyệt, đơn -> Quoted, email cho khách
+                    await _quoteService.IssueFinalQuoteAsync(booking.BookingId, plan.RoutePlanId);
+                }
 
                 await _notificationService.SendAsync(
                     plan.PlannedByUserId,
@@ -259,6 +298,63 @@ namespace RacehorseTransport.Services.Implementations
             });
 
             return await LoadModelAsync(plan.RoutePlanId);
+        }
+
+        // BE-06 (Chính sách mục 2): công ty đổi tuyến sau khi khách đã chấp nhận báo giá. Giá chốt giữ nguyên.
+        // Tuyến mới qua nước mới và đơn đang làm giấy -> thêm giấy theo nước đó (danh sách giấy tự tính theo tuyến), gia hạn nộp giấy,
+        // khách được hủy hoàn 100% tới hạn mới (POST /api/bookings/{id}/cancel-route-change).
+        private async Task ApplyCompanyRouteChangeAsync(BookingRequest booking, List<string> oldTransit, List<string> newTransit, int submitDays)
+        {
+            var added = DocumentDeadlineRules.NewCountries(oldTransit, newTransit);
+            string route = newTransit.Count == 0 ? "direct" : string.Join(" → ", newTransit);
+
+            if (added.Count > 0 && booking.Status != BookingStatuses.AwaitingDeposit)
+            {
+                booking.DocsDueAt = DocumentDeadlineRules.ExtendedDueAt(booking.DocsDueAt, DateTimeOffset.UtcNow, submitDays);
+                booking.DocsRemindersSent = 0;
+                booking.RouteChangeCancelUntil = booking.DocsDueAt;
+            }
+            await _bookingRepo.SaveChangesAsync();
+
+            string message = added.Count == 0
+                ? $"We changed the route of booking {booking.BookingCode} for operational reasons (transit: {route}). Your agreed price stays the same."
+                : booking.Status == BookingStatuses.AwaitingDeposit
+                    ? $"We changed the route of booking {booking.BookingCode} for operational reasons. It now also crosses {string.Join(", ", added)}, which needs extra documents after the deposit. Your agreed price stays the same."
+                    : $"We changed the route of booking {booking.BookingCode} for operational reasons. It now also crosses {string.Join(", ", added)}: please upload the extra documents by {booking.DocsDueAt!.Value.ToOffset(TimeSpan.FromHours(7)):HH:mm dd/MM/yyyy} (Vietnam time). Your agreed price stays the same. If you cannot provide these documents, you may cancel with a 100% refund until then.";
+            await _notificationService.SendAsync(
+                booking.CustomerUserId,
+                $"Route changed for booking {booking.BookingCode}",
+                message,
+                NotificationReferenceTypes.Booking,
+                booking.BookingId,
+                emailCustomers: added.Count > 0);
+
+            if (added.Count > 0 && booking.AssignedSpecialistId.HasValue)
+            {
+                await _notificationService.SendAsync(
+                    booking.AssignedSpecialistId.Value,
+                    $"New transit countries for booking {booking.BookingCode}",
+                    $"The approved route now also crosses {string.Join(", ", added)}. The dossier checklists include their transit documents; please request them from the customer.",
+                    NotificationReferenceTypes.Booking,
+                    booking.BookingId);
+            }
+        }
+
+        // Ngựa của đơn đã rời điểm đón thì không đổi tuyến dự kiến nữa (đổi giữa đường đi qua sự cố, Flow 5)
+        private async Task EnsureNotDepartedAsync(BookingRequest booking)
+        {
+            if (booking.Status != BookingStatuses.Assigned)
+            {
+                return;
+            }
+            bool departed = await _tripHorseRepo.GetQueryable()
+                .AnyAsync(th => th.BookingHorse!.BookingId == booking.BookingId
+                    && th.Trip!.OverallStatus != TripStatuses.Cancelled
+                    && th.PickedUpAt != null);
+            if (departed)
+            {
+                throw new BusinessException($"Horses of booking {booking.BookingCode} are already on the way; change the route through an incident instead.");
+            }
         }
 
         public async Task<RoutePlanModel> RejectAsync(int routePlanId, string reason, CurrentUser currentUser)

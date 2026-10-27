@@ -30,6 +30,12 @@ namespace RacehorseTransport.Repositories.Entities
         // Phiên bản Chính sách dịch vụ khách đã đồng ý (lúc gửi đơn, cập nhật lại lúc chấp nhận báo giá)
         public string? PolicyVersion { get; set; }
         public DateTimeOffset? PolicyAcceptedAt { get; set; }
+
+        // R-10 (BE-06): hạn nộp giấy (lúc cọc + Dossier.SubmitDays; gia hạn khi công ty đổi tuyến thêm nước), số lần đã nhắc
+        public DateTimeOffset? DocsDueAt { get; set; }
+        public int DocsRemindersSent { get; set; }
+        // Công ty đổi tuyến thêm nước mới: tới thời điểm này khách được hủy và hoàn 100%
+        public DateTimeOffset? RouteChangeCancelUntil { get; set; }
         // Khoảng ngày ngựa sẵn sàng được đón và hạn giao trễ nhất; ngày chạy thật nằm ở chuyến
         public DateTimeOffset PickupWindowStart { get; set; }
         public DateTimeOffset PickupWindowEnd { get; set; }

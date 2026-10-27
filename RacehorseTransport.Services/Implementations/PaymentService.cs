@@ -488,7 +488,7 @@ namespace RacehorseTransport.Services.Implementations
         // Hoàn tiền
         // =============================================================================================
 
-        public async Task<List<PaymentModel>> RefundForCancellationAsync(BookingRequest booking, CurrentUser currentUser)
+        public async Task<List<PaymentModel>> RefundForCancellationAsync(BookingRequest booking, CurrentUser currentUser, bool fullRefund = false)
         {
             var settings = await _settingService.GetPaymentSettingsAsync();
             var charges = await _paymentRepo.GetQueryable()
@@ -498,7 +498,7 @@ namespace RacehorseTransport.Services.Implementations
             var results = new List<PaymentModel>();
             foreach (var original in charges.Where(p => p.Status == PaymentStatuses.Succeeded && PaymentTypes.Charges.Contains(p.PaymentType)))
             {
-                decimal percent = original.PaymentType == PaymentTypes.Deposit ? settings.CancelRefundPercent : 100;
+                decimal percent = original.PaymentType == PaymentTypes.Deposit && !fullRefund ? settings.CancelRefundPercent : 100;
                 decimal alreadyRefunded = charges
                     .Where(r => r.RefundOfPaymentId == original.PaymentId && r.Status != PaymentStatuses.Failed && r.Status != PaymentStatuses.Expired)
                     .Sum(r => r.Amount);

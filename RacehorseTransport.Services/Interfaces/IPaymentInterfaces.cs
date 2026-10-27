@@ -66,7 +66,8 @@ namespace RacehorseTransport.Services.Interfaces
         Task<PaymentModel> RecordManualPaymentAsync(int bookingId, ManualPaymentModel model, CurrentUser currentUser);
 
         // Khách hủy đơn: hoàn % tiền cọc theo cấu hình + toàn bộ phần còn lại đã trả
-        Task<List<PaymentModel>> RefundForCancellationAsync(BookingRequest booking, CurrentUser currentUser);
+        // fullRefund: hoàn 100% cả tiền cọc (R-10: khách hủy vì công ty đổi tuyến thêm nước mới)
+        Task<List<PaymentModel>> RefundForCancellationAsync(BookingRequest booking, CurrentUser currentUser, bool fullRefund = false);
 
         // Số tiền còn hoàn được của đơn: tổng các khoản đã thu thành công trừ phần đã / đang hoàn
         Task<decimal> GetRefundableAmountAsync(int bookingId);
