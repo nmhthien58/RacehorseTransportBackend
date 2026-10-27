@@ -230,6 +230,51 @@ DELETE {{baseUrl}}/api/transport-assets/1
 Authorization: Bearer {{coordinatorToken}}
 
 ### =====================================================================
+### BE-09 · Giá trị từng con ngựa, chứng từ, giá trị thỏa thuận
+### Ngựa ID 5, 6 của khách minhchau.hoang@horseowner.com; giá trị từ 50.000 USD cần chứng từ (POST /api/files, category documents)
+### =====================================================================
+
+### [SAI - 400] Khai giá trị cho một con, bỏ trống con kia
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "pickupAddress": "Trang trại Yên Bài, Ba Vì, Hà Nội",
+  "pickupCountryCode": "VN",
+  "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
+  "dropoffCountryCode": "CN",
+  "pickupWindowStart": "2026-11-25T00:00:00+07:00",
+  "pickupWindowEnd": "2026-11-30T00:00:00+07:00",
+  "deliveryDeadline": "2026-12-20T00:00:00+07:00",
+  "transportMode": "Ground",
+  "distanceKm": 900,
+  "horses": [
+    { "horseId": 5, "stallClass": "Shared", "declaredValue": 30000 },
+    { "horseId": 6, "stallClass": "Shared" }
+  ]
+}
+
+### [ĐÚNG] Manager chốt giá trị thỏa thuận (đổi 2 thành mã đơn đang Submitted, 3 thành bookingHorseId)
+PUT {{baseUrl}}/api/bookings/2/horse-values
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "horses": [ { "bookingHorseId": 3, "agreedValue": 95000 } ],
+  "note": "Theo giấy định giá của bác sĩ thú y"
+}
+
+### [SAI - 403] Khách không chốt được giá trị thỏa thuận
+PUT {{baseUrl}}/api/bookings/2/horse-values
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "horses": [ { "bookingHorseId": 3, "agreedValue": 1 } ]
+}
+
+### =====================================================================
 ### B-02 · Quy định giấy tờ theo quốc gia
 ### Chạy yêu cầu tạo trước các yêu cầu dùng {{createdRequirementId}}.
 ### =====================================================================

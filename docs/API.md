@@ -1706,7 +1706,7 @@ Các trường gửi lên:
 | `transportMode` | chuỗi | Có | `Ground` (đường bộ) hoặc `Air` (hàng không) |
 | `distanceKm` | số nguyên | Không | Quãng đường (km). Bỏ trống thì server tự động tính toán |
 | `requiresClimateControl` | true / false | Không | Cần khoang điều hòa (có phụ phí) |
-| `declaredValue` | số | Không | Giá trị khai báo để mua bảo hiểm. Bỏ trống hoặc `null` là không mua |
+| `declaredValue` | số | Không | Tổng giá trị khai báo của cả đơn (cách cũ). **Nên khai theo từng con** bằng `horses[].declaredValue` (bên dưới); khi đó trường này bị bỏ qua và server lấy tổng các con |
 | `pickupWindowStart` | ngày giờ | Có | Ngày đầu của khoảng ngựa sẵn sàng được đón (không phải ngày khởi hành); không sớm hơn `earliestPickupDate` của xem giá |
 | `pickupWindowEnd` | ngày giờ | Có | Ngày cuối của khoảng đón; từ `pickupWindowStart` trở đi, khoảng dài tối đa 30 ngày |
 | `deliveryDeadline` | ngày giờ | Có | Hạn giao trễ nhất; không sớm hơn `earliestDeliveryDeadline` của xem giá |
@@ -1721,6 +1721,9 @@ Mỗi phần tử của `horses`:
 | `horseId` | số | Có | Mã ngựa của khách (lấy từ `GET /api/horses`) |
 | `stallClass` | chuỗi | Có | `Shared`, `Comfort` hoặc `Private` |
 | `notes` | chuỗi | Không | Ghi chú riêng cho con ngựa này, tối đa 300 ký tự |
+| `declaredValue` | số | Không | Giá trị khai báo của con ngựa (USD). Khai cho một con thì **phải khai cho mọi con** trong đơn. Bảo hiểm và bồi thường tính trên giá trị này (sau khi Manager chốt) |
+| `valueProofPath` | chuỗi | Có khi `declaredValue` ≥ `Insurance.ProofThresholdUsd` (50.000 USD) | Chứng từ giá trị: hóa đơn mua, giấy định giá của bác sĩ thú y / chuyên gia, hoặc kết quả đấu giá. Tải lên trước bằng `POST /api/files` với `category = documents`, rồi gửi `path` nhận được |
+| `insurancePlan` | chuỗi | Không | Gói bảo hiểm của con ngựa: `None` (không mua, mặc định) hoặc `Full` (toàn giá trị). So sánh hai gói xem `GET /api/policy` (`insurance`) và Chính sách mục 8 |
 
 Ví dụ request:
 
@@ -1827,6 +1830,10 @@ Lỗi thường gặp:
 | 400 | `The pickup window cannot be longer than 30 days.` | Khoảng pickup quá dài |
 | 400 | `Horse(s) with ID 9 were not found among your active horses.` | Ngựa không phải của khách, hoặc đã xóa |
 | 400 | `These horses are already in another booking for an overlapping period: ...` | Ngựa đang nằm trong một đơn khác trùng thời gian |
+| 400 | `Declare the value of every horse or of none. Missing: Sakura Wind.` | Khai giá trị cho một số con mà bỏ trống con khác |
+| 400 | `Midnight Crown: a value from 50,000 USD needs a proof document (...)` | Giá trị từ ngưỡng chứng từ mà không gửi `valueProofPath` |
+| 400 | `Midnight Crown: ValueProofPath is not a valid uploaded file path.` | `valueProofPath` không phải đường dẫn do `POST /api/files` (category `documents`) trả về |
+| 400 | `Midnight Crown: InsurancePlan 'Gold' is invalid. Allowed values: None, Full.` | Sai tên gói bảo hiểm |
 | 400 | `These horses cannot be transported in this pickup window: Little Star: it will be younger than 6 months on 2026-11-30 (born 2026-07-01). Lady Due: it is due to foal on 2026-12-20; a pregnant mare can only travel if the pickup window ends before 2026-11-16.` | Ngựa không đủ điều kiện chở (Chính sách mục 5): chưa đủ `Horse.MinAgeMonths` tháng tuổi tính tới **ngày cuối** khoảng đón; ngựa cái mang thai mà ngày cuối khoảng đón không trước ngày dự sinh − 34 ngày (340 × 10%); ngựa cái vừa đẻ chưa đủ `Horse.PostFoalingDays` ngày tính tới **ngày đầu** khoảng đón. `message` liệt kê mọi con không đạt và lý do |
 | 400 | `The same horse appears more than once in this booking.` | Chọn trùng một con ngựa |
 | 403 | `You do not have permission to perform this action.` | Người gọi không phải `Customer` |
@@ -1985,6 +1992,10 @@ Response `200` — phần `data`:
       "stallClass": "Shared",
       "status": "Approved",
       "notes": "Chuồng bên trái",
+      "declaredValue": 120000.00,
+      "agreedValue": 100000.00,
+      "valueProofUrl": "https://abcd.supabase.co/storage/v1/object/sign/files/documents/2026/10/9c1e....pdf?token=eyJ...",
+      "insurancePlan": "Full",
       "dossierId": 3,
       "dossierCode": "DOS-2026-0003",
       "dossierStatus": "Cleared",
@@ -2017,7 +2028,11 @@ Ngoài các trường của danh sách, chi tiết có thêm:
 | `reviewedByName`, `reviewedAt` | Ai duyệt / từ chối và lúc nào |
 | `quoteLines[]` | Các dòng báo giá đã lưu, dạng giống `lines` của xem giá |
 | `horses[]` | Từng con ngựa trong đơn |
-| `horses[].bookingHorseId` | Mã "ngựa trong đơn", dùng khi xếp chuyến |
+| `horses[].bookingHorseId` | Mã "ngựa trong đơn", dùng khi xếp chuyến và khi Manager chốt giá trị |
+| `horses[].declaredValue` | Giá trị khách khai báo (USD); `null` với đơn cũ chỉ khai một giá trị cho cả đơn |
+| `horses[].agreedValue` | Giá trị thỏa thuận Manager chốt (mặc định bằng giá trị khai báo). **Bảo hiểm và bồi thường tính trên giá trị này** |
+| `horses[].valueProofUrl` | Link xem chứng từ giá trị (có hạn); `null` nếu không có |
+| `horses[].insurancePlan` | Gói bảo hiểm của con ngựa: `None` hoặc `Full` |
 | `horses[].dossierId`, `dossierCode`, `dossierStatus` | Hồ sơ kiểm dịch của con ngựa; có sau khi đơn được duyệt |
 | `horses[].trips[]` | Các chuyến con ngựa được xếp lên, kèm `tripStatus` (trạng thái xe) và `horseStatus` (trạng thái con ngựa trên chuyến) |
 | `horses[].trips[].pickedUpAt`, `deliveredAt` | Lúc con ngựa lên xe (xe rời điểm đón) và lúc ký bàn giao; dùng để vẽ timeline tiến trình đơn |
@@ -2092,6 +2107,51 @@ Lỗi thường gặp:
 | 400 | `Only a Submitted booking can be approved (current status: ...).` | Đơn không còn ở trạng thái chờ duyệt |
 | 400 | `User with ID 9 is not an active transport specialist.` | Người được chọn không phải chuyên viên, hoặc đã bị khóa |
 | 400 | `This booking can no longer be approved: its pickup window ends on ... on this route need about 26 days ...` | Duyệt quá muộn: khoảng pickup không còn đủ thời gian đặt cọc + làm hồ sơ của tuyến + xếp chuyến. Từ chối và nhờ khách đặt lại khoảng ngày muộn hơn |
+
+### PUT /api/bookings/{id}/horse-values — Chốt giá trị thỏa thuận từng con
+
+Trước khi gửi báo giá, Manager xem giá trị khách khai báo và chứng từ (`horses[].valueProofUrl`), rồi **chốt giá trị thỏa thuận** của từng con. Bảo hiểm và bồi thường về sau tính trên giá trị thỏa thuận, không định giá lại (kiểu "agreed value" của bảo hiểm ngựa). Mặc định giá trị thỏa thuận bằng giá trị khai báo, nên chỉ cần gọi khi muốn sửa.
+
+Khách nhận thông báo liệt kê các con có giá trị thay đổi (kèm ghi chú nếu có).
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON
+- **Khi nào:** đơn đang `Submitted` (trước khi gửi báo giá)
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã đơn |
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `horses` | mảng | Có | Các con cần chốt (ít nhất 1); con không gửi giữ nguyên |
+| `horses[].bookingHorseId` | số | Có | Lấy từ `horses[].bookingHorseId` của chi tiết đơn |
+| `horses[].agreedValue` | số | Có | Giá trị thỏa thuận (USD), không âm |
+| `note` | chuỗi | Không | Ghi chú gửi khách, ví dụ lý do chốt khác giá trị khai báo, tối đa 500 ký tự |
+
+Ví dụ request:
+
+```json
+{
+  "horses": [
+    { "bookingHorseId": 3, "agreedValue": 95000 },
+    { "bookingHorseId": 4, "agreedValue": 30000 }
+  ],
+  "note": "Theo giấy định giá của bác sĩ thú y"
+}
+```
+
+Response `200`: `data` là chi tiết đơn sau khi lưu; `horses[].agreedValue` là giá trị mới.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Agreed values can only be set before the quote is sent (current status: Approved).` | Đơn đã qua bước báo giá |
+| 400 | `Booking horse(s) with ID 999 are not in booking BKG-2026-0002.` | `bookingHorseId` không thuộc đơn |
+| 400 | `AgreedValue cannot be negative.` / `Validation failed` | Giá trị âm hoặc thiếu trường |
+| 403 | | Không phải quản lý / Admin |
+| 404 | `Booking with ID 99 was not found.` | Không có đơn |
 
 ### PUT /api/bookings/{id}/transit-countries — Xác nhận / sửa nước quá cảnh
 
@@ -7186,6 +7246,7 @@ Tổng cộng 121 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | GET | `/api/bookings/{id}` | Chi tiết đơn | Như danh sách đơn |
 | POST | `/api/bookings/{id}/cancel` | Khách hủy đơn | Customer (chủ đơn) |
 | POST | `/api/bookings/{id}/approve` | Duyệt đơn | LogisticsManager, Admin |
+| PUT | `/api/bookings/{id}/horse-values` | Chốt giá trị thỏa thuận từng con trước khi báo giá | LogisticsManager, Admin |
 | POST | `/api/bookings/{id}/reject` | Từ chối đơn | LogisticsManager, Admin |
 | POST | `/api/bookings/{id}/reassign-specialist` | Đổi chuyên viên phụ trách | LogisticsManager, Admin |
 

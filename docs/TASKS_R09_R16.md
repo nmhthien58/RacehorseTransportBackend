@@ -200,7 +200,9 @@ Làm:
 - Khi thêm ngựa vào đơn (và khi tạo đơn): chặn nếu tuổi tại **ngày cuối của khoảng đón** < `Horse.MinAgeMonths`; ngựa cái mang thai mà ngày cuối của khoảng đón ≥ ngày dự sinh − 34 ngày (≈ 90% của 340 ngày, đưa 340 và 90% vào cấu hình); vừa đẻ trong 7 ngày (thêm `last_foaling_date` nếu cần). Thông báo lỗi ghi rõ tên ngựa và lý do.
 - Test cho từng ngưỡng (đúng ngưỡng, dưới, trên).
 
-### [ ] BE-09 · Giá trị khai báo theo từng con, chứng từ, giá trị thỏa thuận (R-12, R-13)
+### [x] BE-09 · Giá trị khai báo theo từng con, chứng từ, giá trị thỏa thuận (R-12, R-13)
+Đã làm: `booking_horses` thêm `declared_value`, `agreed_value`, `value_proof_path`, `insurance_plan` (`None` / `Full`); tạo đơn nhận giá trị từng con (khai một con thì phải khai mọi con; tổng ghi vào `booking_requests.declared_value`), từ `Insurance.ProofThresholdUsd` bắt buộc chứng từ; `PUT /api/bookings/{id}/horse-values` cho Manager chốt giá trị thỏa thuận (mặc định = khai báo) khi đơn còn `Submitted` (`TODO(BE-04)`: mở thêm `PreApproved` / `RoutePlanned`). Báo giá vẫn tính bảo hiểm trên tổng khai báo như cũ; chuyển sang giá trị thỏa thuận từng con ở BE-12.
+
 Làm:
 - `booking.booking_horses`: thêm `declared_value`, `agreed_value`, `value_proof_url`, `insurance_plan` (`None` / `Full`). Giữ `booking_requests.declared_value` cũ = tổng (để đơn cũ không vỡ), đơn mới tính từ các con.
 - Giá trị ≥ `Insurance.ProofThresholdUsd` bắt buộc có tệp chứng từ (upload qua storage hiện có).
