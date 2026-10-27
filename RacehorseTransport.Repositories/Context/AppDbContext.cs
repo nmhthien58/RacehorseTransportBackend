@@ -39,6 +39,7 @@ namespace RacehorseTransport.Repositories.Context
         public virtual DbSet<SystemNotification> SystemNotifications { get; set; } = null!;
         public virtual DbSet<PriceItem> PriceItems { get; set; } = null!;
         public virtual DbSet<Payment> Payments { get; set; } = null!;
+        public virtual DbSet<DelayCompensation> DelayCompensations { get; set; } = null!;
         public virtual DbSet<SystemSetting> SystemSettings { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -311,6 +312,21 @@ namespace RacehorseTransport.Repositories.Context
             });
 
             // ---------- acceptance ----------
+            modelBuilder.Entity<DelayCompensation>(entity =>
+            {
+                entity.ToTable("delay_compensations", "billing");
+                entity.HasKey(e => e.DelayCompensationId);
+                entity.Property(e => e.DelayHours).HasPrecision(10, 2);
+                entity.Property(e => e.FreightAmount).HasPrecision(18, 2);
+                entity.Property(e => e.Percent).HasPrecision(5, 2);
+                entity.Property(e => e.CalculatedAmount).HasPrecision(18, 2);
+                entity.Property(e => e.ApprovedAmount).HasPrecision(18, 2);
+
+                entity.HasOne(e => e.Booking).WithMany().HasForeignKey(e => e.BookingId);
+                entity.HasOne(e => e.Trip).WithMany().HasForeignKey(e => e.TripId);
+                entity.HasOne(e => e.ReviewedBy).WithMany().HasForeignKey(e => e.ReviewedByUserId);
+            });
+
             modelBuilder.Entity<HandoverAcceptance>(entity =>
             {
                 entity.ToTable("handover_acceptances", "acceptance");

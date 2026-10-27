@@ -15,6 +15,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public string Location { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public int? AffectedTripHorseId { get; set; } // bỏ trống nếu sự cố không gắn với một con ngựa cụ thể
+
+        // Thú y bắt buộc dỡ ngay: con ngựa AffectedTripHorseId rời xe lúc báo, phương án OffloadHorse duyệt sau (R-12)
+        public bool EmergencyOffload { get; set; }
     }
 
     // Coordinator đề xuất phương án xử lý
@@ -27,6 +30,12 @@ namespace RacehorseTransport.Services.BusinessModels
         public ApplyRerouteModel? RouteChange { get; set; }
         public string? RevisedRouteNotes { get; set; }
         public decimal AdditionalCost { get; set; }
+
+        // OffloadHorse (R-12): con ngựa rời chuyến (bỏ trống = con ngựa đã chọn lúc báo sự cố), hướng xử lý tiếp
+        // và đường dẫn biên bản thú y đã tải lên qua POST /api/files (bắt buộc khi OffloadOutcome = Deceased)
+        public int? AffectedTripHorseId { get; set; }
+        public string? OffloadOutcome { get; set; }
+        public string? VetReportPath { get; set; }
     }
 
     // Nắn tuyến: bỏ các mốc chưa tới và chèn các mốc mới vào lộ trình
@@ -61,10 +70,16 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? RevisedRouteNotes { get; set; }
         public decimal AdditionalCost { get; set; }
         public string? RejectionReason { get; set; } // lý do của lần từ chối gần nhất; xóa khi phương án được duyệt
+        public string? FaultParty { get; set; }      // nguyên nhân chọn khi đóng sự cố (R-09)
+        public string? FaultNote { get; set; }
         public int? ApprovedByUserId { get; set; }
         public string? ApprovedByName { get; set; }
         public DateTimeOffset? ApprovedAt { get; set; }
         public DateTimeOffset? ResolvedAt { get; set; }
+        public bool EmergencyOffload { get; set; }
+        public string? OffloadOutcome { get; set; }
+        public string? VetReportPath { get; set; }
+        public string? VetReportUrl { get; set; } // link xem biên bản thú y (có hạn)
     }
 
     // Thay đổi tuyến của một phương án, lưu dạng JSON ở trip_incidents.route_change.

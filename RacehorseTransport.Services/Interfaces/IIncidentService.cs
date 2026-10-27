@@ -16,6 +16,7 @@ namespace RacehorseTransport.Services.Interfaces
         Task<IncidentModel> RejectPlanAsync(int incidentId, string reason, CurrentUser currentUser);
 
         Task<TripDetailModel> ApplyRerouteAsync(int incidentId, ApplyRerouteModel model, CurrentUser currentUser);
-        Task<IncidentModel> ResolveIncidentAsync(int incidentId, CurrentUser currentUser);
+        // R-09: đóng sự cố bắt buộc chọn nguyên nhân (FaultParties)
+        Task<IncidentModel> ResolveIncidentAsync(int incidentId, string faultParty, string? faultNote, CurrentUser currentUser);
     }
 }

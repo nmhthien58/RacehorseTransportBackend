@@ -105,9 +105,4 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset PickupWindowEnd { get; set; }
         public DateTimeOffset DeliveryDeadline { get; set; }
     }
-
-    public class OffloadHorseModel
-    {
-        public string Reason { get; set; } = string.Empty;
-    }
 }

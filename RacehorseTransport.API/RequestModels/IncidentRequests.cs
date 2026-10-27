@@ -33,6 +33,9 @@ namespace RacehorseTransport.API.RequestModels
 
         // Bỏ trống nếu sự cố không gắn với một con ngựa cụ thể
         public int? AffectedTripHorseId { get; set; }
+
+        // true khi thú y yêu cầu dỡ con ngựa AffectedTripHorseId xuống ngay (R-12); phương án OffloadHorse vẫn phải duyệt sau
+        public bool EmergencyOffload { get; set; }
     }
 
     public class ProposeIncidentPlanRequest
@@ -53,6 +56,27 @@ namespace RacehorseTransport.API.RequestModels
 
         [Range(0, 1000000000, ErrorMessage = "AdditionalCost must be between 0 and 1,000,000,000.")]
         public decimal AdditionalCost { get; set; }
+
+        // Chỉ dùng với OffloadHorse (R-12). Bỏ trống AffectedTripHorseId = con ngựa đã chọn lúc báo sự cố.
+        public int? AffectedTripHorseId { get; set; }
+
+        // WaitRecover | ReturnToOrigin | HandOverHere | Deceased (bắt buộc với OffloadHorse)
+        public string? OffloadOutcome { get; set; }
+
+        // Đường dẫn biên bản thú y đã tải lên qua POST /api/files (category documents); bắt buộc khi Deceased
+        [MaxLength(500, ErrorMessage = "VetReportPath cannot exceed 500 characters.")]
+        public string? VetReportPath { get; set; }
+    }
+
+    // R-09: đóng sự cố phải chọn nguyên nhân
+    public class ResolveIncidentRequest
+    {
+        // Company | Customer | ForceMajeure
+        [Required(ErrorMessage = "FaultParty is required.")]
+        public string FaultParty { get; set; } = string.Empty;
+
+        [MaxLength(500, ErrorMessage = "FaultNote cannot exceed 500 characters.")]
+        public string? FaultNote { get; set; }
     }
 
     public class RejectIncidentPlanRequest
