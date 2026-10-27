@@ -44,6 +44,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IPricingService _pricingService;
         private readonly ISystemSettingService _settingService;
         private readonly IContractService _contractService;
+        private readonly IClaimService _claimService;
         private readonly IUnitOfWork _unitOfWork;
 
         public IncidentService(
@@ -62,6 +63,7 @@ namespace RacehorseTransport.Services.Implementations
             IPricingService pricingService,
             ISystemSettingService settingService,
             IContractService contractService,
+            IClaimService claimService,
             IUnitOfWork unitOfWork)
         {
             _incidentRepo = incidentRepo;
@@ -79,6 +81,7 @@ namespace RacehorseTransport.Services.Implementations
             _pricingService = pricingService;
             _settingService = settingService;
             _contractService = contractService;
+            _claimService = claimService;
             _unitOfWork = unitOfWork;
         }
 
@@ -310,6 +313,19 @@ namespace RacehorseTransport.Services.Implementations
             });
 
             await _trackingService.InvalidateTripAsync(tripId);
+            // R-13: sự cố rất nghiêm trọng gắn với một con ngựa -> tự mở hồ sơ bồi thường
+            var created = await _incidentRepo.GetQueryable().AsNoTracking()
+                .Where(i => i.TripId == tripId && i.ReportedByUserId == currentUser.UserId)
+                .OrderByDescending(i => i.IncidentId)
+                .Select(i => new { i.IncidentId, i.IncidentCode, i.Severity, i.AffectedTripHorseId, i.Description })
+                .FirstAsync();
+            if (created.Severity == IncidentSeverities.Critical && created.AffectedTripHorseId.HasValue)
+            {
+                var affected = trip.TripHorses.First(th => th.TripHorseId == created.AffectedTripHorseId);
+                await _claimService.OpenAutomaticallyAsync(affected.BookingHorseId, ClaimTypes.Injury,
+                    $"Critical incident {created.IncidentCode}: {created.Description}", created.IncidentId);
+            }
+
             return await GetIncidentByIdAsync(incident.IncidentId, currentUser);
         }
 
@@ -1148,7 +1164,17 @@ namespace RacehorseTransport.Services.Implementations
             if (outcome == OffloadOutcomes.Deceased)
             {
                 bookingHorse.Status = BookingHorseStatuses.Deceased;
-                // TODO(BE-12): tự mở hồ sơ bồi thường bảo hiểm cho con ngựa này
+            }
+            // R-13: ngựa chết, hoặc phải rời chuyến vì sức khỏe -> tự mở hồ sơ bồi thường
+            if (outcome == OffloadOutcomes.Deceased)
+            {
+                await _claimService.OpenAutomaticallyAsync(bookingHorse.BookingHorseId, ClaimTypes.Death,
+                    $"{horseName} died during trip {trip.TripCode} ({incident.IncidentCode}).", incident.IncidentId);
+            }
+            else if (incident.IncidentType == IncidentTypes.EquineHealthIssue)
+            {
+                await _claimService.OpenAutomaticallyAsync(bookingHorse.BookingHorseId, ClaimTypes.Injury,
+                    $"{horseName} left trip {trip.TripCode} for health reasons ({incident.IncidentCode}): {incident.Description}", incident.IncidentId);
             }
             // R-14: phần cước chưa đi của con ngựa được hoàn khi đóng sự cố (biết nguyên nhân), trừ WaitRecover vì con ngựa còn đi chuyến sau
 

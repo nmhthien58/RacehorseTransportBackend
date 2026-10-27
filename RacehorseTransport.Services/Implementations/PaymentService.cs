@@ -160,6 +160,7 @@ namespace RacehorseTransport.Services.Implementations
                 ExtraPaid = Paid(PaymentTypes.Extra),
                 ExtraDueAt = booking.ExtraDueAt,
                 RefundedAmount = Paid(PaymentTypes.Refund),
+                CompensationAmount = Paid(PaymentTypes.Compensation),
                 Payments = payments.OrderByDescending(p => p.CreatedAt).Select(ToModel).ToList()
             };
             summary.Payments.ForEach(p => p.BookingCode = booking.BookingCode);
@@ -575,7 +576,59 @@ namespace RacehorseTransport.Services.Implementations
             return RefundableByCharge(payments).Sum(x => x.Remaining);
         }
 
-        public async Task<List<PaymentModel>> RefundAmountAsync(BookingRequest booking, decimal amount, string note, CurrentUser currentUser)
+        public Task<List<PaymentModel>> RefundAmountAsync(BookingRequest booking, decimal amount, string note, CurrentUser currentUser) =>
+            RefundAmountAsync(booking, amount, note, currentUser, PaymentTypes.Refund);
+
+        // R-13 (BE-12): chi bồi thường. Phần không quá số khách còn có thể hoàn -> hoàn qua cổng thanh toán (dòng Compensation gắn khoản gốc);
+        // phần vượt -> ghi nhận chuyển khoản thủ công (bắt buộc mã tham chiếu)
+        public async Task<List<PaymentModel>> PayCompensationAsync(BookingRequest booking, decimal amount, string? manualReference, string note, CurrentUser currentUser)
+        {
+            if (amount <= 0)
+            {
+                throw new BusinessException("The compensation amount must be greater than 0.");
+            }
+            decimal viaGateway = Math.Min(amount, await GetRefundableAmountAsync(booking.BookingId));
+            decimal manual = amount - viaGateway;
+            if (manual > 0 && string.IsNullOrWhiteSpace(manualReference))
+            {
+                throw new BusinessException($"{manual:N2} {booking.CurrencyCode} is more than the customer paid for booking {booking.BookingCode}; transfer it manually and send the bank reference (ManualReference).");
+            }
+
+            var results = viaGateway > 0
+                ? await RefundAmountAsync(booking, viaGateway, note, currentUser, PaymentTypes.Compensation)
+                : new List<PaymentModel>();
+            if (manual > 0)
+            {
+                var settings = await _settingService.GetPaymentSettingsAsync();
+                var transfer = await _unitOfWork.ExecuteInTransactionAsync(async () =>
+                {
+                    string code = await _codeGenerator.NextAsync(CodePrefixes.Payment);
+                    var created = new Payment
+                    {
+                        PaymentCode = code,
+                        BookingId = booking.BookingId,
+                        PaymentType = PaymentTypes.Compensation,
+                        Provider = PaymentProviders.Manual,
+                        Status = PaymentStatuses.Succeeded,
+                        Amount = manual,
+                        CurrencyCode = booking.CurrencyCode,
+                        ExchangeRate = settings.UsdVndRate,
+                        AmountVnd = ToVnd(manual, settings.UsdVndRate),
+                        TxnRef = code.Replace("-", string.Empty),
+                        Note = $"{note} (bank transfer {manualReference!.Trim()})",
+                        CreatedByUserId = currentUser.UserId,
+                        CreatedAt = DateTimeOffset.UtcNow,
+                        PaidAt = DateTimeOffset.UtcNow
+                    };
+                    await _paymentRepo.AddAsync(created);
+                    return created;
+                });
+                results.Add(ToModel(transfer));
+            }
+            return results;
+        }
+
+        private async Task<List<PaymentModel>> RefundAmountAsync(BookingRequest booking, decimal amount, string note, CurrentUser currentUser, string paymentType)
         {
             if (amount <= 0)
             {
@@ -609,7 +662,7 @@ namespace RacehorseTransport.Services.Implementations
                     {
                         PaymentCode = code,
                         BookingId = booking.BookingId,
-                        PaymentType = PaymentTypes.Refund,
+                        PaymentType = paymentType,
                         Provider = original.Provider,
                         Status = PaymentStatuses.Pending,
                         Amount = part,
@@ -730,7 +783,7 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(p => p.RefundOf)
                 .FirstOrDefaultAsync(p => p.PaymentId == refundPaymentId);
 
-            if (refund == null || refund.PaymentType != PaymentTypes.Refund)
+            if (refund == null || !PaymentTypes.Payouts.Contains(refund.PaymentType))
             {
                 throw new NotFoundException($"Refund with ID {refundPaymentId} was not found.");
             }

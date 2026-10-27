@@ -24,6 +24,7 @@ namespace RacehorseTransport.Repositories.Context
         public virtual DbSet<BookingContract> BookingContracts { get; set; } = null!;
         public virtual DbSet<IncidentConsent> IncidentConsents { get; set; } = null!;
         public virtual DbSet<DeliveryFailure> DeliveryFailures { get; set; } = null!;
+        public virtual DbSet<InsuranceClaim> InsuranceClaims { get; set; } = null!;
         public virtual DbSet<BookingHorse> BookingHorses { get; set; } = null!;
         public virtual DbSet<BookingTransitCountry> BookingTransitCountries { get; set; } = null!;
         public virtual DbSet<DocumentType> DocumentTypes { get; set; } = null!;
@@ -122,6 +123,19 @@ namespace RacehorseTransport.Repositories.Context
 
                 entity.HasOne(e => e.Booking).WithMany().HasForeignKey(e => e.BookingId);
                 entity.HasOne(e => e.PlannedBy).WithMany().HasForeignKey(e => e.PlannedByUserId);
+                entity.HasOne(e => e.ReviewedBy).WithMany().HasForeignKey(e => e.ReviewedByUserId);
+            });
+
+            modelBuilder.Entity<InsuranceClaim>(entity =>
+            {
+                entity.ToTable("insurance_claims", "billing");
+                entity.HasKey(e => e.ClaimId);
+                entity.Property(e => e.EvidencePaths).HasColumnType("jsonb");
+                entity.Property(e => e.AgreedValue).HasPrecision(18, 2);
+                entity.Property(e => e.RequestedAmount).HasPrecision(18, 2);
+                entity.Property(e => e.ApprovedAmount).HasPrecision(18, 2);
+                entity.HasOne(e => e.Booking).WithMany().HasForeignKey(e => e.BookingId);
+                entity.HasOne(e => e.BookingHorse).WithMany().HasForeignKey(e => e.BookingHorseId);
                 entity.HasOne(e => e.ReviewedBy).WithMany().HasForeignKey(e => e.ReviewedByUserId);
             });
 

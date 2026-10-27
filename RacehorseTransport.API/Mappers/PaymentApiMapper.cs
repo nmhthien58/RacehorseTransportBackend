@@ -51,6 +51,7 @@ namespace RacehorseTransport.API.Mappers
                 ExtraDueAt = model.ExtraDueAt,
                 ExtraOverdue = model.ExtraOverdue,
                 RefundedAmount = model.RefundedAmount,
+                CompensationAmount = model.CompensationAmount,
                 TotalDue = model.TotalDue,
                 TotalPaid = model.TotalPaid,
                 Outstanding = model.Outstanding,

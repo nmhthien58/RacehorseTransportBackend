@@ -76,6 +76,9 @@ namespace RacehorseTransport.Services.Interfaces
         // Không vượt quá số còn hoàn được. Khoản thu ngoài hệ thống thì tạo dòng chờ Manager hoàn tay.
         Task<List<PaymentModel>> RefundAmountAsync(BookingRequest booking, decimal amount, string note, CurrentUser currentUser);
 
+        // R-13 (BE-12): chi bồi thường bảo hiểm (VNPay tới mức khách đã trả, phần vượt chuyển khoản thủ công kèm mã tham chiếu)
+        Task<List<PaymentModel>> PayCompensationAsync(BookingRequest booking, decimal amount, string? manualReference, string note, CurrentUser currentUser);
+
         Task<PaymentModel> RetryRefundAsync(int refundPaymentId, CurrentUser currentUser);
         Task<PaymentModel> MarkRefundedManuallyAsync(int refundPaymentId, string reference, string? note, CurrentUser currentUser);
 

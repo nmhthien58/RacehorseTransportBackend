@@ -1190,3 +1190,57 @@ Content-Type: image/png
 
 < ./chu-ky.png
 --be11--
+
+### ===== R-13 (BE-12): hồ sơ bồi thường bảo hiểm =====
+### Khách mở hồ sơ trong 24 giờ sau khi nhận ngựa
+POST {{baseUrl}}/api/bookings/1/claims
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "bookingHorseId": 1,
+  "claimType": "Injury",
+  "description": "Ngựa trầy chân sau, phát hiện khi dắt xuống xe",
+  "requestedAmount": 1200,
+  "evidencePaths": []
+}
+
+### Danh sách hồ sơ đang mở (Manager)
+GET {{baseUrl}}/api/claims?status=Open
+Authorization: Bearer {{managerToken}}
+
+### Chi tiết hồ sơ
+GET {{baseUrl}}/api/claims/1
+Authorization: Bearer {{managerToken}}
+
+### Bổ sung bằng chứng
+POST {{baseUrl}}/api/claims/1/evidence
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{ "evidencePaths": ["documents/2026/10/0123456789abcdef0123456789abcdef.pdf"] }
+
+### Nhận xét duyệt
+POST {{baseUrl}}/api/claims/1/review
+Authorization: Bearer {{managerToken}}
+
+### Duyệt (≤ mức trả tối đa)
+POST {{baseUrl}}/api/claims/1/approve
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{ "approvedAmount": 800, "faultParty": "Company", "reason": "Lỗi buộc dây khi xếp ngựa" }
+
+### Từ chối
+POST {{baseUrl}}/api/claims/1/reject
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{ "reason": "Ngoại lệ 8.4: bệnh có sẵn trước chuyến" }
+
+### Chi trả (phần vượt số khách đã trả cần mã chuyển khoản)
+POST {{baseUrl}}/api/claims/1/pay
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{ "manualReference": "VCB-123456" }

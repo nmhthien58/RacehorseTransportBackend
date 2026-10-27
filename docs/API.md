@@ -34,6 +34,7 @@ Tài liệu này hướng dẫn gọi API của hệ thống vận chuyển ng�
 18. [Danh mục giá trị cho dropdown](#18-danh-mục-giá-trị-cho-dropdown)
 19. [Thanh toán (đặt cọc, phần còn lại, phát sinh, hoàn tiền)](#19-thanh-toán-đặt-cọc-phần-còn-lại-phát-sinh-hoàn-tiền)
 19b. [Bồi thường giao trễ](#19b-bồi-thường-giao-trễ)
+19c. [Hồ sơ bồi thường bảo hiểm](#19c-hồ-sơ-bồi-thường-bảo-hiểm)
 20. [Chính sách dịch vụ và cấu hình](#20-chính-sách-dịch-vụ-và-cấu-hình)
 21. [Những phần chưa có API](#21-những-phần-chưa-có-api)
 22. [Bảng tra nhanh mọi endpoint](#22-bảng-tra-nhanh-mọi-endpoint)
@@ -418,7 +419,7 @@ Các trường dưới đây chỉ nhận đúng những giá trị liệt kê, 
 | Trạng thái đơn (`status`) | `Submitted` chờ duyệt · `PreApproved` đã duyệt sơ bộ, công ty đang lập tuyến · `RoutePlanned` đã duyệt tuyến, đang tính báo giá chốt · `Quoted` đã gửi báo giá chốt, chờ khách chấp nhận · `AwaitingDeposit` chờ khách đặt cọc · `Approved` đã cọc, đang làm hồ sơ · `Assigned` đã xếp chuyến · `AwaitingFinalPayment` giao xong nhưng còn chi phí phát sinh chưa trả · `Completed` hoàn tất · `Rejected` bị từ chối · `Expired` quá hạn duyệt hoặc quá hạn đặt cọc (đơn cũ) · `QuoteExpired` quá hạn chấp nhận / đặt cọc báo giá chốt · `Cancelled` khách hủy hoặc từ chối báo giá |
 | Trạng thái tuyến dự kiến (`routePlan.status`) | `Draft` bản nháp · `Submitted` chờ duyệt · `Approved` tuyến hiệu lực của đơn · `Rejected` bị từ chối, sửa rồi trình lại · `Superseded` bản đã duyệt nhưng bị thay bằng bản mới |
 | Loại mốc của tuyến dự kiến (`stopType`) | `Origin` điểm đón (lấy từ đơn) · `RestStop` trạm nghỉ · `BorderGate` cửa khẩu · `Destination` điểm trả (lấy từ đơn) |
-| `paymentType` (mục 19) | `Deposit` đặt cọc · `Balance` phần còn lại · `Extra` phát sinh · `Refund` hoàn tiền |
+| `paymentType` (mục 19) | `Deposit` đặt cọc · `Balance` phần còn lại · `Extra` phát sinh · `Refund` hoàn tiền · `Compensation` bồi thường bảo hiểm |
 | Trạng thái giao dịch (mục 19) | `Pending` đang chờ cổng · `Succeeded` thành công · `Failed` thất bại · `Expired` link bị thay |
 | `provider` (mục 19) | `VnPay` · `Mock` cổng giả lập · `Manual` ghi nhận tay |
 | Trạng thái ngựa trong đơn | `Pending` · `Approved` · `Cancelled` |
@@ -5079,7 +5080,7 @@ Ai thấy sự cố nào: khách thấy sự cố trên chuyến có ngựa củ
 | `HandOverHere` | Khách nhận ngựa tại nơi dỡ | Ngựa `Offloaded`; đoàn xe ký e-POD tại chỗ (`POST /api/trips/{tripId}/handover` với `tripHorseId`) → `Delivered` |
 | `Deceased` | Ngựa chết | Ngựa `Deceased` (cả trên chuyến và trong đơn). Chỉ chọn được ở sự cố mức `Critical` và **bắt buộc biên bản thú y** |
 
-Mỗi trường hợp, khách của con ngựa nhận thông báo + email. Chuyến chỉ đóng được khi không còn con nào đang chờ phương án hoặc chờ ký e-POD tại chỗ. Hoàn tiền phần cước chưa đi và hồ sơ bồi thường bảo hiểm sẽ có ở các bản sau (BE-14b, BE-12).
+Mỗi trường hợp, khách của con ngựa nhận thông báo + email. Chuyến chỉ đóng được khi không còn con nào đang chờ phương án hoặc chờ ký e-POD tại chỗ. Ngựa chết hoặc rời chuyến vì sức khỏe thì hệ thống tự mở hồ sơ bồi thường bảo hiểm (mục 19c).
 
 Một sự cố (`incident`) có dạng:
 
@@ -7460,7 +7461,8 @@ Response `200`:
       "Deposit",
       "Balance",
       "Extra",
-      "Refund"
+      "Refund",
+      "Compensation"
     ],
     "paymentStatuses": [
       "Pending",
@@ -7515,6 +7517,7 @@ Báo giá của đơn tính bằng **USD**; khách trả bằng **VND** qua cổ
 | `Balance` phần còn lại | Khi đơn đã `Approved` / `Assigned`, hạn là trước ngày xuất phát của chuyến (cấu hình số ngày) | Báo giá − tiền cọc |
 | `Extra` phát sinh | Sau khi đóng chuyến, nếu sự cố có chi phí được duyệt (đơn ở `AwaitingFinalPayment`) | Chi phí sự cố phân bổ cho đơn |
 | `Refund` hoàn tiền | Tự tạo khi khách hủy đơn đã trả tiền | `% hoàn cọc` × tiền cọc + 100% phần còn lại đã trả |
+| `Compensation` bồi thường | Manager chi trả hồ sơ bồi thường bảo hiểm (mục 19c) | Số tiền đã duyệt |
 
 Vòng đời đơn có thanh toán:
 
@@ -7581,6 +7584,7 @@ Response `200` (đơn đã cọc rồi bị khách hủy, được hoàn 50% c�
     "extraDueAt": null,
     "extraOverdue": false,
     "refundedAmount": 442.2,
+    "compensationAmount": 0,
     "totalDue": 2948.0,
     "totalPaid": 884.4,
     "outstanding": 0,
@@ -7648,13 +7652,14 @@ Response `200` (đơn đã cọc rồi bị khách hủy, được hoàn 50% c�
 | `balanceDueAt` | Hạn trả phần còn lại; chỉ có khi ngựa của đơn đã được xếp chuyến |
 | `extraAmount`, `extraDueAt`, `extraOverdue` | Chi phí phát sinh sau khi đóng chuyến, hạn trả, và đã quá hạn hay chưa |
 | `refundedAmount` | Tổng đã hoàn cho khách |
+| `compensationAmount` | Tổng bồi thường bảo hiểm đã chi (mục 19c) |
 | `totalDue`, `totalPaid`, `outstanding` | Tổng phải trả, tổng đã trả, còn thiếu (đơn đã hủy / từ chối / hết hạn thì `outstanding = 0`) |
 | `nextPaymentType`, `nextPaymentAmount`, `nextPaymentAmountVnd` | Khoản khách trả được **ngay bây giờ**; `null` nếu không có gì để trả |
 | `payments[]` | Lịch sử giao dịch, mới nhất trước |
 | `payments[].status` | `Pending` đang chờ cổng · `Succeeded` thành công · `Failed` thất bại · `Expired` link cũ bị thay bằng link mới |
 | `payments[].provider` | `VnPay` · `Mock` cổng giả lập · `Manual` ghi nhận tay (ngoài hệ thống) |
 | `payments[].amountVnd`, `exchangeRate` | Số VND thực trả và tỉ giá tại thời điểm tạo giao dịch |
-| `payments[].refundOfPaymentId` | Với dòng `Refund`: giao dịch gốc được hoàn |
+| `payments[].refundOfPaymentId` | Với dòng `Refund` / `Compensation` qua cổng: giao dịch gốc được hoàn |
 | `payments[].providerTxnNo` | Mã giao dịch phía cổng / mã chuyển khoản |
 | `payments[].bookingCode` | Mã đơn của giao dịch |
 
@@ -7953,7 +7958,7 @@ Response `201`: `data` là giao dịch vừa tạo (`provider` = `Manual`, `stat
 Khi khách hủy đơn, server tự gọi API hoàn tiền của VNPay. Nếu thất bại, dòng `Refund` ở trạng thái `Failed` và quản lý nhận thông báo; dùng API này để thử lại.
 
 - **Ai gọi được:** LogisticsManager, Admin
-- **Dữ liệu gửi lên:** không có. `id` là `paymentId` của dòng `Refund`.
+- **Dữ liệu gửi lên:** không có. `id` là `paymentId` của dòng `Refund` (hoặc `Compensation` qua cổng, mục 19c).
 
 Response `200`: `data` là dòng hoàn tiền sau khi thử (`status` `Succeeded` hoặc vẫn `Failed`).
 
@@ -8149,6 +8154,210 @@ Response `200`: khoản bồi thường với `status` = `Approved`. Các dòng 
 - **Dữ liệu gửi lên:** JSON `{ "reason": "..." }` (bắt buộc, tối đa 500 ký tự)
 
 Response `200`: khoản bồi thường với `status` = `Rejected`, `reviewReason` là lý do.
+
+---
+
+## 19c. Hồ sơ bồi thường bảo hiểm
+
+Chính sách mục 8. Mỗi hồ sơ (`claim`) là yêu cầu bồi thường cho **một con ngựa** của đơn.
+
+**Mức trả tối đa (`cap`)** theo gói bảo hiểm của con ngựa (chốt lúc mở hồ sơ):
+
+| Gói | Nguyên nhân được trả | Chết (`Death`) / Mất, giao nhầm (`Loss`) | Bị thương (`Injury`, chi phí thú y) |
+|---|---|---|---|
+| `None` không mua | **Chỉ khi lỗi công ty** (`faultParty = Company`) | ≤ `Insurance.BaseLiabilityUsd` (5.000 USD) | ≤ `Insurance.BaseVetCapUsd` (1.000 USD) |
+| `Full` toàn giá trị | Mọi nguyên nhân (trừ ngoại lệ mục 8.4, Manager từ chối) | ≤ 100% giá trị thỏa thuận | ≤ `Insurance.VetCapPercent` (20)% giá trị thỏa thuận |
+
+**Ai mở hồ sơ:**
+
+| Cách mở | Khi nào | Loại |
+|---|---|---|
+| Hệ thống tự mở | Tổ lái báo sự cố `Critical` có chọn con ngựa (`affectedTripHorseId`) | `Injury` |
+| Hệ thống tự mở | Duyệt cho ngựa rời chuyến với kết quả `Deceased` | `Death` (nếu sự cố đã có hồ sơ `Injury` chưa quyết định thì hồ sơ đó đổi thành `Death`) |
+| Hệ thống tự mở | Duyệt cho ngựa rời chuyến vì sự cố `EquineHealthIssue` | `Injury` |
+| Hệ thống tự mở | Biên bản e-POD có `overallCondition = Injured` | `Injury` cho từng con giao lần đó |
+| Hệ thống tự mở | Người nhận từ chối vì `RefusedInjured` / `RefusedWrongHorse` (mục 12b) | `Injury` / `Loss` cho từng con của đơn |
+| Khách tự mở | Trong **24 giờ** sau khi con ngựa được giao (`deliveredAt`) | Khách chọn |
+
+Mỗi sự cố / mỗi lần không giao được chỉ mở một hồ sơ cho mỗi con ngựa. Hồ sơ tự mở thì khách nhận thông báo + email để tải bằng chứng lên.
+
+**Luồng:** `Open` → (Manager nhận xét duyệt) `UnderReview` → `Approved` (số tiền ≤ `cap`) hoặc `Rejected` (có lý do) → Manager **chi trả** → `Paid`. Khi duyệt / từ chối khách nhận email `ClaimDecision`.
+
+**Chi trả:** phần không quá số khách đã trả mà chưa hoàn → hoàn qua cổng thanh toán (dòng `Compensation` gắn khoản gốc, giống `Refund`; nếu cổng lỗi thì dùng `retry-refund` / `mark-refunded` như hoàn tiền). Phần vượt → Manager chuyển khoản ngoài hệ thống rồi gửi `manualReference`; hệ thống ghi một dòng `Compensation` `Manual` / `Succeeded`. Tổng đã bồi thường xem ở `compensationAmount` của `GET /api/bookings/{id}/payments`.
+
+Một hồ sơ có dạng:
+
+```json
+{
+  "claimId": 3,
+  "claimCode": "CLM-2026-0003",
+  "bookingId": 1,
+  "bookingCode": "BKG-2026-0001",
+  "bookingHorseId": 2,
+  "horseName": "Thunder Bolt",
+  "incidentId": 12,
+  "deliveryFailureId": null,
+  "claimType": "Injury",
+  "insurancePlan": "Full",
+  "agreedValue": 100000.0,
+  "faultParty": null,
+  "cap": 20000.0,
+  "description": "Critical incident INC-2026-0012: Ngựa ngã trong xe",
+  "requestedAmount": 3500.0,
+  "approvedAmount": null,
+  "status": "Open",
+  "decisionReason": null,
+  "evidencePaths": ["welfare/2026/10/6f1c...e2.jpg"],
+  "evidenceUrls": ["https://.../welfare/2026/10/6f1c...e2.jpg?token=..."],
+  "openedBySystem": true,
+  "openedAt": "2026-10-27T07:41:58.004+00:00",
+  "reviewedByName": null,
+  "reviewedAt": null,
+  "paidAt": null,
+  "paidReference": null
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `claimType` | `Death` chết / phải an tử · `Injury` bị thương · `Loss` mất, thất lạc, giao nhầm |
+| `insurancePlan`, `agreedValue` | Gói và giá trị thỏa thuận của con ngựa lúc mở hồ sơ |
+| `cap` | Mức trả tối đa. Gói `None` hiện mức trả khi lỗi công ty |
+| `faultParty` | Nguyên nhân Manager chốt khi duyệt (`Company`, `Customer`, `ForceMajeure`) |
+| `requestedAmount` | Số khách đề nghị (có thể trống) |
+| `approvedAmount` | Số Manager duyệt |
+| `status` | `Open` mới mở · `UnderReview` đang xét · `Approved` đã duyệt, chờ chi · `Rejected` từ chối · `Paid` đã chi |
+| `evidencePaths`, `evidenceUrls` | File bằng chứng (biên bản thú y, ảnh, hóa đơn thú y) và link xem tạm |
+| `openedBySystem` | `true` = hệ thống tự mở |
+| `paidReference` | Mã chuyển khoản phần chi ngoài hệ thống |
+
+### GET /api/claims — Danh sách hồ sơ bồi thường
+
+- **Ai gọi được:** mọi người đã đăng nhập trừ DriverEscort. Khách chỉ thấy hồ sơ của đơn mình.
+
+| Tham số query | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `status` | chuỗi | Không | `Open`, `UnderReview`, `Approved`, `Rejected`, `Paid` |
+| `bookingId` | số | Không | Lọc theo đơn (dùng trên trang chi tiết đơn) |
+
+Ví dụ: `GET /api/claims?status=Open`, `GET /api/claims?bookingId=1`
+
+Response `200`: `data` là mảng hồ sơ (không có `evidenceUrls`), mới nhất trước, tối đa 200.
+
+### GET /api/claims/{id} — Chi tiết hồ sơ
+
+- **Ai gọi được:** khách của đơn, nhân sự (trừ DriverEscort)
+
+Response `200`: một hồ sơ, có `evidenceUrls`.
+
+| HTTP | Khi nào |
+|---|---|
+| 403 | Hồ sơ của đơn người khác, hoặc tài xế gọi |
+| 404 | Không có hồ sơ |
+
+### POST /api/bookings/{id}/claims — Khách mở hồ sơ
+
+- **Ai gọi được:** Customer (chủ đơn)
+- **Dữ liệu gửi lên:** JSON. Tải file trước bằng `POST /api/files`.
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `bookingHorseId` | số | Có | Con ngựa của đơn (`horses[].bookingHorseId` ở chi tiết đơn) |
+| `claimType` | chuỗi | Có | `Death`, `Injury` hoặc `Loss` |
+| `description` | chuỗi | Có | Mô tả, tối đa 2000 ký tự |
+| `requestedAmount` | số | Không | Số tiền đề nghị (USD) |
+| `evidencePaths` | mảng chuỗi | Không | Đường dẫn file từ `POST /api/files`, tối đa 20 |
+
+Ví dụ request:
+
+```json
+{
+  "bookingHorseId": 2,
+  "claimType": "Injury",
+  "description": "Ngựa trầy chân sau, phát hiện khi dắt xuống xe",
+  "requestedAmount": 1200,
+  "evidencePaths": ["welfare/2026/10/6f1c0a9d4b7e4f3a8c2d1e0f9a8b7c6d.jpg"]
+}
+```
+
+Response `201`: hồ sơ vừa mở. Các Manager nhận thông báo.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Thunder Bolt has not been delivered yet. Claims during the trip are opened by the company.` | Ngựa chưa giao |
+| 400 | `Claims must be opened within 24 hours after the horse is received (...).` | Quá 24 giờ sau khi giao |
+| 400 | `ClaimType 'Fire' is invalid. ...` | Sai loại |
+| 400 | `Each evidence path must come from POST /api/files ...` | Đường dẫn file không hợp lệ |
+| 400 | `Booking horse 9 is not part of booking 1.` | Ngựa không thuộc đơn |
+| 403 | `You can only open a claim for your own bookings.` | Đơn người khác |
+
+### POST /api/claims/{id}/evidence — Bổ sung bằng chứng
+
+- **Ai gọi được:** khách của đơn, nhân sự (trừ DriverEscort)
+- **Dữ liệu gửi lên:** JSON `{ "evidencePaths": ["documents/2026/10/....pdf"] }` (1–20 file; file trùng bị bỏ qua)
+
+Response `200`: hồ sơ sau khi thêm. Lỗi `400` khi hồ sơ đã `Paid` / `Rejected`.
+
+### POST /api/claims/{id}/review — Nhận xét duyệt
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** không có
+
+Chuyển `Open` → `UnderReview` để khách biết hồ sơ đang được xử lý (hạn trả lời 7 ngày làm việc). Lỗi `400` nếu hồ sơ không ở `Open`.
+
+### POST /api/claims/{id}/approve — Duyệt bồi thường
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `approvedAmount` | số | Có | Số tiền duyệt (USD), lớn hơn 0 và ≤ `cap` |
+| `faultParty` | chuỗi | Không | `Company`, `Customer`, `ForceMajeure`. Bỏ trống = lấy theo sự cố gắn với hồ sơ. Gói `None` bắt buộc là `Company` |
+| `reason` | chuỗi | Không | Ghi chú gửi khách, tối đa 1000 ký tự |
+
+Ví dụ request:
+
+```json
+{
+  "approvedAmount": 800,
+  "faultParty": "Company",
+  "reason": "Lỗi buộc dây khi xếp ngựa"
+}
+```
+
+Response `200`: hồ sơ `Approved`. Khách nhận email `ClaimDecision`.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `This horse has no insurance: compensation is only paid when the company is at fault (FaultParty = Company).` | Gói `None` mà không phải lỗi công ty |
+| 400 | `The approved amount 1,500.00 USD is above the cap of 1,000.00 USD for a Injury claim with plan None.` | Vượt mức trả tối đa |
+| 400 | `Only an open or reviewed claim can be decided (current status: Paid).` | Đã quyết định rồi |
+
+### POST /api/claims/{id}/reject — Từ chối bồi thường
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON `{ "reason": "Ngoại lệ 8.4: bệnh có sẵn trước chuyến" }` (bắt buộc, tối đa 1000 ký tự)
+
+Response `200`: hồ sơ `Rejected`. Khách nhận email `ClaimDecision`.
+
+### POST /api/claims/{id}/pay — Chi trả bồi thường
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `manualReference` | chuỗi | Có khi số duyệt lớn hơn số khách đã trả mà chưa hoàn | Mã chuyển khoản phần vượt, tối đa 100 ký tự |
+
+Ví dụ: duyệt 20.000 USD, khách đã trả 7.500 USD → 7.500 hoàn qua VNPay, 12.500 Manager chuyển khoản và gửi `{ "manualReference": "VCB-123456" }`.
+
+Response `200`: hồ sơ `Paid`. Các dòng `Compensation` xem ở `GET /api/bookings/{id}/payments`. Khách nhận thông báo + email.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `12,500.00 USD is more than the customer paid for booking BKG-2026-0001; transfer it manually and send the bank reference (ManualReference).` | Thiếu mã chuyển khoản cho phần vượt |
+| 400 | `Only an approved claim can be paid (current status: Open).` | Chưa duyệt |
 
 ---
 
@@ -8370,7 +8579,7 @@ Tiến độ từng phần xem ở [TASKS.md](TASKS.md).
 
 ## 22. Bảng tra nhanh mọi endpoint
 
-Tổng cộng 121 endpoint. Chi tiết từng cái xem ở mục tương ứng.
+Tổng cộng 129 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 
 **4. Đăng nhập và tài khoản của tôi**
 
@@ -8518,6 +8727,19 @@ Tổng cộng 121 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | GET | `/api/bookings/{bookingId}/delay-compensations` | Bồi thường giao trễ của một đơn | Khách của đơn, nhân sự |
 | POST | `/api/delay-compensations/{id}/approve` | Duyệt bồi thường (có thể sửa số tiền) | LogisticsManager, Admin |
 | POST | `/api/delay-compensations/{id}/reject` | Từ chối bồi thường | LogisticsManager, Admin |
+
+**19c. Hồ sơ bồi thường bảo hiểm**
+
+| Method | Đường dẫn | Việc | Ai gọi được |
+|---|---|---|---|
+| GET | `/api/claims` | Danh sách hồ sơ (lọc `status`, `bookingId`) | Mọi người trừ DriverEscort; khách thấy của mình |
+| GET | `/api/claims/{id}` | Chi tiết hồ sơ | Khách của đơn, nhân sự trừ DriverEscort |
+| POST | `/api/bookings/{id}/claims` | Khách mở hồ sơ (24 giờ sau khi nhận ngựa) | Customer |
+| POST | `/api/claims/{id}/evidence` | Bổ sung bằng chứng | Khách của đơn, nhân sự trừ DriverEscort |
+| POST | `/api/claims/{id}/review` | Nhận xét duyệt | LogisticsManager, Admin |
+| POST | `/api/claims/{id}/approve` | Duyệt số tiền (≤ mức trả tối đa) | LogisticsManager, Admin |
+| POST | `/api/claims/{id}/reject` | Từ chối có lý do | LogisticsManager, Admin |
+| POST | `/api/claims/{id}/pay` | Chi trả (VNPay + chuyển khoản phần vượt) | LogisticsManager, Admin |
 
 **12. Flow 6 – Bàn giao, đóng chuyến và báo cáo**
 

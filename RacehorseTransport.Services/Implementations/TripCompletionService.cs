@@ -45,6 +45,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly INotificationService _notificationService;
         private readonly IRecipientService _recipientService;
         private readonly IDeliveryService _deliveryService;
+        private readonly IClaimService _claimService;
         private readonly ISystemSettingService _settingService;
         private readonly IUnitOfWork _unitOfWork;
 
@@ -62,6 +63,7 @@ namespace RacehorseTransport.Services.Implementations
             INotificationService notificationService,
             IRecipientService recipientService,
             IDeliveryService deliveryService,
+            IClaimService claimService,
             ISystemSettingService settingService,
             IUnitOfWork unitOfWork)
         {
@@ -78,6 +80,7 @@ namespace RacehorseTransport.Services.Implementations
             _notificationService = notificationService;
             _recipientService = recipientService;
             _deliveryService = deliveryService;
+            _claimService = claimService;
             _settingService = settingService;
             _unitOfWork = unitOfWork;
         }
@@ -256,6 +259,16 @@ namespace RacehorseTransport.Services.Implementations
             });
 
             await _trackingService.InvalidateTripAsync(tripId);
+
+            // R-13: biên bản ghi ngựa bị thương -> tự mở hồ sơ bồi thường cho từng con giao lần này
+            if (handover.OverallCondition == HandoverConditions.Injured)
+            {
+                foreach (var tripHorse in horses)
+                {
+                    await _claimService.OpenAutomaticallyAsync(tripHorse.BookingHorseId, ClaimTypes.Injury,
+                        $"The e-POD of booking {booking.BookingCode} records an injured horse. {handover.Remarks}".Trim());
+                }
+            }
 
             // R-16: báo khách đã ký nhận (email HandoverCompleted)
             await _recipientService.OnHandoverSignedAsync(booking.BookingId, handover.RecipientName, now, handover.OverallCondition);
