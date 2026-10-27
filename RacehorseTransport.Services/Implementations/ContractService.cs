@@ -198,6 +198,18 @@ namespace RacehorseTransport.Services.Implementations
             return ToModel(contract, booking.BookingCode);
         }
 
+        public async Task DiscardDraftsAsync(int bookingId)
+        {
+            var drafts = await _contractRepo.GetQueryable()
+                .Where(c => c.BookingId == bookingId && c.Status == ContractStatuses.Draft)
+                .ToListAsync();
+            foreach (var draft in drafts)
+            {
+                draft.Status = ContractStatuses.Superseded;
+            }
+            await _contractRepo.SaveChangesAsync();
+        }
+
         // =============================================================================================
         // Xem / tải
         // =============================================================================================

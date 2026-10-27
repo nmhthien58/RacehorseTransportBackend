@@ -11,6 +11,9 @@ namespace RacehorseTransport.Services.Interfaces
         // Bản mới khi đổi điều khoản sau khi khách đã chấp nhận (BE-06 đổi điểm đón / trả, BE-14b đi đường vòng, BE-15 đổi người nhận)
         Task<BookingContractModel> CreateAmendmentAsync(int bookingId, string reason);
 
+        // Báo giá bị rút lại (khách đổi điểm đón / trả trước khi chấp nhận): bản nháp -> Superseded
+        Task DiscardDraftsAsync(int bookingId);
+
         Task<BookingContractModel> GetCurrentAsync(int bookingId, CurrentUser currentUser);
         Task<List<BookingContractModel>> GetHistoryAsync(int bookingId, CurrentUser currentUser);
         Task<SignedFileUrlModel> GetFileUrlAsync(int contractId, CurrentUser currentUser);

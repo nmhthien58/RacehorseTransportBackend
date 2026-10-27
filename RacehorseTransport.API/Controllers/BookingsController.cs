@@ -21,12 +21,14 @@ namespace RacehorseTransport.API.Controllers
         private readonly IBookingService _bookingService;
         private readonly IPricingService _pricingService;
         private readonly IBookingQuoteService _quoteService;
+        private readonly IBookingChangeService _changeService;
 
-        public BookingsController(IBookingService bookingService, IPricingService pricingService, IBookingQuoteService quoteService)
+        public BookingsController(IBookingService bookingService, IPricingService pricingService, IBookingQuoteService quoteService, IBookingChangeService changeService)
         {
             _bookingService = bookingService;
             _pricingService = pricingService;
             _quoteService = quoteService;
+            _changeService = changeService;
         }
 
         /// <summary>
@@ -142,6 +144,48 @@ namespace RacehorseTransport.API.Controllers
                 UserAgent = HttpContext.GetUserAgent()
             }, User.ToCurrentUser());
             return Ok(ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse(), "Quote accepted, please pay the deposit"));
+        }
+
+        /// <summary>
+        /// Customer changes the pickup / drop-off before paying anything. The estimate is recalculated; a planned route or quote is withdrawn
+        /// and the booking goes back to route planning (PreApproved), then receives a new final quote.
+        /// </summary>
+        [HttpPut("{id:int}/locations")]
+        [Authorize(Roles = UserRoles.Customer)]
+        [ProducesResponseType(typeof(ApiResponse<BookingDetailResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ChangeLocations(int id, [FromBody] ChangeLocationsRequest request)
+        {
+            var booking = await _changeService.ChangeLocationsAsync(id, new ChangeLocationsModel
+            {
+                PickupAddress = request.PickupAddress,
+                PickupCountryCode = request.PickupCountryCode.Trim().ToUpperInvariant(),
+                PickupLat = request.PickupLat,
+                PickupLng = request.PickupLng,
+                DropoffAddress = request.DropoffAddress,
+                DropoffCountryCode = request.DropoffCountryCode.Trim().ToUpperInvariant(),
+                DropoffLat = request.DropoffLat,
+                DropoffLng = request.DropoffLng
+            }, User.ToCurrentUser());
+            return Ok(ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse(), "Pickup / drop-off updated"));
+        }
+
+        /// <summary>
+        /// Customer cancels because the company changed the route to a new country whose documents they cannot provide: 100% refund.
+        /// Allowed until routeChangeCancelUntil.
+        /// </summary>
+        [HttpPost("{id:int}/cancel-route-change")]
+        [Authorize(Roles = UserRoles.Customer)]
+        [ProducesResponseType(typeof(ApiResponse<BookingDetailResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> CancelForRouteChange(int id)
+        {
+            var booking = await _changeService.CancelForRouteChangeAsync(id, User.ToCurrentUser());
+            return Ok(ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse(), "Booking cancelled with a full refund"));
         }
 
         /// <summary>

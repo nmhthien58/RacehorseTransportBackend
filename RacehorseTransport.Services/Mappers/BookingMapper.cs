@@ -26,6 +26,8 @@ namespace RacehorseTransport.Services.Mappers
                 RequiresClimateControl = entity.RequiresClimateControl,
                 DeclaredValue = entity.DeclaredValue,
                 RejectionReason = entity.RejectionReason,
+                DocsDueAt = entity.DocsDueAt,
+                RouteChangeCancelUntil = entity.RouteChangeCancelUntil,
                 QuotedAt = entity.QuotedAt,
                 QuoteExpiresAt = entity.QuoteExpiresAt,
                 QuoteAcceptedAt = entity.QuoteAcceptedAt,

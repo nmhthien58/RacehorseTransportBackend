@@ -367,6 +367,7 @@ INSERT INTO common.system_settings (setting_key, setting_value, description) VAL
 -- BE-17: giá trị cấu hình của Chính sách dịch vụ (docs/CHINH_SACH_DICH_VU.md)
 ('Policy.Version',                       '1.0',   'Phiên bản Chính sách dịch vụ hiện hành (lưu vào đơn khi khách đồng ý)'),
 ('Booking.QuoteAcceptDays',              '3',     'Số ngày khách được xem và chấp nhận báo giá chốt + đặt cọc'),
+('Dossier.SubmitDays',                   '7',     'Số ngày khách có để nộp đủ giấy tờ, tính từ lúc đặt cọc'),
 ('Delay.GraceHours',                     '6',     'Số giờ trễ được miễn bồi thường'),
 ('Delay.PercentPer12Hours',              '5',     '% tiền cước bồi thường cho mỗi 12 giờ trễ sau ân hạn'),
 ('Delay.MaxPercent',                     '25',    '% tiền cước bồi thường giao trễ tối đa'),

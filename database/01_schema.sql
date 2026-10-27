@@ -115,6 +115,10 @@ CREATE TABLE booking.booking_requests (
     -- Phiên bản Chính sách dịch vụ khách đã đồng ý
     policy_version           varchar(20),
     policy_accepted_at       timestamptz,
+    -- R-10 (BE-06): hạn nộp giấy, số lần đã nhắc (3 = quá hạn đã báo Manager), hạn khách được hủy hoàn 100% khi công ty đổi tuyến
+    docs_due_at              timestamptz,
+    docs_reminders_sent      integer       NOT NULL DEFAULT 0,
+    route_change_cancel_until timestamptz,
     currency_code            char(3)       NOT NULL DEFAULT 'USD',
     -- Vòng đời: Submitted -> AwaitingDeposit (Manager duyệt, chờ cọc) -> Approved (đã cọc: làm hồ sơ, xếp chuyến)
     --           -> Completed, hoặc -> AwaitingFinalPayment (còn chi phí phát sinh) -> Completed

@@ -7,6 +7,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public string PolicyVersion { get; set; } = "1.0";            // Policy.Version
 
         public int QuoteAcceptDays { get; set; } = 3;                  // Booking.QuoteAcceptDays
+        public int DossierSubmitDays { get; set; } = 7;                // Dossier.SubmitDays (R-10: hạn nộp giấy tính từ lúc cọc)
 
         public int DelayGraceHours { get; set; } = 6;                  // Delay.GraceHours
         public decimal DelayPercentPer12Hours { get; set; } = 5;       // Delay.PercentPer12Hours

@@ -49,6 +49,14 @@ namespace RacehorseTransport.API.BackgroundJobs
                         _logger.LogInformation("Processed {Count} quote deadline(s) (reminders or expiries).", quoted);
                     }
 
+                    // R-10 (BE-06): hạn nộp giấy: nhắc khi còn 3 ngày / 1 ngày, quá hạn còn thiếu -> hủy đơn
+                    var deadlineService = scope.ServiceProvider.GetRequiredService<IDossierDeadlineService>();
+                    int docs = await deadlineService.ProcessDocumentDeadlinesAsync();
+                    if (docs > 0)
+                    {
+                        _logger.LogInformation("Processed {Count} document deadline(s) (reminders or cancellations).", docs);
+                    }
+
                     // R-02: nhắc nợ chi phí phát sinh quá hạn (ngày đến hạn, +3, +7)
                     var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentService>();
                     int reminded = await paymentService.SendOverdueRemindersAsync();

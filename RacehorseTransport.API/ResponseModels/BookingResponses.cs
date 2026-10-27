@@ -89,6 +89,9 @@ namespace RacehorseTransport.API.ResponseModels
 
     public class BookingDetailResponse : BookingSummaryResponse
     {
+        // R-10 (BE-06): hạn nộp giấy; công ty đổi tuyến thêm nước mới -> khách được hủy hoàn 100% tới routeChangeCancelUntil
+        public DateTimeOffset? DocsDueAt { get; set; }
+        public DateTimeOffset? RouteChangeCancelUntil { get; set; }
         // R-10: báo giá chốt (estimatedCost + quoteLines) gửi lúc quotedAt; khách chấp nhận + cọc trước quoteExpiresAt
         public DateTimeOffset? QuotedAt { get; set; }
         public DateTimeOffset? QuoteExpiresAt { get; set; }

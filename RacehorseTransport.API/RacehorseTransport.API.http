@@ -669,6 +669,38 @@ Content-Type: application/json
   "policyVersion": "1.0"
 }
 
+### [ĐÚNG] Khách đổi điểm đón / trả trước khi trả tiền (đơn về PreApproved nếu đã có báo giá)
+PUT {{baseUrl}}/api/bookings/2/locations
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "pickupAddress": "Sơn Tây, Hà Nội",
+  "pickupCountryCode": "VN",
+  "pickupLat": 21.1382,
+  "pickupLng": 105.5051,
+  "dropoffAddress": "Trường đua Nam Ninh",
+  "dropoffCountryCode": "CN",
+  "dropoffLat": 22.817,
+  "dropoffLng": 108.3665
+}
+
+### [SAI - 400] Mã nước không hợp lệ
+PUT {{baseUrl}}/api/bookings/2/locations
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "pickupAddress": "Sơn Tây, Hà Nội",
+  "pickupCountryCode": "VNM",
+  "dropoffAddress": "Trường đua Nam Ninh",
+  "dropoffCountryCode": "CN"
+}
+
+### [SAI - 400] Hủy hoàn 100% khi công ty không đổi tuyến (đơn có routeChangeCancelUntil mới gọi được)
+POST {{baseUrl}}/api/bookings/2/cancel-route-change
+Authorization: Bearer {{customerToken}}
+
 ### [ĐÚNG] Điều phối nhập vận đơn hàng không (chuyến phải chở ngựa của đơn Air)
 PUT {{baseUrl}}/api/trips/1/air-waybill
 Authorization: Bearer {{coordinatorToken}}
@@ -749,7 +781,7 @@ Authorization: Bearer {{managerToken}}
 GET {{baseUrl}}/api/settings/policy
 Authorization: Bearer {{customerToken}}
 
-### [ĐÚNG] Quản lý sửa cấu hình chính sách (gửi đủ 18 trường)
+### [ĐÚNG] Quản lý sửa cấu hình chính sách (gửi đủ 19 trường)
 PUT {{baseUrl}}/api/settings/policy
 Authorization: Bearer {{managerToken}}
 Content-Type: application/json
@@ -757,6 +789,7 @@ Content-Type: application/json
 {
   "policyVersion": "1.0",
   "quoteAcceptDays": 3,
+  "dossierSubmitDays": 7,
   "delayGraceHours": 6,
   "delayPercentPer12Hours": 5,
   "delayMaxPercent": 25,
@@ -783,6 +816,7 @@ Content-Type: application/json
 {
   "policyVersion": "",
   "quoteAcceptDays": 3,
+  "dossierSubmitDays": 7,
   "delayGraceHours": 6,
   "delayPercentPer12Hours": 5,
   "delayMaxPercent": 150,

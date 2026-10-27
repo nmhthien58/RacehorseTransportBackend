@@ -13,6 +13,7 @@ namespace RacehorseTransport.API.Mappers
             {
                 PolicyVersion = model.PolicyVersion,
                 QuoteAcceptDays = model.QuoteAcceptDays,
+                DossierSubmitDays = model.DossierSubmitDays,
                 DelayGraceHours = model.DelayGraceHours,
                 DelayPercentPer12Hours = model.DelayPercentPer12Hours,
                 DelayMaxPercent = model.DelayMaxPercent,
@@ -40,6 +41,7 @@ namespace RacehorseTransport.API.Mappers
             {
                 PolicyVersion = request.PolicyVersion.Trim(),
                 QuoteAcceptDays = request.QuoteAcceptDays,
+                DossierSubmitDays = request.DossierSubmitDays,
                 DelayGraceHours = request.DelayGraceHours,
                 DelayPercentPer12Hours = request.DelayPercentPer12Hours,
                 DelayMaxPercent = request.DelayMaxPercent,
@@ -75,7 +77,7 @@ namespace RacehorseTransport.API.Mappers
                     BalanceDueDaysBeforeDeparture = p.BalanceDueDaysBeforeDeparture,
                     ExtraPaymentDueDays = p.ExtraPaymentDueDays
                 },
-                Booking = new PolicyBookingSection { QuoteAcceptDays = s.QuoteAcceptDays },
+                Booking = new PolicyBookingSection { QuoteAcceptDays = s.QuoteAcceptDays, DossierSubmitDays = s.DossierSubmitDays },
                 Delay = new PolicyDelaySection
                 {
                     GraceHours = s.DelayGraceHours,
@@ -113,6 +115,7 @@ namespace RacehorseTransport.API.Mappers
                     [SystemSettingService.BalanceDueDaysKey] = p.BalanceDueDaysBeforeDeparture,
                     [SystemSettingService.ExtraDueDaysKey] = p.ExtraPaymentDueDays,
                     [SystemSettingService.QuoteAcceptDaysKey] = s.QuoteAcceptDays,
+                    [SystemSettingService.DossierSubmitDaysKey] = s.DossierSubmitDays,
                     [SystemSettingService.DelayGraceHoursKey] = s.DelayGraceHours,
                     [SystemSettingService.DelayPercentPer12HoursKey] = s.DelayPercentPer12Hours,
                     [SystemSettingService.DelayMaxPercentKey] = s.DelayMaxPercent,
