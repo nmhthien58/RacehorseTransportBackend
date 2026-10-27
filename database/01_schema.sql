@@ -72,7 +72,12 @@ CREATE TABLE racehorse.horses (
     special_care_requirements  text,        -- Dinh dưỡng, đệm chuồng, tiền sử say xe
     photo_url                  varchar(500),
     is_active                  boolean      NOT NULL DEFAULT true,
-    created_at                 timestamptz  NOT NULL DEFAULT now()
+    created_at                 timestamptz  NOT NULL DEFAULT now(),
+    -- R-12: tình trạng sinh sản (chặn chở ngựa mang thai gần ngày đẻ, ngựa vừa đẻ)
+    is_pregnant                boolean      NOT NULL DEFAULT false,
+    expected_foaling_date      date,
+    last_foaling_date          date,
+    CONSTRAINT ck_horses_pregnancy CHECK (NOT is_pregnant OR (gender = 'Mare' AND expected_foaling_date IS NOT NULL))
 );
 
 -- =====================================================================================
