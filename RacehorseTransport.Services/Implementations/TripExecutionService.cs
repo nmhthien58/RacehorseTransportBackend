@@ -25,6 +25,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ITrackingService _trackingService;
         private readonly INotificationService _notificationService;
         private readonly IRecipientService _recipientService;
+        private readonly IRepository<DeliveryFailure> _deliveryFailureRepo;
         private readonly IFileStorageService _fileStorage;
         private readonly IUnitOfWork _unitOfWork;
 
@@ -38,6 +39,7 @@ namespace RacehorseTransport.Services.Implementations
             ITrackingService trackingService,
             INotificationService notificationService,
             IRecipientService recipientService,
+            IRepository<DeliveryFailure> deliveryFailureRepo,
             IFileStorageService fileStorage,
             IUnitOfWork unitOfWork)
         {
@@ -50,6 +52,7 @@ namespace RacehorseTransport.Services.Implementations
             _trackingService = trackingService;
             _notificationService = notificationService;
             _recipientService = recipientService;
+            _deliveryFailureRepo = deliveryFailureRepo;
             _fileStorage = fileStorage;
             _unitOfWork = unitOfWork;
         }
@@ -314,8 +317,10 @@ namespace RacehorseTransport.Services.Implementations
                 .ToList();
 
             // R-04: chưa ký biên bản bàn giao cho đơn được trả ở mốc này thì xe chưa được đi tiếp
+            // R-16: đã ghi "không giao được" ở mốc này thì được đi tiếp (ngựa xử lý theo quyết định của khách)
             if (checkpoint.CheckpointType == CheckpointTypes.DropOff
-                && bookingHorses.Any(th => TripHorseStatuses.OnBoard.Contains(th.Status)))
+                && bookingHorses.Any(th => TripHorseStatuses.OnBoard.Contains(th.Status))
+                && !await _deliveryFailureRepo.ExistsAsync(f => f.CheckpointId == checkpoint.CheckpointId && f.BookingId == checkpoint.BookingId))
             {
                 throw new BusinessException($"Record the handover (e-POD) of the horses dropped off at '{checkpoint.CheckpointName}' before leaving.");
             }

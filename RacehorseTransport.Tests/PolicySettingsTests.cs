@@ -17,6 +17,7 @@ public class PolicySettingsTests
         Assert.Equal(3, m.QuoteAcceptDays);
         Assert.Equal(7, m.DossierSubmitDays);
         Assert.Equal(50, m.StableFeePerHorsePerDayUsd);
+        Assert.Equal(2, m.DeliveryExtraKmFeeUsd);
         Assert.Equal(6, m.DelayGraceHours);
         Assert.Equal(5, m.DelayPercentPer12Hours);
         Assert.Equal(25, m.DelayMaxPercent);
@@ -58,6 +59,7 @@ public class PolicySettingsTests
         yield return Case("Booking.QuoteAcceptDays", m => m.QuoteAcceptDays = 0);
         yield return Case("Dossier.SubmitDays", m => m.DossierSubmitDays = 61);
         yield return Case("Stable.FeePerHorsePerDayUsd", m => m.StableFeePerHorsePerDayUsd = -1);
+        yield return Case("Delivery.ExtraKmFeeUsd", m => m.DeliveryExtraKmFeeUsd = -1);
         yield return Case("Delay.GraceHours", m => m.DelayGraceHours = -1);
         yield return Case("Delay.PercentPer12Hours", m => m.DelayPercentPer12Hours = 100.01m);
         yield return Case("Delay.MaxPercent", m => m.DelayMaxPercent = -5);
@@ -109,6 +111,7 @@ public class PolicySettingsTests
             QuoteAcceptDays = 1,
             DossierSubmitDays = 1,
             StableFeePerHorsePerDayUsd = 0,
+            DeliveryExtraKmFeeUsd = 0,
             DelayGraceHours = 0,
             DelayPercentPer12Hours = 0,
             DelayMaxPercent = 100,

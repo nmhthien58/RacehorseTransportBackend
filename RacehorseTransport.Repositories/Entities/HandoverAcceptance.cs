@@ -16,6 +16,10 @@ namespace RacehorseTransport.Repositories.Entities
         public int DriverUserId { get; set; }
         public int? CheckpointId { get; set; } // mốc nơi ký nhận: DropOff của đơn hoặc Destination
 
+        // R-16 (BE-16): phí chờ tại điểm giao (cộng vào phát sinh của đơn khi đóng chuyến)
+        public int WaitingHours { get; set; }
+        public decimal WaitingFee { get; set; }
+
         // Navigation properties
         public virtual Trip? Trip { get; set; }
         public virtual BookingRequest? Booking { get; set; }

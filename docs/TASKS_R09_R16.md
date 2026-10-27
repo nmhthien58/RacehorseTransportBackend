@@ -277,7 +277,8 @@ Làm:
 - e-POD: API chi tiết chuyến cho đoàn xe trả thông tin người nhận của từng đơn; e-POD điền sẵn, nếu tên người ký khác người nhận trong đơn → bắt buộc khách xác nhận trên app trước (`POST /api/bookings/{id}/approve-alternate-recipient`).
 - Ký e-POD xong → thông báo + email `HandoverCompleted` cho khách.
 
-### [ ] BE-16 · Không giao được, phí chờ, quyết định 24 giờ (R-16)
+### [x] BE-16 · Không giao được, phí chờ, quyết định 24 giờ (R-16)
+Đã làm: bảng `acceptance.delivery_failures`, `handover_acceptances.waiting_hours / waiting_fee`; `DeliveryService` + `DeliveryRules` (phí chờ tính theo phút đầy đủ, giờ lẻ làm tròn lên). Ghi không giao được: lưu lý do / ảnh, tự mở sự cố (`RecipientUnavailable`, hoặc `EquineHealthIssue` / `Other` khi từ chối vì bị thương / nhầm ngựa) **trực tiếp** vì chuyến có thể đã `ArrivedDestination`; cho xe rời mốc `DropOff`. Theo lựa chọn của anh, **chi phí tự tính**: khóa mới `Delivery.ExtraKmFeeUsd` (2 USD/km) cho người nhận / địa chỉ khác (km theo bản đồ), chuồng tạm theo `Stable.FeePerHorsePerDayUsd` (tính khi đóng chuyến), chở về = báo giá chiều ngược (bảng giá chưa có chiều ngược thì lấy cước cùng tuyến chiều đi). Quá hạn → `HoldAtStable` (job). Phí chờ + chi phí lựa chọn cộng vào phát sinh khi đóng chuyến (`GetChargesForTripAsync`). Điều phối thực hiện lựa chọn qua sự cố đã mở. Hồ sơ bồi thường khi từ chối vì bị thương / nhầm ngựa: `TODO(BE-12)`.
 Làm:
 - `POST /api/trips/{id}/bookings/{bookingId}/delivery-failed` (đoàn xe): lý do `RecipientAbsent` / `RecipientRefused` / `RefusedInjured` / `RefusedWrongHorse`, ghi chú, ảnh.
 - Phí chờ: giờ chờ = (lúc ký e-POD hoặc lúc ghi không giao được) − lúc check-in điểm trả − `Delivery.FreeWaitingHours`; chỉ tính nếu lúc check-in ≥ `recipient_notified_window_start`; làm tròn lên giờ; tối đa `MaxWaitingHours`; × `WaitingFeePerHourUsd` → cộng vào **khoản phát sinh** của đơn (`ExtraCharges`, luồng thanh toán Extra hiện có).

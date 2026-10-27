@@ -437,6 +437,28 @@ namespace RacehorseTransport.Repositories.Constants
         public static readonly string[] All = { Reported, PlanProposed, Approved, Rejected, Resolved, AwaitingConsent };
     }
 
+    // R-16 (BE-16): lý do không giao được
+    public static class DeliveryFailureReasons
+    {
+        public const string RecipientAbsent = "RecipientAbsent";       // người nhận vắng mặt (lỗi khách)
+        public const string RecipientRefused = "RecipientRefused";     // người nhận từ chối không có lý do chính đáng (lỗi khách)
+        public const string RefusedInjured = "RefusedInjured";         // từ chối vì ngựa bị thương (công ty chịu)
+        public const string RefusedWrongHorse = "RefusedWrongHorse";   // từ chối vì giao nhầm ngựa (công ty chịu)
+
+        public static readonly string[] All = { RecipientAbsent, RecipientRefused, RefusedInjured, RefusedWrongHorse };
+        public static readonly string[] CustomerFault = { RecipientAbsent, RecipientRefused };
+    }
+
+    // R-16 (BE-16): khách chọn cách xử lý khi không giao được (Chính sách 10.5); quá hạn -> HoldAtStable
+    public static class DeliveryDecisions
+    {
+        public const string AlternateRecipient = "AlternateRecipient"; // người nhận / địa chỉ khác gần đó
+        public const string HoldAtStable = "HoldAtStable";             // gửi chuồng tạm, khách tự tới nhận
+        public const string ReturnToOrigin = "ReturnToOrigin";         // chở về nơi đi
+
+        public static readonly string[] All = { AlternateRecipient, HoldAtStable, ReturnToOrigin };
+    }
+
     public static class HandoverConditions
     {
         public const string Excellent = "Excellent";

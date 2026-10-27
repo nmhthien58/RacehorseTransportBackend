@@ -44,6 +44,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IFileStorageService _fileStorage;
         private readonly INotificationService _notificationService;
         private readonly IRecipientService _recipientService;
+        private readonly IDeliveryService _deliveryService;
         private readonly ISystemSettingService _settingService;
         private readonly IUnitOfWork _unitOfWork;
 
@@ -60,6 +61,7 @@ namespace RacehorseTransport.Services.Implementations
             IFileStorageService fileStorage,
             INotificationService notificationService,
             IRecipientService recipientService,
+            IDeliveryService deliveryService,
             ISystemSettingService settingService,
             IUnitOfWork unitOfWork)
         {
@@ -75,6 +77,7 @@ namespace RacehorseTransport.Services.Implementations
             _fileStorage = fileStorage;
             _notificationService = notificationService;
             _recipientService = recipientService;
+            _deliveryService = deliveryService;
             _settingService = settingService;
             _unitOfWork = unitOfWork;
         }
@@ -175,8 +178,21 @@ namespace RacehorseTransport.Services.Implementations
             var signature = await _fileStorage.UploadAsync(
                 model.Signature.Content, model.Signature.FileName, model.Signature.SizeBytes, FileCategories.Signatures);
 
+            // R-16: phí chờ tại điểm giao của đơn (giao tại chỗ con ngựa rời chuyến thì không tính)
+            int waitingHours = 0;
+            decimal waitingFee = 0;
+            if (!model.TripHorseId.HasValue && signedAt?.ActualArrivalTime != null)
+            {
+                var policy = await _settingService.GetPolicySettingsAsync();
+                waitingHours = DeliveryRules.WaitingHours(signedAt.ActualArrivalTime.Value, DateTimeOffset.UtcNow,
+                    booking.RecipientNotifiedWindowStart, policy.DeliveryFreeWaitingHours, policy.DeliveryMaxWaitingHours);
+                waitingFee = DeliveryRules.WaitingFee(waitingHours, policy.DeliveryWaitingFeePerHourUsd);
+            }
+
             var handover = new HandoverAcceptance
             {
+                WaitingHours = waitingHours,
+                WaitingFee = waitingFee,
                 TripId = tripId,
                 BookingId = model.BookingId,
                 RecipientName = model.RecipientName,
@@ -307,6 +323,11 @@ namespace RacehorseTransport.Services.Implementations
             var bookingIds = trip.TripHorses.Select(th => th.BookingHorse!.BookingId).Distinct().ToList();
             var customerIds = trip.TripHorses.Select(th => th.BookingHorse!.Booking!.CustomerUserId).Distinct().ToList();
             var extras = AllocateExtraCharges(trip, acceptedIncidents);
+            // R-16: phí chờ, chi phí khi không giao được (khách chịu)
+            foreach (var (bookingId, amount) in await _deliveryService.GetChargesForTripAsync(trip.TripId, now))
+            {
+                extras[bookingId] = (extras.TryGetValue(bookingId, out var current) ? current : 0) + amount;
+            }
             var paymentSettings = await _settingService.GetPaymentSettingsAsync();
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>

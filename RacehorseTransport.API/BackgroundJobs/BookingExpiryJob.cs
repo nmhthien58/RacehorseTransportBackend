@@ -65,6 +65,14 @@ namespace RacehorseTransport.API.BackgroundJobs
                         _logger.LogInformation("Sent {Count} recipient confirmation reminder(s).", confirms);
                     }
 
+                    // R-16 (BE-16): không giao được, quá hạn khách chọn -> chuồng tạm
+                    var deliveryService = scope.ServiceProvider.GetRequiredService<IDeliveryService>();
+                    int decisions = await deliveryService.ProcessOverdueDecisionsAsync();
+                    if (decisions > 0)
+                    {
+                        _logger.LogInformation("Applied the default decision (temporary stable) to {Count} failed delivery(ies).", decisions);
+                    }
+
                     // R-02: nhắc nợ chi phí phát sinh quá hạn (ngày đến hạn, +3, +7)
                     var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentService>();
                     int reminded = await paymentService.SendOverdueRemindersAsync();

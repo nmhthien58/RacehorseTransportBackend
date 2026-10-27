@@ -5620,9 +5620,126 @@ Một biên bản bàn giao (`handover`) có dạng:
 | `checkpointId` | Mốc nơi ký nhận (mốc `DropOff` của đơn hoặc `Destination`). Biên bản giao tại chỗ: mốc gần nhất đoàn xe đã tới lúc dỡ ngựa |
 | `horses[]` | Các con ngựa được giao trong biên bản này (biên bản giao tại chỗ chỉ có một con) |
 
+### Không giao được, phí chờ (R-16, BE-16)
+
+Xe đã check-in điểm giao của đơn nhưng không giao được: đoàn xe ghi lại, **không ký e-POD**. Hệ thống lưu lý do + ảnh, tự mở một **sự cố** để điều phối / quản lý xử lý ngựa còn trên xe, và **cho xe rời điểm giao** (mốc `DropOff`).
+
+| `reason` | Ý nghĩa | Ai chịu | Khách phải chọn? |
+|---|---|---|---|
+| `RecipientAbsent` | Người nhận vắng mặt | Khách (phí chờ + chi phí lựa chọn) | Có, trong `Delivery.DecisionHours` giờ |
+| `RecipientRefused` | Người nhận từ chối không có lý do chính đáng | Khách | Có |
+| `RefusedInjured` | Từ chối vì ngựa bị thương | Công ty (không thu phí chờ; ngựa được chăm bằng chi phí công ty) | Không |
+| `RefusedWrongHorse` | Từ chối vì giao nhầm ngựa | Công ty | Không |
+
+**Phí chờ** (Chính sách 10.4), tính cả khi ký e-POD lẫn khi ghi không giao được (lỗi khách): giờ chờ = (lúc ký / lúc ghi) − lúc xe check-in điểm giao − `Delivery.FreeWaitingHours` (2 giờ), tính theo phút, phần giờ chưa đủ làm tròn lên, tối đa `Delivery.MaxWaitingHours` (24); × `Delivery.WaitingFeePerHourUsd` (40). **Chỉ tính khi xe tới đúng hoặc sau đầu khung giờ đã báo người nhận** (`recipientNotifiedWindowStart`, mục 7d); tới sớm hơn hoặc chưa báo khung giờ thì 0. Ví dụ: chờ 2 giờ → 0; chờ 3 giờ 10 → 2 giờ tính phí = 80 USD.
+
+**Khách chọn cách xử lý** (Chính sách 10.5) bằng `POST /api/bookings/{id}/delivery-decision`, hạn `decisionDueAt`. Chi phí hệ thống tự tính, cộng vào phát sinh của đơn khi đóng chuyến:
+
+| `decision` | Chi phí |
+|---|---|
+| `AlternateRecipient` (người nhận / địa chỉ khác gần đó) | Số km thêm (theo bản đồ, từ điểm giao tới địa chỉ mới, làm tròn lên) × `Delivery.ExtraKmFeeUsd` (2 USD). Người nhận mới được ký e-POD ngay |
+| `HoldAtStable` (gửi chuồng tạm, khách tự tới nhận) | Số ngày (từ lúc chọn tới lúc ngựa được giao / rời chuyến, chưa đủ ngày tính tròn) × số ngựa × `Stable.FeePerHorsePerDayUsd` (50), tính khi đóng chuyến |
+| `ReturnToOrigin` (chở về nơi đi) | Báo giá như một đơn đi ngược lại (cùng ngựa, hạng chuồng, quãng đường; không bảo hiểm). Bảng giá chưa có chiều ngược thì tính theo cước cùng tuyến chiều đi |
+
+Quá hạn không chọn → hệ thống chọn `HoldAtStable` (`decidedBySystem = true`). Tiền cước không được hoàn (dịch vụ đã làm xong). Điều phối thực hiện lựa chọn qua sự cố đã mở (ví dụ phương án `OffloadHorse` với `HandOverHere` cho chuồng tạm, hoặc ký e-POD với người nhận mới).
+
+#### POST /api/trips/{tripId}/bookings/{bookingId}/delivery-failed — Ghi không giao được
+
+- **Ai gọi được:** Đoàn xe của chuyến, Admin
+- **Khi nào:** xe đang dừng ở điểm giao của đơn (`Arrived`), còn ngựa của đơn trên xe; mỗi điểm giao ghi một lần
+- **Dữ liệu gửi lên:** JSON
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `reason` | chuỗi | Có | `RecipientAbsent`, `RecipientRefused`, `RefusedInjured`, `RefusedWrongHorse` |
+| `note` | chuỗi | Không | Ghi chú, tối đa 1000 ký tự |
+| `photoPaths` | mảng chuỗi | Không | Tối đa 10 ảnh, tải lên trước bằng `POST /api/files` |
+
+```json
+{
+  "reason": "RecipientAbsent",
+  "note": "Gọi 3 lần không nghe máy",
+  "photoPaths": ["welfare/2026/11/0f8e7d6c5b4a39281706f5e4d3c2b1a0.jpg"]
+}
+```
+
+Response `201` — phần `data`:
+
+```json
+{
+  "failureId": 2,
+  "tripId": 1,
+  "bookingId": 1,
+  "bookingCode": "BKG-2026-0001",
+  "checkpointId": 4,
+  "reason": "RecipientAbsent",
+  "note": "Gọi 3 lần không nghe máy",
+  "photoPaths": [],
+  "recordedAt": "2026-11-20T13:58:24+00:00",
+  "incidentId": 2,
+  "waitingHours": 2,
+  "waitingFee": 80,
+  "customerPays": true,
+  "decisionDueAt": "2026-11-21T13:58:24+00:00",
+  "decision": null,
+  "decidedAt": null,
+  "decidedBySystem": false,
+  "decisionCost": 0,
+  "alternateRecipientName": null,
+  "alternateRecipientPhone": null,
+  "alternateAddress": null,
+  "extraDistanceKm": null
+}
+```
+
+Lỗi khách (`RecipientAbsent` / `RecipientRefused`): khách nhận thông báo + email `DeliveryFailed` kèm hạn chọn. Lỗi công ty: khách nhận thông báo, không phải chọn. Điều phối và quản lý nhận thông báo kèm mã sự cố.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Reason 'Lost' is invalid. Allowed values: ...` | Sai lý do |
+| 400 | `Record the arrival at the drop-off point of booking BKG-2026-0001 first.` | Xe chưa check-in điểm giao của đơn |
+| 400 | `A failed delivery of booking ... has already been recorded at '...'.` | Đã ghi rồi |
+| 403 | `Only the crew of this trip can record a failed delivery.` | Không phải đoàn xe của chuyến |
+
+#### POST /api/bookings/{id}/delivery-decision — Khách chọn cách xử lý
+
+- **Ai gọi được:** Customer (chủ đơn)
+- **Dữ liệu gửi lên:** JSON
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `decision` | chuỗi | Có | `AlternateRecipient`, `HoldAtStable`, `ReturnToOrigin` |
+| `recipientName`, `recipientPhone`, `address` | chuỗi | Có khi `AlternateRecipient` | Người nhận mới và địa chỉ |
+| `lat`, `lng` | số | Nên gửi với `AlternateRecipient` | Tọa độ địa chỉ mới (chọn bằng `MapPicker`) để tính km thêm; thiếu thì km thêm = 0 |
+
+```json
+{
+  "decision": "AlternateRecipient",
+  "recipientName": "Lê Văn C",
+  "recipientPhone": "0987654321",
+  "address": "Trường đua Quảng Tây",
+  "lat": 22.85,
+  "lng": 108.25
+}
+```
+
+Response `200`: bản ghi như trên với `decision`, `decidedAt`, `decisionCost` (ví dụ 10,96 km thêm → 11 × 2 = 22 USD), `extraDistanceKm`.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Booking ... has no failed delivery waiting for your decision.` | Không có lần không giao được do lỗi khách |
+| 400 | `The decision has already been made (...).` | Đã chọn (hoặc hệ thống đã chọn khi quá hạn) |
+| 400 | `The decision deadline has passed; the horses go to a temporary stable.` | Quá hạn |
+| 400 | `Another recipient needs a name, a phone number and an address.` | Thiếu thông tin người nhận mới |
+| 403 | `You can only decide for your own bookings.` | Đơn của khách khác |
+
+#### GET /api/bookings/{id}/delivery-failures — Các lần không giao được của đơn
+
+- **Ai gọi được:** như xem đơn. Response `200`: mảng bản ghi (mới nhất trước).
+
 ### POST /api/trips/{tripId}/handover — Lập biên bản bàn giao (e-POD)
 
-Lập biên bản bàn giao cho **một** đơn khi xe đang dừng ở điểm trả của đơn đó (mốc `bookings[].dropoffCheckpointId` có `status` là `Arrived`). Mã vi mạch quét được phải khớp đúng các con ngựa **còn trên xe** của đơn (con đã rớt lại giữa đường không giao ở đây): thiếu một con hoặc thừa một mã lạ đều bị từ chối. Ký xong, các con ngựa thành `Delivered`; đơn giao hết ngựa thì thành `Completed` ngay. Khách nhận thông báo; khi đây là biên bản cuối cùng của chuyến đã tới đích, quản lý được báo để đóng chuyến.
+Lập biên bản bàn giao cho **một** đơn khi xe đang dừng ở điểm trả của đơn đó (mốc `bookings[].dropoffCheckpointId` có `status` là `Arrived`). Mã vi mạch quét được phải khớp đúng các con ngựa **còn trên xe** của đơn (con đã rớt lại giữa đường không giao ở đây): thiếu một con hoặc thừa một mã lạ đều bị từ chối. Ký xong, các con ngựa thành `Delivered`; đơn giao hết ngựa thì thành `Completed` ngay. **Phí chờ (R-16):** server ghi `waitingHours` / `waitingFee` vào biên bản theo luật ở mục "Không giao được" bên dưới; phí cộng vào phát sinh của đơn khi đóng chuyến. Khách nhận thông báo; khi đây là biên bản cuối cùng của chuyến đã tới đích, quản lý được báo để đóng chuyến.
 
 - **Ai gọi được:** Đoàn xe của chuyến, Admin
 - **Dữ liệu gửi lên:** `multipart/form-data` (xem mục 2.5)
@@ -8074,7 +8191,7 @@ Response `200`:
       "proofThresholdUsd": 50000
     },
     "horse": { "minAgeMonths": 6, "gestationDays": 340, "latePregnancyPercent": 90, "postFoalingDays": 7 },
-    "delivery": { "stableFeePerHorsePerDayUsd": 50, "freeWaitingHours": 2, "waitingFeePerHourUsd": 40, "maxWaitingHours": 24, "decisionHours": 24 },
+    "delivery": { "stableFeePerHorsePerDayUsd": 50, "extraKmFeeUsd": 2, "freeWaitingHours": 2, "waitingFeePerHourUsd": 40, "maxWaitingHours": 24, "decisionHours": 24 },
     "values": {
       "Policy.Version": "1.0",
       "Payment.DepositPercent": 30,
@@ -8085,6 +8202,7 @@ Response `200`:
       "Booking.QuoteAcceptDays": 3,
       "Dossier.SubmitDays": 7,
       "Stable.FeePerHorsePerDayUsd": 50,
+      "Delivery.ExtraKmFeeUsd": 2,
       "Delay.GraceHours": 6,
       "Delay.PercentPer12Hours": 5,
       "Delay.MaxPercent": 25,
@@ -8115,6 +8233,7 @@ Response `200`:
 | `booking.quoteAcceptDays` | Số ngày khách có để chấp nhận báo giá chốt và đặt cọc |
 | `booking.dossierSubmitDays` | Số ngày khách có để nộp đủ giấy tờ, tính từ lúc đặt cọc |
 | `delivery.stableFeePerHorsePerDayUsd` | Phí chuồng tạm + chăm sóc (USD / con / ngày) |
+| `delivery.extraKmFeeUsd` | Phí mỗi km thêm khi giao cho người nhận / địa chỉ khác |
 | `delay.graceHours` | Số giờ trễ được miễn bồi thường |
 | `delay.percentPer12Hours`, `delay.maxPercent` | % tiền cước bồi thường cho mỗi 12 giờ trễ sau ân hạn, và mức tối đa |
 | `insurance.premiumPercent` | % phí bảo hiểm toàn giá trị trên giá trị thỏa thuận mỗi con |
@@ -8155,6 +8274,7 @@ Response `200`:
     "quoteAcceptDays": 3,
     "dossierSubmitDays": 7,
     "stableFeePerHorsePerDayUsd": 50,
+    "deliveryExtraKmFeeUsd": 2,
     "delayGraceHours": 6,
     "delayPercentPer12Hours": 5,
     "delayMaxPercent": 25,
@@ -8190,7 +8310,7 @@ Response `200`:
 Giá trị mới áp dụng từ lúc lưu. Đơn đã đồng ý chính sách giữ phiên bản đã đồng ý. Khi đổi nội dung quy tắc, nhớ **tăng `policyVersion`** (ví dụ `1.0` → `1.1`) để các đơn mới lưu đúng phiên bản.
 
 - **Ai gọi được:** LogisticsManager, Admin
-- **Dữ liệu gửi lên:** JSON, gửi **đủ cả 20 trường** (kể cả trường không đổi)
+- **Dữ liệu gửi lên:** JSON, gửi **đủ cả 21 trường** (kể cả trường không đổi)
 
 | Trường | Kiểu | Giới hạn | Khóa cấu hình |
 |---|---|---|---|
@@ -8198,6 +8318,7 @@ Giá trị mới áp dụng từ lúc lưu. Đơn đã đồng ý chính sách g
 | `quoteAcceptDays` | số nguyên | 1 – 30 | `Booking.QuoteAcceptDays` |
 | `dossierSubmitDays` | số nguyên | 1 – 60 | `Dossier.SubmitDays` |
 | `stableFeePerHorsePerDayUsd` | số | ≥ 0 | `Stable.FeePerHorsePerDayUsd` |
+| `deliveryExtraKmFeeUsd` | số | ≥ 0 | `Delivery.ExtraKmFeeUsd` |
 | `delayGraceHours` | số nguyên | 0 – 168 | `Delay.GraceHours` |
 | `delayPercentPer12Hours` | số | 0 – 100 | `Delay.PercentPer12Hours` |
 | `delayMaxPercent` | số | 0 – 100 | `Delay.MaxPercent` |
@@ -8403,6 +8524,9 @@ Tổng cộng 121 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | Method | Đường dẫn | Việc | Ai gọi được |
 |---|---|---|---|
 | POST | `/api/trips/{tripId}/handover` | Lập biên bản bàn giao (e-POD) | Đoàn xe của chuyến, Admin |
+| POST | `/api/trips/{tripId}/bookings/{bookingId}/delivery-failed` | Ghi không giao được (vắng mặt / từ chối) | Đoàn xe của chuyến, Admin |
+| POST | `/api/bookings/{id}/delivery-decision` | Khách chọn cách xử lý khi không giao được | Customer (chủ đơn) |
+| GET | `/api/bookings/{id}/delivery-failures` | Các lần không giao được của đơn | Như xem đơn |
 | GET | `/api/trips/{tripId}/handovers` | Các biên bản bàn giao của một chuyến | Mọi nhân sự; tài xế / áp tải chỉ xem được chuyến của mình |
 | GET | `/api/bookings/{bookingId}/handovers` | Các biên bản bàn giao của một đơn | Chủ đơn; nhân sự được xem đơn đó (như `GET /api/bookings/{id}`) |
 | POST | `/api/trips/{tripId}/close` | Đóng chuyến và chốt KPI | LogisticsManager, Admin |
