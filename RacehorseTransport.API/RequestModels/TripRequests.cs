@@ -117,13 +117,6 @@ namespace RacehorseTransport.API.RequestModels
         public int DriverCount { get; set; } = 1;
     }
 
-    public class OffloadHorseRequest
-    {
-        [Required(ErrorMessage = "Reason is required.")]
-        [MaxLength(300, ErrorMessage = "Reason cannot exceed 300 characters.")]
-        public string Reason { get; set; } = string.Empty;
-    }
-
     public class ReorderCheckpointsRequest
     {
         [Required(ErrorMessage = "CheckpointIds is required.")]

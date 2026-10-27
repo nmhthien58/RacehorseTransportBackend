@@ -569,6 +569,95 @@ namespace RacehorseTransport.Services.Implementations
             return results;
         }
 
+        public async Task<decimal> GetRefundableAmountAsync(int bookingId)
+        {
+            var payments = await _paymentRepo.GetQueryable().AsNoTracking().Where(p => p.BookingId == bookingId).ToListAsync();
+            return RefundableByCharge(payments).Sum(x => x.Remaining);
+        }
+
+        public async Task<List<PaymentModel>> RefundAmountAsync(BookingRequest booking, decimal amount, string note, CurrentUser currentUser)
+        {
+            if (amount <= 0)
+            {
+                throw new BusinessException("The refund amount must be greater than 0.");
+            }
+
+            var payments = await _paymentRepo.GetQueryable().Where(p => p.BookingId == booking.BookingId).ToListAsync();
+            var refundable = RefundableByCharge(payments);
+            decimal available = refundable.Sum(x => x.Remaining);
+            if (amount > available)
+            {
+                throw new BusinessException($"Booking {booking.BookingCode} has only {available:N2} {booking.CurrencyCode} that can still be refunded; {amount:N2} is too much.");
+            }
+
+            // Khoản trả sau cùng hoàn trước (thường là phần còn lại / phát sinh)
+            var results = new List<PaymentModel>();
+            decimal left = amount;
+            foreach (var (original, remaining) in refundable.OrderByDescending(x => x.Charge.PaidAt ?? x.Charge.CreatedAt))
+            {
+                if (left <= 0)
+                {
+                    break;
+                }
+                decimal part = Math.Min(left, remaining);
+                left -= part;
+
+                var refund = await _unitOfWork.ExecuteInTransactionAsync(async () =>
+                {
+                    string code = await _codeGenerator.NextAsync(CodePrefixes.Payment);
+                    var created = new Payment
+                    {
+                        PaymentCode = code,
+                        BookingId = booking.BookingId,
+                        PaymentType = PaymentTypes.Refund,
+                        Provider = original.Provider,
+                        Status = PaymentStatuses.Pending,
+                        Amount = part,
+                        CurrencyCode = original.CurrencyCode,
+                        ExchangeRate = original.ExchangeRate,
+                        AmountVnd = ToVnd(part, original.ExchangeRate),
+                        TxnRef = code.Replace("-", string.Empty),
+                        RefundOfPaymentId = original.PaymentId,
+                        Note = $"{note} (from {original.PaymentCode})",
+                        CreatedByUserId = currentUser.UserId,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    };
+                    await _paymentRepo.AddAsync(created);
+                    return created;
+                });
+                refund.RefundOf = original;
+
+                if (original.Provider != PaymentProviders.Manual)
+                {
+                    await CallRefundGatewayAsync(refund, currentUser);
+                }
+                results.Add(ToModel(refund));
+            }
+
+            if (results.Any(r => r.Status != PaymentStatuses.Succeeded))
+            {
+                await _notificationService.SendToRoleAsync(
+                    UserRoles.LogisticsManager,
+                    $"Refund needs attention: {booking.BookingCode}",
+                    "A refund failed or has to be done manually. Open the booking's payments to retry or mark it as refunded.",
+                    NotificationReferenceTypes.Booking,
+                    booking.BookingId);
+            }
+            return results;
+        }
+
+        // Từng khoản đã thu thành công và số còn hoàn được của nó (trừ các dòng hoàn chưa thất bại / hết hạn)
+        private static List<(Payment Charge, decimal Remaining)> RefundableByCharge(List<Payment> payments)
+        {
+            return payments
+                .Where(p => p.Status == PaymentStatuses.Succeeded && PaymentTypes.Charges.Contains(p.PaymentType))
+                .Select(charge => (Charge: charge, Remaining: charge.Amount - payments
+                    .Where(r => r.RefundOfPaymentId == charge.PaymentId && r.Status != PaymentStatuses.Failed && r.Status != PaymentStatuses.Expired)
+                    .Sum(r => r.Amount)))
+                .Where(x => x.Remaining > 0)
+                .ToList();
+        }
+
         public async Task<PaymentModel> RetryRefundAsync(int refundPaymentId, CurrentUser currentUser)
         {
             var refund = await GetOpenRefundAsync(refundPaymentId);
