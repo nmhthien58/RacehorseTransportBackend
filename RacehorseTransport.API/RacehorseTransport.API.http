@@ -553,6 +553,70 @@ Content-Type: application/json
 }
 
 ### =====================================================================
+### BE-04 · Tuyến dự kiến của đơn (đổi 4 thành mã đơn đang PreApproved, 3 thành routePlanId)
+### =====================================================================
+
+### [ĐÚNG] Manager duyệt sơ bộ (đơn -> PreApproved, chưa thu cọc)
+POST {{baseUrl}}/api/bookings/4/approve
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "specialistUserId": 16
+}
+
+### [ĐÚNG] Coordinator tính thử tuyến (không lưu)
+POST {{baseUrl}}/api/bookings/4/route-plans/preview
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "stops": [
+    { "name": "Trạm nghỉ Lạng Sơn", "stopType": "RestStop", "address": "TP Lạng Sơn", "lat": 21.8537, "lng": 106.7615, "countryCode": "VN", "restMinutes": 60 },
+    { "name": "Cửa khẩu Hữu Nghị", "stopType": "BorderGate", "address": "Đồng Đăng, Cao Lộc, Lạng Sơn", "lat": 21.9749, "lng": 106.7064, "restMinutes": 120 }
+  ]
+}
+
+### [ĐÚNG] Tạo bản nháp đi thẳng (sẽ có cảnh báo thiếu cửa khẩu nếu đổi nước)
+POST {{baseUrl}}/api/bookings/4/route-plans
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "stops": [],
+  "notes": "Đi thẳng"
+}
+
+### [SAI - 400] Trình khi còn cảnh báo cửa khẩu
+POST {{baseUrl}}/api/route-plans/3/submit
+Authorization: Bearer {{coordinatorToken}}
+
+### [ĐÚNG] Sửa thêm cửa khẩu rồi trình
+PUT {{baseUrl}}/api/route-plans/3
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "stops": [
+    { "name": "Cửa khẩu Hữu Nghị", "stopType": "BorderGate", "address": "Đồng Đăng, Cao Lộc, Lạng Sơn", "lat": 21.9749, "lng": 106.7064, "restMinutes": 120 }
+  ],
+  "notes": "Qua Hữu Nghị"
+}
+
+### [ĐÚNG] Manager duyệt tuyến (đơn -> RoutePlanned)
+POST {{baseUrl}}/api/route-plans/3/approve
+Authorization: Bearer {{managerToken}}
+
+### [ĐÚNG] Manager từ chối tuyến
+POST {{baseUrl}}/api/route-plans/3/reject
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "reason": "Thêm trạm nghỉ trước cửa khẩu"
+}
+
+### =====================================================================
 ### B-05 · Hộp thông báo
 ### =====================================================================
 

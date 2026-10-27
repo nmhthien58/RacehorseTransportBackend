@@ -18,6 +18,7 @@ Tài liệu này hướng dẫn gọi API của hệ thống vận chuyển ng�
 6. [Ngựa](#6-ngựa)
 6b. [Bản đồ: tìm địa chỉ, chỉ đường](#6b-bản-đồ-tìm-địa-chỉ-chỉ-đường)
 7. [Flow 1 – Đơn vận chuyển](#7-flow-1--đơn-vận-chuyển)
+7b. [Tuyến dự kiến của đơn](#7b-tuyến-dự-kiến-của-đơn)
 8. [Flow 2 – Hồ sơ kiểm dịch](#8-flow-2--hồ-sơ-kiểm-dịch)
 9. [Flow 3 – Lập kế hoạch chuyến](#9-flow-3--lập-kế-hoạch-chuyến)
 10. [Flow 4 – Chạy chuyến và theo dõi](#10-flow-4--chạy-chuyến-và-theo-dõi)
@@ -411,7 +412,7 @@ Các trường dưới đây chỉ nhận đúng những giá trị liệt kê, 
 
 | Trường | Giá trị và ý nghĩa |
 |---|---|
-| Trạng thái đơn (`status`) | `Submitted` chờ duyệt · `AwaitingDeposit` đã duyệt, chờ khách đặt cọc · `Approved` đã cọc, đang làm hồ sơ · `Assigned` đã xếp chuyến · `AwaitingFinalPayment` giao xong nhưng còn chi phí phát sinh chưa trả · `Completed` hoàn tất · `Rejected` bị từ chối · `Expired` quá hạn duyệt hoặc quá hạn đặt cọc · `Cancelled` khách hủy |
+| Trạng thái đơn (`status`) | `Submitted` chờ duyệt · `PreApproved` đã duyệt sơ bộ, công ty đang lập tuyến · `RoutePlanned` đã duyệt tuyến, chờ báo giá chốt · `AwaitingDeposit` chờ khách đặt cọc · `Approved` đã cọc, đang làm hồ sơ · `Assigned` đã xếp chuyến · `AwaitingFinalPayment` giao xong nhưng còn chi phí phát sinh chưa trả · `Completed` hoàn tất · `Rejected` bị từ chối · `Expired` quá hạn duyệt hoặc quá hạn đặt cọc · `Cancelled` khách hủy |
 | `paymentType` (mục 19) | `Deposit` đặt cọc · `Balance` phần còn lại · `Extra` phát sinh · `Refund` hoàn tiền |
 | Trạng thái giao dịch (mục 19) | `Pending` đang chờ cổng · `Succeeded` thành công · `Failed` thất bại · `Expired` link bị thay |
 | `provider` (mục 19) | `VnPay` · `Mock` cổng giả lập · `Manual` ghi nhận tay |
@@ -431,6 +432,8 @@ Các trường dưới đây chỉ nhận đúng những giá trị liệt kê, 
 | `stressLevel` | `Calm` bình tĩnh · `MildStress` hơi căng thẳng · `Agitated` kích động |
 | `incidentType` (loại sự cố) | `MechanicalBreakdown` hỏng xe · `BorderCongestion` tắc biên · `EquineHealthIssue` sức khỏe ngựa · `Weather` thời tiết · `ClimateControlFailure` hỏng điều hòa · `CustomsHold` bị giữ ở hải quan · `Other` khác |
 | `severity` (mức độ sự cố) | `Minor` nhẹ · `Moderate` vừa · `Major` nặng · `Critical` nghiêm trọng |
+| Trạng thái tuyến dự kiến (`routePlan.status`) | `Draft` bản nháp · `Submitted` chờ duyệt · `Approved` tuyến hiệu lực của đơn · `Rejected` bị từ chối, sửa rồi trình lại · `Superseded` bản đã duyệt nhưng bị thay bằng bản mới |
+| Loại mốc của tuyến dự kiến (`stopType`) | `Origin` điểm đón (lấy từ đơn) · `RestStop` trạm nghỉ · `BorderGate` cửa khẩu · `Destination` điểm trả (lấy từ đơn) |
 | Trạng thái sự cố | `Reported` mới báo · `PlanProposed` đã có phương án chờ duyệt · `Approved` phương án được duyệt · `Rejected` phương án bị từ chối · `Resolved` đã xử lý xong |
 | `overallCondition` (tình trạng khi bàn giao) | `Excellent` tốt · `NormalFatigue` mệt bình thường · `Injured` bị thương |
 | `onTimeStatus` (kết quả đúng giờ của chuyến) | `OnTime` đúng giờ · `Delayed_AcceptableForceMajeure` trễ do bất khả kháng · `Delayed_OperationalFault` trễ do lỗi vận hành |
@@ -1673,18 +1676,21 @@ import { MapContainer, TileLayer, Polyline } from "react-leaflet";
 
 ## 7. Flow 1 – Đơn vận chuyển
 
-Khách hàng gửi một **đơn vận chuyển** (booking) cho một hoặc nhiều con ngựa. Quản lý duyệt hoặc từ chối. Khi duyệt, quản lý chọn một chuyên viên thủ tục phụ trách; đơn chuyển sang chờ khách **đặt cọc** (mục 19). Khi khách cọc xong, hệ thống tự mở một hồ sơ kiểm dịch cho mỗi con ngựa (Flow 2).
+Khách hàng gửi một **đơn vận chuyển** (booking) cho một hoặc nhiều con ngựa, kèm **khoảng giá ước tính**. Quản lý **duyệt sơ bộ** (đơn khả thi) và chọn chuyên viên thủ tục phụ trách; điều phối viên **lập tuyến dự kiến** trên bản đồ (mục 7b); quản lý **duyệt tuyến**; sau đó khách nhận **báo giá chốt**, chấp nhận và **đặt cọc** (mục 19). Khi khách cọc xong, hệ thống tự mở một hồ sơ kiểm dịch cho mỗi con ngựa (Flow 2).
 
 Vòng đời của một đơn:
 
 ```
-Submitted ──(quản lý duyệt)──> AwaitingDeposit ──(khách cọc)──> Approved ──(xếp chuyến)──> Assigned ──(giao xong)──> Completed
-    │                              │                                                              │
-    │                              └─(quá hạn không cọc)─> Expired                                └─(còn phát sinh)─> AwaitingFinalPayment ─(trả xong)─> Completed
-    ├──(quản lý từ chối)──────────> Rejected
-    ├──(khách hủy, trước khi lên chuyến)──> Cancelled   (đã trả tiền thì tự hoàn, xem mục 19)
-    └──(quá 48 giờ không ai duyệt)────────> Expired
+Submitted ──(quản lý duyệt sơ bộ)──> PreApproved ──(điều phối lập tuyến, quản lý duyệt tuyến)──> RoutePlanned
+    ──(báo giá chốt, khách chấp nhận)──> AwaitingDeposit ──(khách cọc)──> Approved ──(xếp chuyến)──> Assigned ──(giao xong)──> Completed
+                                              │                                                                  │
+                                              └─(quá hạn không cọc)─> Expired                                    └─(còn phát sinh)─> AwaitingFinalPayment ─(trả xong)─> Completed
+Submitted / PreApproved / RoutePlanned ──(quản lý từ chối)──> Rejected
+Mọi trạng thái trước khi lên chuyến ──(khách hủy)──> Cancelled   (đã trả tiền thì tự hoàn, xem mục 19)
+Submitted ──(quá 48 giờ không ai duyệt)──> Expired
 ```
+
+Bước "báo giá chốt, khách chấp nhận" là phần BE-05 (đang làm); trong lúc chưa có, đơn dừng ở `RoutePlanned`.
 
 Thứ tự gọi thông thường:
 
@@ -1692,8 +1698,9 @@ Thứ tự gọi thông thường:
 2. Khách: `POST /api/bookings/quote-preview` để xem giá (gọi lại mỗi khi khách đổi lựa chọn).
 3. Khách: `POST /api/bookings` để gửi đơn.
 4. Quản lý: `GET /api/bookings?status=Submitted` để xem đơn chờ duyệt, `GET /api/users/staff?role=TransportSpecialist` để lấy danh sách chuyên viên.
-5. Quản lý: `POST /api/bookings/{id}/approve` hoặc `POST /api/bookings/{id}/reject`.
-6. Khách: `GET /api/bookings/{id}/payments` rồi `POST /api/bookings/{id}/payments` để đặt cọc qua VNPay (mục 19).
+5. Quản lý: `POST /api/bookings/{id}/approve` (duyệt sơ bộ) hoặc `POST /api/bookings/{id}/reject`.
+6. Điều phối: `GET /api/bookings?status=PreApproved` rồi lập tuyến (mục 7b) và trình; quản lý duyệt tuyến.
+7. Khách: nhận báo giá chốt, chấp nhận, rồi `GET /api/bookings/{id}/payments` và `POST /api/bookings/{id}/payments` để đặt cọc qua VNPay (mục 19).
 
 Ai thấy đơn nào: khách thấy đơn của mình; chuyên viên thấy đơn mình phụ trách; `LogisticsManager`, `FleetCoordinator`, `Admin` thấy tất cả; tài xế không xem đơn (gọi vào nhận 403).
 
@@ -2285,9 +2292,9 @@ Lỗi thường gặp:
 | 400 | `Horses of this booking are already planned on trip TRP-2026-0003. Please contact the logistics team to cancel.` | Ngựa đã được xếp lên chuyến |
 | 403 | `You can only cancel your own bookings.` | Hủy đơn của người khác |
 
-### POST /api/bookings/{id}/approve — Duyệt đơn
+### POST /api/bookings/{id}/approve — Duyệt sơ bộ đơn
 
-Duyệt một đơn đang `Submitted` và chọn chuyên viên phụ trách. Đơn chuyển sang `AwaitingDeposit` và chốt `% cọc` hiện tại trong cấu hình; khách được báo để đặt cọc. Khi khách cọc đủ, đơn chuyển `Approved`, hệ thống mở một hồ sơ kiểm dịch cho mỗi con ngựa và báo chuyên viên. Nếu cấu hình `% cọc = 0`, đơn chuyển thẳng `Approved` ngay khi duyệt. Không cọc trong thời hạn thì đơn tự chuyển `Expired`.
+**Đổi từ R-10:** đây là bước **duyệt sơ bộ** (đơn khả thi), chưa thu cọc. Duyệt một đơn đang `Submitted` và chọn chuyên viên phụ trách. Đơn chuyển sang `PreApproved`; khách nhận thông báo "đang lập tuyến, chưa phải thanh toán"; các điều phối viên nhận thông báo cần lập tuyến (mục 7b). Cọc chỉ thu sau khi khách chấp nhận báo giá chốt.
 
 - **Ai gọi được:** LogisticsManager, Admin
 - **Dữ liệu gửi lên:** JSON
@@ -2312,7 +2319,7 @@ Ví dụ request:
 }
 ```
 
-Response `200`: `data` là chi tiết đơn với `status` là `AwaitingDeposit` (hoặc `Approved` kèm `dossierId` cho từng ngựa nếu `% cọc = 0`); trường `payment.nextPaymentType` là `Deposit`.
+Response `200`: `data` là chi tiết đơn với `status` là `PreApproved` và `assignedSpecialistName` là chuyên viên vừa chọn.
 
 Lỗi thường gặp:
 
@@ -2320,7 +2327,7 @@ Lỗi thường gặp:
 |---|---|---|
 | 400 | `Only a Submitted booking can be approved (current status: ...).` | Đơn không còn ở trạng thái chờ duyệt |
 | 400 | `User with ID 9 is not an active transport specialist.` | Người được chọn không phải chuyên viên, hoặc đã bị khóa |
-| 400 | `This booking can no longer be approved: its pickup window ends on ... on this route need about 26 days ...` | Duyệt quá muộn: khoảng pickup không còn đủ thời gian đặt cọc + làm hồ sơ của tuyến + xếp chuyến. Từ chối và nhờ khách đặt lại khoảng ngày muộn hơn |
+| 400 | `This booking can no longer be approved: its pickup window ends on ... on this route need about 26 days ...` | Duyệt quá muộn: khoảng pickup không còn đủ thời gian lập tuyến, đặt cọc, làm hồ sơ của tuyến và xếp chuyến. Từ chối và nhờ khách đặt lại khoảng ngày muộn hơn |
 
 ### PUT /api/bookings/{id}/horse-values — Chốt giá trị thỏa thuận từng con
 
@@ -2330,7 +2337,7 @@ Khách nhận thông báo liệt kê các con có giá trị thay đổi (kèm g
 
 - **Ai gọi được:** LogisticsManager, Admin
 - **Dữ liệu gửi lên:** JSON
-- **Khi nào:** đơn đang `Submitted` (trước khi gửi báo giá)
+- **Khi nào:** đơn đang `Submitted`, `PreApproved` hoặc `RoutePlanned` (trước khi gửi báo giá)
 
 Tham số trên đường dẫn:
 
@@ -2420,7 +2427,7 @@ Lỗi thường gặp:
 
 ### POST /api/bookings/{id}/reject — Từ chối đơn
 
-Từ chối một đơn đang `Submitted`, bắt buộc ghi lý do. Khách nhận thông báo kèm lý do.
+Từ chối một đơn chưa gửi báo giá (`Submitted`, `PreApproved` hoặc `RoutePlanned`, ví dụ không lập được tuyến khả thi), bắt buộc ghi lý do. Khách nhận thông báo kèm lý do.
 
 - **Ai gọi được:** LogisticsManager, Admin
 - **Dữ liệu gửi lên:** JSON
@@ -2482,6 +2489,176 @@ Lỗi thường gặp:
 |---|---|---|
 | 400 | `The specialist can only be changed on an approved booking (current status: ...).` | Đơn chưa duyệt hoặc đã kết thúc |
 | 400 | `... is already the specialist of this booking.` | Chọn lại đúng người đang phụ trách |
+
+---
+
+## 7b. Tuyến dự kiến của đơn
+
+Sau khi đơn được **duyệt sơ bộ** (`PreApproved`), điều phối viên **lập tuyến dự kiến** trên bản đồ: điểm đón và điểm trả lấy từ đơn (không sửa được), điều phối thêm các **trạm nghỉ** và **cửa khẩu** theo thứ tự đi. Hệ thống tính quãng đường và thời gian từng chặng, tự suy ra **các nước quá cảnh**, và **cảnh báo** chặng nào đổi nước mà thiếu mốc cửa khẩu. Quản lý **duyệt** hoặc **từ chối** (kèm lý do). Duyệt xong, tuyến thành tuyến hiệu lực của đơn: nước quá cảnh, quãng đường, thời gian vận chuyển của đơn lấy theo tuyến; đơn chuyển `RoutePlanned`. Khi xếp chuyến, các mốc của tuyến này được chép sang lộ trình của chuyến (BE-07).
+
+Một đơn có thể có nhiều **phiên bản** tuyến (`version` 1, 2, ...) nhưng chỉ một bản `Approved` hiệu lực; khi duyệt bản mới, bản cũ thành `Superseded`.
+
+Vòng đời:
+
+```
+Draft ──(trình)──> Submitted ──(quản lý duyệt)──> Approved ──(có bản mới được duyệt)──> Superseded
+  ▲                    │
+  │                    └──(quản lý từ chối)──> Rejected
+  └────────(sửa)────────────────────────────────┘
+```
+
+**Quy tắc cửa khẩu.** Mỗi lần qua biên giới phải có một mốc `BorderGate`. Hệ thống tra các nước dọc từng chặng: chặng thường chỉ được ở trong 1 nước; chặng có một đầu là cửa khẩu được qua 2 nước; chặng nối hai cửa khẩu được qua 3 nước. Vượt quá thì có cảnh báo (`warnings`) và **không trình được**. Hiện cảnh báo ngay tại đoạn đường liên quan (`fromIndex` → `toIndex` là vị trí trong `stops`).
+
+**Thời gian chờ.** Lần đầu tính một tuyến mới mất vài giây đến vài chục giây (tra nước dọc đường, 1 lượt / giây); sửa lại các mốc gần đó thì nhanh vì có bộ nhớ đệm. Nên gọi `preview` khi người dùng **thả** ghim / bấm "Tính lại", không gọi theo từng lần kéo.
+
+Thứ tự gọi thông thường:
+
+1. Điều phối: `GET /api/bookings?status=PreApproved` để xem đơn cần lập tuyến.
+2. Điều phối: `POST /api/bookings/{bookingId}/route-plans/preview` mỗi khi thêm / kéo / xóa mốc để vẽ lại và xem cảnh báo.
+3. Điều phối: `POST /api/bookings/{bookingId}/route-plans` để lưu bản nháp (hoặc `PUT /api/route-plans/{id}` để sửa), rồi `POST /api/route-plans/{id}/submit`.
+4. Quản lý: `POST /api/route-plans/{id}/approve` hoặc `/reject`.
+5. Bị từ chối: điều phối xem `rejectionReason`, sửa bằng `PUT` rồi trình lại.
+
+Một tuyến (`routePlan`) có dạng:
+
+```json
+{
+  "routePlanId": 3,
+  "bookingId": 4,
+  "bookingCode": "BKG-2026-0004",
+  "version": 1,
+  "status": "Approved",
+  "stops": [
+    { "sequenceOrder": 1, "name": "Pickup", "stopType": "Origin", "address": "Ba Vì, Hà Nội", "lat": 21.0285, "lng": 105.8542, "countryCode": "VN", "distanceKmFromPrevious": null, "durationHoursFromPrevious": null, "restMinutes": 0 },
+    { "sequenceOrder": 2, "name": "Trạm nghỉ Lạng Sơn", "stopType": "RestStop", "address": "TP Lạng Sơn", "lat": 21.8537, "lng": 106.7615, "countryCode": "VN", "distanceKmFromPrevious": 153.73, "durationHoursFromPrevious": 2.31, "restMinutes": 60 },
+    { "sequenceOrder": 3, "name": "Cửa khẩu Hữu Nghị", "stopType": "BorderGate", "address": "Đồng Đăng, Cao Lộc, Lạng Sơn", "lat": 21.9749, "lng": 106.7064, "countryCode": "CN", "distanceKmFromPrevious": 21.76, "durationHoursFromPrevious": 0.42, "restMinutes": 120 },
+    { "sequenceOrder": 4, "name": "Drop-off", "stopType": "Destination", "address": "Nanning", "lat": 22.817, "lng": 108.3665, "countryCode": "CN", "distanceKmFromPrevious": 215.47, "durationHoursFromPrevious": 2.95, "restMinutes": 0 }
+  ],
+  "transitCountryCodes": [],
+  "totalDistanceKm": 390.96,
+  "estimatedHours": 15.8,
+  "isEstimate": false,
+  "polyline": [[21.0285, 105.8542], [21.0301, 105.8577], [22.817, 108.3665]],
+  "warnings": [],
+  "notes": "Qua Hữu Nghị",
+  "plannedByUserId": 17,
+  "plannedByName": "Fleet Coordinator",
+  "reviewedByName": "Logistics Manager",
+  "reviewedAt": "2026-10-27T08:30:12.415+00:00",
+  "rejectionReason": null,
+  "createdAt": "2026-10-27T08:28:02.110+00:00",
+  "updatedAt": "2026-10-27T08:30:12.415+00:00"
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `version`, `status` | Phiên bản và trạng thái tuyến (mục 3) |
+| `stops[]` | Các mốc theo thứ tự đi: mốc đầu `Origin` và mốc cuối `Destination` lấy từ đơn |
+| `stops[].countryCode` | Nước của mốc (mốc cửa khẩu có thể tra ra nước bên kia biên giới) |
+| `stops[].distanceKmFromPrevious`, `durationHoursFromPrevious` | Quãng đường (km) và thời gian lái (giờ) của chặng từ mốc trước tới mốc này; dùng làm nhãn trên đoạn đường |
+| `stops[].restMinutes` | Thời gian nghỉ bắt buộc tại mốc (phút) |
+| `transitCountryCodes` | Nước quá cảnh suy ra từ tuyến (bỏ nước đi và nước đến), theo thứ tự |
+| `totalDistanceKm`, `estimatedHours` | Tổng quãng đường và thời gian vận chuyển dự kiến (đã gồm nghỉ, qua cửa khẩu) |
+| `isEstimate` | `true` khi có chặng tính theo đường chim bay (nhà cung cấp bản đồ lỗi) |
+| `polyline` | Đường vẽ cả tuyến: mảng `[vĩ độ, kinh độ]` |
+| `warnings[]` | Cảnh báo cửa khẩu (chỉ có trong kết quả `preview`, tạo, sửa): `fromIndex`, `toIndex`, `countryCodes`, `message`. Còn cảnh báo thì không trình được |
+| `rejectionReason` | Lý do lần từ chối gần nhất |
+
+### GET /api/bookings/{bookingId}/route-plans — Các phiên bản tuyến của đơn
+
+- **Ai gọi được:** nhân sự xem được đơn (mọi phiên bản); khách của đơn (chỉ tuyến `Approved`, để vẽ trên trang báo giá)
+
+Response `200`: `data` là mảng tuyến, phiên bản mới nhất trước.
+
+### GET /api/route-plans/{id} — Chi tiết một tuyến
+
+- **Ai gọi được:** như trên (khách chỉ xem được tuyến `Approved`, bản khác trả 403)
+
+### POST /api/bookings/{bookingId}/route-plans/preview — Tính thử tuyến (không lưu)
+
+- **Ai gọi được:** FleetCoordinator, LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON, giống body của tạo tuyến bên dưới
+
+Response `200`: `data` là tuyến đã tính (`routePlanId = 0`, `status = Draft`), có `warnings`.
+
+### POST /api/bookings/{bookingId}/route-plans — Tạo bản nháp tuyến
+
+Đơn phải đang `PreApproved` (hoặc `RoutePlanned` khi cần phiên bản mới). Mỗi lúc một đơn chỉ có một bản đang soạn / chờ duyệt.
+
+- **Ai gọi được:** FleetCoordinator, Admin
+- **Dữ liệu gửi lên:** JSON
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `stops` | mảng | Không (rỗng = đi thẳng) | Các mốc **ở giữa** theo thứ tự đi, tối đa 23. Điểm đón / trả không gửi |
+| `stops[].name` | chuỗi | Có | Tên mốc, tối đa 100 ký tự |
+| `stops[].stopType` | chuỗi | Có | `RestStop` hoặc `BorderGate` |
+| `stops[].address` | chuỗi | Không | Địa chỉ (lấy từ `GET /api/geo/search` / `reverse`), tối đa 255 ký tự |
+| `stops[].lat`, `stops[].lng` | số | Có | Tọa độ |
+| `stops[].countryCode` | chuỗi | Không | Nước của mốc (từ kết quả tìm địa chỉ); gửi kèm thì khỏi tra lại |
+| `stops[].restMinutes` | số nguyên | Không | Nghỉ bắt buộc tại mốc, 0–1440 phút |
+| `notes` | chuỗi | Không | Ghi chú cho quản lý, tối đa 1000 ký tự |
+| `originLat`, `originLng`, `destinationLat`, `destinationLng` | số | Chỉ với đơn cũ chưa có tọa độ | Ghim điểm đón / trả trên bản đồ |
+
+Ví dụ request:
+
+```json
+{
+  "stops": [
+    { "name": "Trạm nghỉ Lạng Sơn", "stopType": "RestStop", "address": "TP Lạng Sơn", "lat": 21.8537, "lng": 106.7615, "countryCode": "VN", "restMinutes": 60 },
+    { "name": "Cửa khẩu Hữu Nghị", "stopType": "BorderGate", "address": "Đồng Đăng, Cao Lộc, Lạng Sơn", "lat": 21.9749, "lng": 106.7064, "restMinutes": 120 }
+  ],
+  "notes": "Qua Hữu Nghị"
+}
+```
+
+Response `201`: `data` là tuyến vừa tạo (`status = Draft`), kèm `warnings`.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `A route can only be planned after the booking passes the first review (current status: Submitted).` | Đơn chưa duyệt sơ bộ |
+| 400 | `Booking BKG-2026-0004 already has route version 1 (Draft). Edit or review that version instead of starting a new one.` | Đã có bản đang soạn / chờ duyệt |
+| 400 | `StopType 'Destination' is invalid for a stop. Allowed values: RestStop, BorderGate.` | Sai loại mốc |
+| 400 | `Booking BKG-2026-0001 has no map coordinates for its pickup / drop-off. ...` | Đơn cũ chưa có tọa độ mà không gửi `originLat` ... |
+| 400 | `Route plans are only made for ground transport.` | Đơn đường hàng không |
+
+### PUT /api/route-plans/{id} — Sửa tuyến
+
+Thay toàn bộ danh sách mốc của bản `Draft` hoặc `Rejected` (bản bị từ chối quay về `Draft`). Body giống tạo tuyến.
+
+- **Ai gọi được:** FleetCoordinator, Admin
+
+Response `200`: tuyến sau khi sửa, kèm `warnings`.
+
+### POST /api/route-plans/{id}/submit — Trình duyệt
+
+- **Ai gọi được:** FleetCoordinator, Admin
+
+Hệ thống kiểm tra lại cảnh báo cửa khẩu; còn cảnh báo thì 400. Trình xong, `status = Submitted` và các quản lý nhận thông báo.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `The route cannot be submitted yet: The leg Pickup → Drop-off crosses VN → CN without a BorderGate stop at each border; ...` | Còn chặng đổi nước thiếu cửa khẩu |
+| 400 | `Only a draft or rejected route can be submitted (current status: Submitted).` | Đã trình rồi |
+
+### POST /api/route-plans/{id}/approve — Duyệt tuyến
+
+- **Ai gọi được:** LogisticsManager, Admin
+
+Tuyến thành `Approved` (bản `Approved` cũ, nếu có, thành `Superseded`); đơn chuyển `RoutePlanned`, nước quá cảnh / quãng đường / thời gian vận chuyển của đơn lấy theo tuyến. Người lập tuyến được báo. (BE-05: hệ thống tính báo giá chốt ngay sau bước này.)
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Only a submitted route can be reviewed (current status: Draft).` | Tuyến chưa trình |
+| 403 | | Không phải quản lý / Admin |
+
+### POST /api/route-plans/{id}/reject — Từ chối tuyến
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON `{ "reason": "Thêm trạm nghỉ trước cửa khẩu" }` (bắt buộc, tối đa 500 ký tự)
+
+Tuyến thành `Rejected`, người lập nhận thông báo kèm lý do; sửa bằng `PUT` rồi trình lại.
 
 ---
 
@@ -6467,6 +6644,8 @@ Response `200`:
     ],
     "bookingStatuses": [
       "Submitted",
+      "PreApproved",
+      "RoutePlanned",
       "AwaitingDeposit",
       "Approved",
       "Assigned",
@@ -7462,9 +7641,17 @@ Tổng cộng 121 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | GET | `/api/bookings` | Danh sách đơn | Customer, LogisticsManager, TransportSpecialist, FleetCoordinator, Admin |
 | GET | `/api/bookings/{id}` | Chi tiết đơn | Như danh sách đơn |
 | POST | `/api/bookings/{id}/cancel` | Khách hủy đơn | Customer (chủ đơn) |
-| POST | `/api/bookings/{id}/approve` | Duyệt đơn | LogisticsManager, Admin |
+| POST | `/api/bookings/{id}/approve` | Duyệt sơ bộ đơn (→ `PreApproved`) | LogisticsManager, Admin |
 | PUT | `/api/bookings/{id}/horse-values` | Chốt giá trị thỏa thuận từng con trước khi báo giá | LogisticsManager, Admin |
-| POST | `/api/bookings/{id}/reject` | Từ chối đơn | LogisticsManager, Admin |
+| POST | `/api/bookings/{id}/reject` | Từ chối đơn (trước khi gửi báo giá) | LogisticsManager, Admin |
+| GET | `/api/bookings/{bookingId}/route-plans` | Các phiên bản tuyến dự kiến của đơn | Nhân sự; khách (chỉ tuyến đã duyệt) |
+| GET | `/api/route-plans/{id}` | Chi tiết một tuyến | Nhân sự; khách (chỉ tuyến đã duyệt) |
+| POST | `/api/bookings/{bookingId}/route-plans/preview` | Tính thử tuyến, không lưu | FleetCoordinator, LogisticsManager, Admin |
+| POST | `/api/bookings/{bookingId}/route-plans` | Tạo bản nháp tuyến | FleetCoordinator, Admin |
+| PUT | `/api/route-plans/{id}` | Sửa tuyến nháp / bị từ chối | FleetCoordinator, Admin |
+| POST | `/api/route-plans/{id}/submit` | Trình duyệt tuyến | FleetCoordinator, Admin |
+| POST | `/api/route-plans/{id}/approve` | Duyệt tuyến | LogisticsManager, Admin |
+| POST | `/api/route-plans/{id}/reject` | Từ chối tuyến | LogisticsManager, Admin |
 | POST | `/api/bookings/{id}/reassign-specialist` | Đổi chuyên viên phụ trách | LogisticsManager, Admin |
 
 **8. Flow 2 – Hồ sơ kiểm dịch**

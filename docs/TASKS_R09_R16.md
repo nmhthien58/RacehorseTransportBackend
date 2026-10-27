@@ -172,7 +172,9 @@ Làm:
 - Đơn mới: lưu `quote_min`, `quote_max`; `estimated_cost` để trống tới khi có báo giá chốt (BE-05). Trạng thái đầu là `Submitted` như cũ.
 - Cập nhật các test hiện có của `PricingService` cho đúng hành vi mới.
 
-### [ ] BE-04 · Tuyến dự kiến của đơn (R-10)
+### [x] BE-04 · Tuyến dự kiến của đơn (R-10)
+Đã làm: bảng `route_plans` (+ `Superseded` cho bản duyệt cũ, chỉ mục duy nhất "một bản Approved / đơn") và `route_plan_stops`; `approve` của đơn thành **duyệt sơ bộ** (`PreApproved`, chưa thu cọc, báo Coordinator); `RoutePlanService` (preview / tạo / sửa / trình / duyệt / từ chối). Quy tắc cửa khẩu: một chặng được qua tối đa 1 + (số đầu chặng là `BorderGate`) nước (`RoutePlanRules`). Duyệt tuyến: đơn `RoutePlanned`, nước quá cảnh / quãng đường / giờ vận chuyển theo tuyến; `TODO(BE-05)` tính báo giá chốt. Manager từ chối được đơn ở `PreApproved` / `RoutePlanned`; chốt giá trị ngựa mở cho cả hai trạng thái này. **Phải merge cùng BE-05** (một mình BE-04 thì đơn dừng ở `RoutePlanned`).
+
 Làm:
 - Bảng `booking.route_plans` (một đơn có nhiều phiên bản tuyến; chỉ một bản `Approved` hiệu lực): `route_plan_id`, `booking_id`, `status` (`Draft` / `Submitted` / `Approved` / `Rejected`), `transit_country_codes`, `total_distance_km`, `estimated_hours`, `planned_by_user_id`, `reviewed_by_user_id`, `reviewed_at`, `rejection_reason`, `created_at`. Bảng con `booking.route_plan_stops`: thứ tự, tên, loại (Origin / RestStop / BorderGate / Destination), địa chỉ, tọa độ, `distance_km_from_previous`, `rest_minutes`.
 - Trạng thái đơn mới: `PreApproved` (Manager duyệt sơ bộ), `RoutePlanned` (Manager đã duyệt tuyến). Luồng: `Submitted → PreApproved → RoutePlanned → Quoted …` (BE-05). Endpoint duyệt đơn hiện tại đổi thành "duyệt sơ bộ".
