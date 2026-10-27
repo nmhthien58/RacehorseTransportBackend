@@ -36,8 +36,8 @@ namespace RacehorseTransport.Services.Options
         // Giá cao nhất: quãng đường A -> B × hệ số này (tuyến chốt thường dài hơn đường ngắn nhất: vòng qua cửa khẩu, trạm nghỉ)
         public decimal QuoteRangeDistanceFactor { get; set; } = 1.25m;
 
-        // ... và cộng phí thủ tục cho thêm bấy nhiêu nước quá cảnh (tuyến đi ra nước ngoài), phòng khi tuyến chốt đi qua nước khác
-        public int QuoteExtraTransitCountries { get; set; } = 1;
+        // ... và cộng phí thủ tục quá cảnh cho các nước đường A -> B đi qua, tối đa bấy nhiêu nước (giá thấp nhất không tính phí này)
+        public int QuoteMaxTransitCountries { get; set; } = 2;
 
         // Số ngày cần tính từ lúc DUYỆT đơn tới ngày pickup, với thời gian làm hồ sơ của tuyến (R-03)
         public int ApprovalLeadDaysFor(int clearanceDays) => DepositDays + clearanceDays + PlanningBufferDays;

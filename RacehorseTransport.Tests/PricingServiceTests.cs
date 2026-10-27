@@ -302,19 +302,30 @@ public class PricingServiceTests
         Assert.Equal(500, quote.DistanceKm);
         Assert.Equal(new[] { "LA" }, quote.TransitCountryCodes);
         Assert.True(geo.Called);
-        Assert.Contains(quote.Lines, l => l.Code == "FEE_TRANSIT");
+        Assert.DoesNotContain(quote.Lines, l => l.Code == "FEE_TRANSIT"); // giá thấp nhất chưa có phí quá cảnh
         Assert.Equal(quote.Total, quote.QuoteMin);
     }
 
     [Fact]
-    public async Task QuoteRange_MaxAddsLongerDistanceAndOneReserveTransitCountry()
+    public async Task QuoteRange_MaxAddsLongerDistanceAndTransitFeesOfCountriesAlong()
     {
         var service = CreateService(geo: new FakeGeoService(500, "VN", "LA", "TH"));
 
         var quote = await service.CalculateQuoteRangeAsync(GroundInput("VN", "TH"));
 
-        // 500 km × 1,25 = 625 km: cước +250 (2 USD/km), phụ phí nhiên liệu 8% trên phần tăng +20, + 1 nước dự phòng 150
+        // 500 km × 1,25 = 625 km: cước +250 (2 USD/km), phụ phí nhiên liệu 8% trên phần tăng +20, phí quá cảnh Lào 150
         Assert.Equal(quote.QuoteMin + 250 + 20 + 150, quote.QuoteMax);
+    }
+
+    [Fact]
+    public async Task QuoteRange_MaxCountsAtMostTwoTransitCountries()
+    {
+        var service = CreateService(geo: new FakeGeoService(500, "VN", "LA", "TH", "MY", "SG"));
+
+        var quote = await service.CalculateQuoteRangeAsync(GroundInput("VN", "SG"));
+
+        Assert.Equal(new[] { "LA", "TH", "MY" }, quote.TransitCountryCodes);
+        Assert.Equal(quote.QuoteMin + 250 + 20 + 2 * 150, quote.QuoteMax);
     }
 
     [Fact]

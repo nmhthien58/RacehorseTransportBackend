@@ -164,7 +164,7 @@ Xong khi: unit test với `HttpMessageHandler` giả cho từng nhà cung cấp 
 
 
 ### [x] BE-03 · Khoảng giá ước tính khi tạo đơn (R-10)
-Đã làm: `PricingService.CalculateQuoteRangeAsync` (dùng ở `quote-preview` và tạo đơn). Có tọa độ: quãng đường + nước đi qua từ `IGeoService`; `max` = quãng đường × `Booking:QuoteRangeDistanceFactor` (1,25) + phí `FEE_TRANSIT` cho `Booking:QuoteExtraTransitCountries` (1) nước dự phòng khi đi ra nước ngoài. `transitCountryCodes` bỏ khỏi request của khách; nước tìm được ghi vào `booking_transit_countries`. Đơn lưu `quote_min`, `quote_max`; **tạm** `estimated_cost = quote_max` để luồng duyệt / cọc cũ chạy tiếp tới khi có BE-05 (`TODO(BE-05)` trong `BookingService`).
+Đã làm: `PricingService.CalculateQuoteRangeAsync` (dùng ở `quote-preview` và tạo đơn). Có tọa độ: quãng đường + nước đi qua từ `IGeoService`; `min` không có phí quá cảnh; `max` = quãng đường × `Booking:QuoteRangeDistanceFactor` (1,25) + phí `FEE_TRANSIT` cho các nước đường A→B đi qua, tối đa `Booking:QuoteMaxTransitCountries` (2). `transitCountryCodes` bỏ khỏi request của khách; nước tìm được ghi vào `booking_transit_countries`. Đơn lưu `quote_min`, `quote_max`; **tạm** `estimated_cost = quote_max` để luồng duyệt / cọc cũ chạy tiếp tới khi có BE-05 (`TODO(BE-05)` trong `BookingService`).
 
 Làm:
 - Request tạo đơn / báo giá nhận tọa độ điểm đón, trả (BE-02); **bỏ** `transitCountryCodes` khỏi request của khách (giữ cột trong DB vì tuyến sẽ ghi vào).

@@ -1731,7 +1731,7 @@ Tính **khoảng giá ước tính** cho một đơn dự kiến. Không lưu g�
 
 **Khoảng giá (R-10).** Lúc khách gửi yêu cầu, công ty chưa lập tuyến nên chỉ báo **khoảng giá** `quoteMin` → `quoteMax`; **giá chốt** gửi sau khi công ty lập tuyến (khách chưa phải thanh toán gì). Form nên hiện: "Giá ước tính: {quoteMin} – {quoteMax} USD. Giá chốt gửi sau khi công ty lập tuyến; chưa phải thanh toán."
 
-- Đường bộ, có tọa độ điểm đón / trả (`pickupLat`, `pickupLng`, `dropoffLat`, `dropoffLng` từ component bản đồ): quãng đường thật A → B và **các nước đường đi qua** lấy từ bản đồ (mục 6b). `quoteMin` = giá theo quãng đường thật; `quoteMax` = quãng đường × 1,25 + phí thủ tục thêm 1 nước quá cảnh dự phòng (tuyến đi ra nước ngoài), vì tuyến chốt có thể vòng qua cửa khẩu khác.
+- Đường bộ, có tọa độ điểm đón / trả (`pickupLat`, `pickupLng`, `dropoffLat`, `dropoffLng` từ component bản đồ): quãng đường thật A → B và **các nước đường đi qua** lấy từ bản đồ (mục 6b). `quoteMin` = giá theo quãng đường thật, **chưa có** phí quá cảnh; `quoteMax` = quãng đường × 1,25 (đi vòng, mốc nghỉ) + phí thủ tục cho các nước đường A → B đi qua (tối đa 2 nước).
 - **Khách không còn nhập nước quá cảnh** (`transitCountryCodes` bị bỏ khỏi request; gửi lên cũng bị bỏ qua). Không có tọa độ (app cũ) thì quãng đường tính như trước (`distanceKm` hoặc theo tên thành phố) và không tính nước quá cảnh.
 - Lần đầu tính một tuyến mới có thể mất **10–40 giây** (phải tra nước theo từng đoạn đường, nhà cung cấp chỉ cho 1 lượt / giây); các lần sau trả về ngay. Nên hiện vòng xoay "Đang tính giá..." và tránh gọi lại khi người dùng chưa đổi điểm.
 - Đường hàng không: `quoteMin` = `quoteMax`.
@@ -1863,7 +1863,7 @@ Response `200` — phần `data`:
 | Trường | Ý nghĩa |
 |---|---|
 | `lines[]` | Các dòng của bảng giá: `name` (tên hiển thị), `quantity`, `unitPrice`, `amount` (thành tiền). Dòng có `amount` âm là chiết khấu |
-| `total` | Tổng tiền theo quãng đường thật (bằng `quoteMin`) |
+| `total` | Tổng tiền theo quãng đường thật, chưa có phí quá cảnh (bằng `quoteMin`) |
 | `quoteMin`, `quoteMax` | **Khoảng giá ước tính** để hiện cho khách (xem đầu mục) |
 | `routeIsEstimate` | `true` khi nhà cung cấp bản đồ lỗi và quãng đường là ước tính theo đường chim bay; nên ghi chú "quãng đường ước tính" |
 | `currencyCode` | Đơn vị tiền (`USD`) |

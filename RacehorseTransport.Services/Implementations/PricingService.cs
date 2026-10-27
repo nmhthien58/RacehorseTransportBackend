@@ -54,8 +54,8 @@ namespace RacehorseTransport.Services.Implementations
         // R-10: khoảng giá ước tính khi khách tạo đơn / xem giá.
         //   Có tọa độ (đường bộ): quãng đường thật A -> B và các nước đường đi qua lấy từ bản đồ (BE-01);
         //   nước quá cảnh khách tự nhập không còn dùng.
-        //   min = giá theo quãng đường thật; max = quãng đường × QuoteRangeDistanceFactor
-        //   + phí thủ tục cho QuoteExtraTransitCountries nước dự phòng nếu tuyến đi ra nước ngoài.
+        //   min = giá theo quãng đường thật, KHÔNG có phí quá cảnh (lịch / thời gian qua cửa khẩu vẫn tính theo các nước thật);
+        //   max = quãng đường × QuoteRangeDistanceFactor + phí quá cảnh cho các nước đường A -> B đi qua (tối đa QuoteMaxTransitCountries).
         public async Task<QuoteModel> CalculateQuoteRangeAsync(QuoteInputModel input)
         {
             bool routed = false;
@@ -91,10 +91,19 @@ namespace RacehorseTransport.Services.Implementations
                 input.TransitCountryCodes = new List<string>();
             }
 
+            var detectedTransit = input.TransitCountryCodes.ToList();
             var min = await CalculateQuoteAsync(input);
             if (routed)
             {
                 min.RouteSummary = routeSummary;
+            }
+
+            // Giá thấp nhất chưa tính phí quá cảnh (tuyến chốt có thể đi thẳng qua cửa khẩu khác)
+            var transitLine = min.Lines.FirstOrDefault(l => l.Code == TransitFeeCode);
+            if (transitLine != null)
+            {
+                min.Lines.Remove(transitLine);
+                min.Total -= transitLine.Amount;
             }
 
             decimal max = min.Total;
@@ -111,7 +120,7 @@ namespace RacehorseTransport.Services.Implementations
                     PickupWindowStart = input.PickupWindowStart,
                     PickupWindowEnd = input.PickupWindowEnd,
                     DeliveryDeadline = input.DeliveryDeadline,
-                    TransitCountryCodes = min.TransitCountryCodes,
+                    TransitCountryCodes = detectedTransit.Take(Math.Max(0, _bookingOptions.QuoteMaxTransitCountries)).ToList(),
                     QuotedAt = input.QuotedAt,
                     StallClasses = input.StallClasses,
                     SkipScheduleCheck = true,
@@ -120,32 +129,10 @@ namespace RacehorseTransport.Services.Implementations
                 max = maxQuote.Total;
             }
 
-            string originCode = string.IsNullOrWhiteSpace(input.PickupCountryCode) ? "VN" : input.PickupCountryCode.Trim().ToUpperInvariant();
-            if (input.TransportMode == TransportModes.Ground && originCode != input.DropoffCountryCode.Trim().ToUpperInvariant())
-            {
-                max += await TransitReserveAsync(input.TransportMode, input.DropoffCountryCode, min.HorseCount, _bookingOptions.QuoteExtraTransitCountries);
-            }
-
             min.QuoteMin = min.Total;
             min.QuoteMax = Math.Max(max, min.Total);
             min.RouteIsEstimate = routeIsEstimate;
             return min;
-        }
-
-        // Phí thủ tục quá cảnh cho một số nước dự phòng (cùng đơn giá FEE_TRANSIT)
-        private async Task<decimal> TransitReserveAsync(string mode, string destination, int horseCount, int countries)
-        {
-            if (countries <= 0)
-            {
-                return 0;
-            }
-            var prices = await GetApplicablePricesAsync(mode, destination.Trim().ToUpperInvariant());
-            if (!prices.TryGetValue(TransitFeeCode, out var fee) || fee.Value <= 0)
-            {
-                return 0;
-            }
-            int quantity = countries * (fee.CalcType == PriceCalcTypes.PerHorse ? horseCount : 1);
-            return Round(quantity * fee.Value);
         }
 
         public async Task<QuoteModel> CalculateQuoteAsync(QuoteInputModel input)
