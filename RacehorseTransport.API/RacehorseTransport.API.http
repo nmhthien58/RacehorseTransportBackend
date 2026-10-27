@@ -472,22 +472,6 @@ Authorization: Bearer {{customerToken}}
 PATCH {{baseUrl}}/api/notifications/read-all
 
 ### =====================================================================
-### B-06 · Mẫu email
-### Không có đường dẫn API riêng. Kiểm tra 8 tệp trong Services/EmailTemplates.
-### =====================================================================
-
-### =====================================================================
-### B-07 · Danh mục giá trị enum
-### =====================================================================
-
-### [ĐÚNG] Người đã đăng nhập lấy dữ liệu cho danh sách chọn
-GET {{baseUrl}}/api/lookups/enums
-Authorization: Bearer {{customerToken}}
-
-### [SAI - 401] Không có mã truy cập
-GET {{baseUrl}}/api/lookups/enums
-
-### =====================================================================
 ### BE-17 · Chính sách dịch vụ và cấu hình
 ### =====================================================================
 
@@ -547,3 +531,19 @@ Content-Type: application/json
   "deliveryMaxWaitingHours": 24,
   "deliveryDecisionHours": 24
 }
+
+### =====================================================================
+### B-06 · Mẫu email
+### Không có đường dẫn API riêng. Kiểm tra 8 tệp trong Services/EmailTemplates.
+### =====================================================================
+
+### =====================================================================
+### B-07 · Danh mục giá trị enum
+### =====================================================================
+
+### [ĐÚNG] Người đã đăng nhập lấy dữ liệu cho danh sách chọn
+GET {{baseUrl}}/api/lookups/enums
+Authorization: Bearer {{customerToken}}
+
+### [SAI - 401] Không có mã truy cập
+GET {{baseUrl}}/api/lookups/enums
