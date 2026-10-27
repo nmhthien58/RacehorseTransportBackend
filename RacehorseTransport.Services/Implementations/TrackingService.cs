@@ -204,6 +204,9 @@ namespace RacehorseTransport.Services.Implementations
                     var myDropoff = TripRouteRules.DropoffCheckpoint(route, bookingId);
                     var eta = LiveEtaCalculator.Calculate(route, trip.OverallStatus, DateTimeOffset.UtcNow);
                     DateTimeOffset? liveDelivery = myDropoff == null ? null : eta.EstimatedArrivals[myDropoff.CheckpointId];
+                    // Biên bản ở điểm trả của đơn (biên bản giao tại chỗ của con rời chuyến không tính, R-12)
+                    bool handedOver = trip.Handovers.Any(h => h.BookingId == bookingId
+                        && (h.CheckpointId == null || h.CheckpointId == myDropoff?.CheckpointId));
                     return new TrackingTripModel
                     {
                         PickupCheckpointId = myPickup?.CheckpointId,
@@ -211,7 +214,7 @@ namespace RacehorseTransport.Services.Implementations
                         EstimatedDeliveryAt = myDropoff?.PlannedTime,
                         LiveEstimatedDeliveryAt = liveDelivery,
                         DeliveryAtRisk = liveDelivery.HasValue && liveDelivery.Value > booking.DeliveryDeadline
-                            && !trip.Handovers.Any(h => h.BookingId == bookingId),
+                            && !handedOver,
                         TripId = trip.TripId,
                         TripCode = trip.TripCode,
                         OverallStatus = trip.OverallStatus,
@@ -222,7 +225,7 @@ namespace RacehorseTransport.Services.Implementations
                         ActualStartDate = trip.ActualStartDate,
                         ActualEndDate = trip.ActualEndDate,
                         DelayMinutes = eta.DelayMinutes,
-                        HandoverCompleted = trip.Handovers.Any(h => h.BookingId == bookingId),
+                        HandoverCompleted = handedOver,
                         Checkpoints = route.Select(c =>
                         {
                             // Khách không được thấy điểm đón / trả của khách khác đi chung chuyến
@@ -268,6 +271,7 @@ namespace RacehorseTransport.Services.Implementations
                                     DeliveredAt = x.TripHorse.DeliveredAt,
                                     OffloadedAt = x.TripHorse.OffloadedAt,
                                     OffloadReason = x.TripHorse.OffloadReason,
+                                    OffloadOutcome = x.TripHorse.OffloadOutcome,
                                     LatestLog = logs.FirstOrDefault(),
                                     Logs = logs
                                 };

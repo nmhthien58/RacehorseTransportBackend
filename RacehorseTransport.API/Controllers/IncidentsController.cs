@@ -149,16 +149,17 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
-        /// Close an incident whose plan was approved. A rerouted trip goes back to InTransit.
+        /// Close an incident whose plan was approved, choosing who caused it (Company, Customer or ForceMajeure).
+        /// The cause decides who pays and whether late delivery is compensated. A rerouted trip goes back to InTransit.
         /// </summary>
         [HttpPost("{id:int}/resolve")]
         [Authorize(Roles = PlanWriteRoles)]
         [ProducesResponseType(typeof(ApiResponse<IncidentResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Resolve(int id)
+        public async Task<IActionResult> Resolve(int id, [FromBody] ResolveIncidentRequest request)
         {
-            var incident = await _incidentService.ResolveIncidentAsync(id, User.ToCurrentUser());
+            var incident = await _incidentService.ResolveIncidentAsync(id, request.FaultParty.Trim(), request.FaultNote, User.ToCurrentUser());
             return Ok(ApiResponse<IncidentResponse>.SuccessResult(incident.ToResponse(), "Incident resolved successfully"));
         }
     }
