@@ -54,6 +54,8 @@ public class CustomerStageRulesTests
     [InlineData(BookingStatuses.Rejected, CustomerStages.Closed)]
     [InlineData(BookingStatuses.Cancelled, CustomerStages.Closed)]
     [InlineData(BookingStatuses.Expired, CustomerStages.Closed)]
+    [InlineData(BookingStatuses.Quoted, CustomerStages.QuoteReady)]
+    [InlineData(BookingStatuses.QuoteExpired, CustomerStages.Closed)]
     [InlineData(BookingStatuses.AwaitingFinalPayment, CustomerStages.AwaitingPayment)]
     [InlineData(BookingStatuses.Completed, CustomerStages.Completed)]
     public void Resolve_MapsBookingStatus(string status, string expected)

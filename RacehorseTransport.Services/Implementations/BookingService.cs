@@ -18,7 +18,7 @@ namespace RacehorseTransport.Services.Implementations
         // Đơn ở các trạng thái này còn đang chạy: ngựa trong đơn chưa thể vào đơn khác trùng thời gian
         private static readonly string[] OpenStatuses =
         {
-            BookingStatuses.Submitted, BookingStatuses.PreApproved, BookingStatuses.RoutePlanned,
+            BookingStatuses.Submitted, BookingStatuses.PreApproved, BookingStatuses.RoutePlanned, BookingStatuses.Quoted,
             BookingStatuses.AwaitingDeposit, BookingStatuses.Approved, BookingStatuses.Assigned
         };
 
@@ -37,7 +37,7 @@ namespace RacehorseTransport.Services.Implementations
         // Khách tự hủy được khi đơn còn ở các trạng thái này (và ngựa chưa nằm trên chuyến nào)
         private static readonly string[] CancellableStatuses =
         {
-            BookingStatuses.Submitted, BookingStatuses.PreApproved, BookingStatuses.RoutePlanned,
+            BookingStatuses.Submitted, BookingStatuses.PreApproved, BookingStatuses.RoutePlanned, BookingStatuses.Quoted,
             BookingStatuses.AwaitingDeposit, BookingStatuses.Approved, BookingStatuses.Assigned
         };
 
@@ -260,6 +260,16 @@ namespace RacehorseTransport.Services.Implementations
 
             // R-12: tuổi tối thiểu, mang thai gần ngày đẻ, vừa đẻ (ngày theo lịch của khách)
             var policy = await _settingService.GetPolicySettingsAsync();
+
+            // R-10: khách phải đồng ý Chính sách dịch vụ đúng phiên bản hiện hành
+            if (!model.AcceptPolicy)
+            {
+                throw new BusinessException("You must accept the service policy to send a request.");
+            }
+            if (string.IsNullOrWhiteSpace(model.PolicyVersion) || model.PolicyVersion != policy.PolicyVersion)
+            {
+                throw new BusinessException($"The service policy has changed (current version {policy.PolicyVersion}). Please read the latest policy and accept it again.");
+            }
             string? ineligible = HorseEligibilityRules.Describe(
                 ownedHorses,
                 DateOnly.FromDateTime(model.PickupWindowStart.DateTime),
@@ -358,8 +368,9 @@ namespace RacehorseTransport.Services.Implementations
                     DeclaredValue = model.DeclaredValue,
                     QuoteMin = quote.QuoteMin,
                     QuoteMax = quote.QuoteMax,
-                    // TODO(BE-05): để trống tới khi có báo giá chốt. Tạm lấy giá cao nhất để luồng duyệt / cọc hiện tại vẫn chạy.
-                    EstimatedCost = quote.QuoteMax,
+                    EstimatedCost = 0, // R-10: giá chốt có sau khi duyệt tuyến (BookingQuoteService)
+                    PolicyVersion = model.PolicyVersion,
+                    PolicyAcceptedAt = DateTimeOffset.UtcNow,
                     CurrencyCode = quote.CurrencyCode,
                     QuoteBreakdown = _pricingService.SerializeLines(quote.Lines),
                     Status = BookingStatuses.Submitted,
@@ -618,7 +629,10 @@ namespace RacehorseTransport.Services.Implementations
         public async Task<BookingDetailModel> ReassignSpecialistAsync(int id, int specialistUserId, CurrentUser currentUser)
         {
             var booking = await GetTrackedBookingAsync(id);
-            if (booking.Status != BookingStatuses.AwaitingDeposit
+            if (booking.Status != BookingStatuses.PreApproved
+                && booking.Status != BookingStatuses.RoutePlanned
+                && booking.Status != BookingStatuses.Quoted
+                && booking.Status != BookingStatuses.AwaitingDeposit
                 && booking.Status != BookingStatuses.Approved
                 && booking.Status != BookingStatuses.Assigned)
             {
@@ -751,7 +765,8 @@ namespace RacehorseTransport.Services.Implementations
             var depositCutoff = DateTimeOffset.UtcNow.AddDays(-_options.DepositDays);
             var unpaid = await _bookingRepo.GetQueryable()
                 .Include(b => b.BookingHorses)
-                .Where(b => b.Status == BookingStatuses.AwaitingDeposit && b.ReviewedAt != null && b.ReviewedAt < depositCutoff)
+                // Đơn theo luồng mới (có hạn báo giá) do BookingQuoteService xử lý (-> QuoteExpired)
+                .Where(b => b.Status == BookingStatuses.AwaitingDeposit && b.QuoteExpiresAt == null && b.ReviewedAt != null && b.ReviewedAt < depositCutoff)
                 .ToListAsync();
 
             foreach (var booking in unpaid)

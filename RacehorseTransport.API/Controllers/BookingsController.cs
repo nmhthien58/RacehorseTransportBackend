@@ -19,11 +19,13 @@ namespace RacehorseTransport.API.Controllers
 
         private readonly IBookingService _bookingService;
         private readonly IPricingService _pricingService;
+        private readonly IBookingQuoteService _quoteService;
 
-        public BookingsController(IBookingService bookingService, IPricingService pricingService)
+        public BookingsController(IBookingService bookingService, IPricingService pricingService, IBookingQuoteService quoteService)
         {
             _bookingService = bookingService;
             _pricingService = pricingService;
+            _quoteService = quoteService;
         }
 
         /// <summary>
@@ -115,6 +117,36 @@ namespace RacehorseTransport.API.Controllers
         {
             var booking = await _bookingService.UpdateHorseValuesAsync(id, request.ToBusinessModel(), User.ToCurrentUser());
             return Ok(ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse(), "Agreed horse values updated successfully"));
+        }
+
+        /// <summary>
+        /// Customer accepts the final quote (with the current service policy version). The booking then waits for the deposit until the quote deadline.
+        /// </summary>
+        [HttpPost("{id:int}/accept-quote")]
+        [Authorize(Roles = UserRoles.Customer)]
+        [ProducesResponseType(typeof(ApiResponse<BookingDetailResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> AcceptQuote(int id, [FromBody] AcceptQuoteRequest request)
+        {
+            var booking = await _quoteService.AcceptQuoteAsync(id, request.AcceptPolicy, request.PolicyVersion, User.ToCurrentUser());
+            return Ok(ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse(), "Quote accepted, please pay the deposit"));
+        }
+
+        /// <summary>
+        /// Customer declines the final quote: the booking is cancelled without any fee.
+        /// </summary>
+        [HttpPost("{id:int}/decline-quote")]
+        [Authorize(Roles = UserRoles.Customer)]
+        [ProducesResponseType(typeof(ApiResponse<BookingDetailResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DeclineQuote(int id, [FromBody] DeclineQuoteRequest? request)
+        {
+            var booking = await _quoteService.DeclineQuoteAsync(id, request?.Reason, User.ToCurrentUser());
+            return Ok(ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse(), "Quote declined, the booking is cancelled"));
         }
 
         /// <summary>

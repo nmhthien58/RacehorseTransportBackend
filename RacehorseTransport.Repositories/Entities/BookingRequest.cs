@@ -20,6 +20,16 @@ namespace RacehorseTransport.Repositories.Entities
         // R-10: khoảng giá ước tính lúc tạo đơn (giá chốt nằm ở EstimatedCost sau khi lập tuyến)
         public decimal? QuoteMin { get; set; }
         public decimal? QuoteMax { get; set; }
+
+        // R-10: báo giá chốt gửi sau khi duyệt tuyến; khách chấp nhận trong hạn rồi đặt cọc
+        public DateTimeOffset? QuotedAt { get; set; }
+        public DateTimeOffset? QuoteExpiresAt { get; set; }        // hạn chấp nhận + đặt cọc
+        public DateTimeOffset? QuoteReminderSentAt { get; set; }   // đã gửi email nhắc sắp hết hạn
+        public DateTimeOffset? QuoteAcceptedAt { get; set; }
+
+        // Phiên bản Chính sách dịch vụ khách đã đồng ý (lúc gửi đơn, cập nhật lại lúc chấp nhận báo giá)
+        public string? PolicyVersion { get; set; }
+        public DateTimeOffset? PolicyAcceptedAt { get; set; }
         // Khoảng ngày ngựa sẵn sàng được đón và hạn giao trễ nhất; ngày chạy thật nằm ở chuyến
         public DateTimeOffset PickupWindowStart { get; set; }
         public DateTimeOffset PickupWindowEnd { get; set; }

@@ -73,6 +73,12 @@ namespace RacehorseTransport.API.RequestModels
         [MaxLength(2000, ErrorMessage = "SpecialInstructions cannot exceed 2000 characters.")]
         public string? SpecialInstructions { get; set; }
 
+        // R-10: bắt buộc tích "Tôi đồng ý với Chính sách dịch vụ" và gửi phiên bản đang hiển thị (GET /api/policy)
+        public bool AcceptPolicy { get; set; }
+
+        [MaxLength(20, ErrorMessage = "PolicyVersion cannot exceed 20 characters.")]
+        public string? PolicyVersion { get; set; }
+
         // R-10 / R-11: tọa độ điểm đón / trả chọn trên bản đồ (GET /api/geo/search, /reverse).
         // Gửi đủ 4 số thì quãng đường và các nước đi qua lấy từ bản đồ; bỏ trống thì tính như trước.
         [Range(-90, 90, ErrorMessage = "PickupLat must be between -90 and 90.")]
@@ -113,6 +119,22 @@ namespace RacehorseTransport.API.RequestModels
 
         // None (mặc định) | Full
         public string? InsurancePlan { get; set; }
+    }
+
+    // R-10: khách chấp nhận báo giá chốt (đồng ý Chính sách dịch vụ đúng phiên bản hiện hành)
+    public class AcceptQuoteRequest
+    {
+        public bool AcceptPolicy { get; set; }
+
+        [Required(ErrorMessage = "PolicyVersion is required.")]
+        [MaxLength(20, ErrorMessage = "PolicyVersion cannot exceed 20 characters.")]
+        public string PolicyVersion { get; set; } = string.Empty;
+    }
+
+    public class DeclineQuoteRequest
+    {
+        [MaxLength(500, ErrorMessage = "Reason cannot exceed 500 characters.")]
+        public string? Reason { get; set; }
     }
 
     // BE-09: Manager chốt giá trị thỏa thuận từng con trước khi gửi báo giá

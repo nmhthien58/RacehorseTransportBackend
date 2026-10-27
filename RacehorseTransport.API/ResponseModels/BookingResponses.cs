@@ -89,6 +89,13 @@ namespace RacehorseTransport.API.ResponseModels
 
     public class BookingDetailResponse : BookingSummaryResponse
     {
+        // R-10: báo giá chốt (estimatedCost + quoteLines) gửi lúc quotedAt; khách chấp nhận + cọc trước quoteExpiresAt
+        public DateTimeOffset? QuotedAt { get; set; }
+        public DateTimeOffset? QuoteExpiresAt { get; set; }
+        public DateTimeOffset? QuoteAcceptedAt { get; set; }
+        public string? PolicyVersion { get; set; }
+        public DateTimeOffset? PolicyAcceptedAt { get; set; }
+
         public string? CustomerEmail { get; set; }
         public string? CustomerPhone { get; set; }
         public string? SpecialInstructions { get; set; }

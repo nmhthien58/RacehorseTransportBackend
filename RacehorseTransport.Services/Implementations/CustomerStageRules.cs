@@ -28,11 +28,14 @@ namespace RacehorseTransport.Services.Implementations
                 case BookingStatuses.PreApproved:
                 case BookingStatuses.RoutePlanned:
                     return CustomerStages.PendingReview;
+                case BookingStatuses.Quoted:
+                    return CustomerStages.QuoteReady;
                 case BookingStatuses.AwaitingDeposit:
                     return CustomerStages.AwaitingDeposit;
                 case BookingStatuses.Rejected:
                 case BookingStatuses.Cancelled:
                 case BookingStatuses.Expired:
+                case BookingStatuses.QuoteExpired:
                     return CustomerStages.Closed;
                 case BookingStatuses.AwaitingFinalPayment:
                     return CustomerStages.AwaitingPayment;
