@@ -145,6 +145,13 @@ CREATE TABLE booking.booking_horses (
         CONSTRAINT ck_booking_horses_status CHECK (status IN ('Pending', 'Approved', 'Cancelled')),
     stall_class       varchar(10) NOT NULL DEFAULT 'Shared' -- Hạng chuồng (hệ số nhân cước)
         CONSTRAINT ck_booking_horses_stall CHECK (stall_class IN ('Shared', 'Comfort', 'Private')),
+    -- R-12 / R-13: giá trị khách khai báo, giá trị Manager chốt (bảo hiểm / bồi thường tính trên giá trị này),
+    -- chứng từ giá trị (bắt buộc từ ngưỡng Insurance.ProofThresholdUsd), gói bảo hiểm của con ngựa
+    declared_value    numeric(18,2) CONSTRAINT ck_booking_horses_declared CHECK (declared_value >= 0),
+    agreed_value      numeric(18,2) CONSTRAINT ck_booking_horses_agreed CHECK (agreed_value >= 0),
+    value_proof_path  varchar(500),
+    insurance_plan    varchar(10) NOT NULL DEFAULT 'None'
+        CONSTRAINT ck_booking_horses_insurance CHECK (insurance_plan IN ('None', 'Full')),
     CONSTRAINT uq_booking_horses UNIQUE (booking_id, horse_id)
 );
 

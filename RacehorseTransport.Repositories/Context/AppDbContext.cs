@@ -107,6 +107,8 @@ namespace RacehorseTransport.Repositories.Context
             {
                 entity.ToTable("booking_horses", "booking");
                 entity.HasKey(e => e.BookingHorseId);
+                entity.Property(e => e.DeclaredValue).HasPrecision(18, 2);
+                entity.Property(e => e.AgreedValue).HasPrecision(18, 2);
 
                 entity.HasOne(e => e.Booking)
                       .WithMany(b => b.BookingHorses)

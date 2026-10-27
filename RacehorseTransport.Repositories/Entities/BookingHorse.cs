@@ -12,6 +12,13 @@ namespace RacehorseTransport.Repositories.Entities
         public string Status { get; set; } = BookingHorseStatuses.Pending;
         public string StallClass { get; set; } = StallClasses.Shared;
 
+        // R-12 / R-13: giá trị từng con. Khách khai báo (kèm chứng từ khi từ ngưỡng Insurance.ProofThresholdUsd),
+        // Manager chốt giá trị thỏa thuận (mặc định = giá trị khai báo); bảo hiểm và bồi thường tính trên giá trị thỏa thuận.
+        public decimal? DeclaredValue { get; set; }
+        public decimal? AgreedValue { get; set; }
+        public string? ValueProofPath { get; set; }
+        public string InsurancePlan { get; set; } = InsurancePlans.None;
+
         // Navigation properties
         public virtual BookingRequest? Booking { get; set; }
         public virtual Horse? Horse { get; set; }
