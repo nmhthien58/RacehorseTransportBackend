@@ -73,6 +73,23 @@ namespace RacehorseTransport.API.RequestModels
         [MaxLength(2000, ErrorMessage = "SpecialInstructions cannot exceed 2000 characters.")]
         public string? SpecialInstructions { get; set; }
 
+        // R-16 (BE-15): người nhận ngựa: tên + SĐT bắt buộc, hoặc RecipientIsCustomer = true (khách tự nhận)
+        public bool RecipientIsCustomer { get; set; }
+
+        [MaxLength(100, ErrorMessage = "RecipientName cannot exceed 100 characters.")]
+        public string? RecipientName { get; set; }
+
+        [MaxLength(20, ErrorMessage = "RecipientPhone cannot exceed 20 characters.")]
+        [RegularExpression(@"^\+?[0-9 .()-]{6,20}$", ErrorMessage = "RecipientPhone is not a valid phone number.")]
+        public string? RecipientPhone { get; set; }
+
+        [EmailAddress(ErrorMessage = "RecipientEmail is not a valid email address.")]
+        [MaxLength(255, ErrorMessage = "RecipientEmail cannot exceed 255 characters.")]
+        public string? RecipientEmail { get; set; }
+
+        [MaxLength(50, ErrorMessage = "RecipientIdNumber cannot exceed 50 characters.")]
+        public string? RecipientIdNumber { get; set; }
+
         // R-10: bắt buộc tích "Tôi đồng ý với Chính sách dịch vụ" và gửi phiên bản đang hiển thị (GET /api/policy)
         public bool AcceptPolicy { get; set; }
 
@@ -119,6 +136,37 @@ namespace RacehorseTransport.API.RequestModels
 
         // None (mặc định) | Full
         public string? InsurancePlan { get; set; }
+    }
+
+    // R-16 (BE-15): khách sửa người nhận
+    public class UpdateRecipientRequest
+    {
+        public bool RecipientIsCustomer { get; set; }
+
+        [MaxLength(100, ErrorMessage = "RecipientName cannot exceed 100 characters.")]
+        public string? RecipientName { get; set; }
+
+        [MaxLength(20, ErrorMessage = "RecipientPhone cannot exceed 20 characters.")]
+        [RegularExpression(@"^\+?[0-9 .()-]{6,20}$", ErrorMessage = "RecipientPhone is not a valid phone number.")]
+        public string? RecipientPhone { get; set; }
+
+        [EmailAddress(ErrorMessage = "RecipientEmail is not a valid email address.")]
+        [MaxLength(255, ErrorMessage = "RecipientEmail cannot exceed 255 characters.")]
+        public string? RecipientEmail { get; set; }
+
+        [MaxLength(50, ErrorMessage = "RecipientIdNumber cannot exceed 50 characters.")]
+        public string? RecipientIdNumber { get; set; }
+    }
+
+    // R-16 (BE-15): khách xác nhận người khác nhận thay (tên phải khớp người ký e-POD)
+    public class ApproveAlternateRecipientRequest
+    {
+        [Required(ErrorMessage = "Name is required.")]
+        [MaxLength(100, ErrorMessage = "Name cannot exceed 100 characters.")]
+        public string Name { get; set; } = string.Empty;
+
+        [MaxLength(50, ErrorMessage = "IdNumber cannot exceed 50 characters.")]
+        public string? IdNumber { get; set; }
     }
 
     // R-10 (BE-06): khách đổi điểm đón / trả (chưa trả tiền) -> lập tuyến + báo giá lại

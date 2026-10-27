@@ -290,6 +290,9 @@ Content-Type: application/json
   "pickupCountryCode": "VN",
   "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
   "dropoffCountryCode": "CN",
+  "recipientName": "Trần Thị B",
+  "recipientPhone": "0912345678",
+  "recipientEmail": "tranthib@example.com",
   "acceptPolicy": true,
   "policyVersion": "1.0",
   "pickupWindowStart": "2026-11-25T00:00:00+07:00",
@@ -748,6 +751,54 @@ Content-Type: application/json
 ### [SAI - 400] Hủy hoàn 100% khi công ty không đổi tuyến (đơn có routeChangeCancelUntil mới gọi được)
 POST {{baseUrl}}/api/bookings/2/cancel-route-change
 Authorization: Bearer {{customerToken}}
+
+### [ĐÚNG] Khách sửa người nhận ngựa
+PUT {{baseUrl}}/api/bookings/2/recipient
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "recipientName": "Trần Thị B",
+  "recipientPhone": "+84 912 345 678",
+  "recipientEmail": "tranthib@example.com",
+  "recipientIdNumber": "001190012345"
+}
+
+### [ĐÚNG] Khách tự nhận ngựa
+PUT {{baseUrl}}/api/bookings/2/recipient
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "recipientIsCustomer": true
+}
+
+### [SAI - 400] Thiếu số điện thoại người nhận
+PUT {{baseUrl}}/api/bookings/2/recipient
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "recipientName": "Trần Thị B"
+}
+
+### [ĐÚNG] Khách xác nhận người nhận sẽ có mặt
+POST {{baseUrl}}/api/bookings/2/confirm-recipient
+Authorization: Bearer {{customerToken}}
+
+### [ĐÚNG] Khách cho người khác nhận thay
+POST {{baseUrl}}/api/bookings/2/approve-alternate-recipient
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "name": "Lê Văn C",
+  "idNumber": "079088001122"
+}
+
+### [ĐÚNG] Người nhận của các đơn trên chuyến (tài xế / nhân sự)
+GET {{baseUrl}}/api/trips/1/recipients
+Authorization: Bearer {{managerToken}}
 
 ### [ĐÚNG] Điều phối nhập vận đơn hàng không (chuyến phải chở ngựa của đơn Air)
 PUT {{baseUrl}}/api/trips/1/air-waybill

@@ -134,6 +134,7 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<IDossierChecklistService>(sp => (DossierService)sp.GetRequiredService<IDossierService>());
             services.AddScoped<IDossierDeadlineService, DossierDeadlineService>();
             services.AddScoped<IBookingChangeService, BookingChangeService>();
+            services.AddScoped<IRecipientService, RecipientService>();
             services.AddScoped<IHorseService, HorseService>();
             services.AddScoped<IHorseDocumentService, HorseDocumentService>();
             services.AddSingleton<ITransitTimeEstimator, TransitTimeEstimator>();

@@ -20,6 +20,7 @@ Tài liệu này hướng dẫn gọi API của hệ thống vận chuyển ng�
 7. [Flow 1 – Đơn vận chuyển](#7-flow-1--đơn-vận-chuyển)
 7b. [Tuyến dự kiến của đơn](#7b-tuyến-dự-kiến-của-đơn)
 7c. [Hợp đồng vận chuyển](#7c-hợp-đồng-vận-chuyển)
+7d. [Người nhận ngựa](#7d-người-nhận-ngựa)
 8. [Flow 2 – Hồ sơ kiểm dịch](#8-flow-2--hồ-sơ-kiểm-dịch)
 9. [Flow 3 – Lập kế hoạch chuyến](#9-flow-3--lập-kế-hoạch-chuyến)
 10. [Flow 4 – Chạy chuyến và theo dõi](#10-flow-4--chạy-chuyến-và-theo-dõi)
@@ -1950,6 +1951,11 @@ Các trường gửi lên:
 | `specialInstructions` | chuỗi | Không | Ghi chú cho công ty, tối đa 2000 ký tự |
 | `pickupLat`, `pickupLng` | số | Không (nên gửi) | Tọa độ điểm đón chọn trên bản đồ (`GET /api/geo/search` / `reverse`). Gửi đủ 4 tọa độ thì quãng đường và các nước đi qua lấy từ bản đồ |
 | `dropoffLat`, `dropoffLng` | số | Không (nên gửi) | Tọa độ điểm trả |
+| `recipientIsCustomer` | true / false | Không | `true` = **khách tự nhận ngựa**: tên / SĐT / email lấy theo hồ sơ khách (hồ sơ phải có SĐT). Khi đó bỏ trống các trường người nhận dưới |
+| `recipientName` | chuỗi | Có nếu `recipientIsCustomer` không phải `true` | Họ tên người nhận ngựa, tối đa 100 ký tự |
+| `recipientPhone` | chuỗi | Có nếu `recipientIsCustomer` không phải `true` | SĐT người nhận (6–20 ký tự: số, dấu cách, `+ . ( ) -`). Tài xế gọi số này khi sắp tới |
+| `recipientEmail` | chuỗi | Không (nên có) | Email người nhận: hệ thống gửi email khi chuyến được lên lịch, khi xe xuất phát và khi xe sắp tới (mục 7d) |
+| `recipientIdNumber` | chuỗi | Không | CMND / CCCD / hộ chiếu để tài xế đối chiếu khi giao |
 | `acceptPolicy` | true / false | Có (phải là `true`) | Khách đã tích đồng ý Chính sách dịch vụ |
 | `policyVersion` | chuỗi | Có | Phiên bản chính sách khách đang xem, lấy từ `GET /api/policy` → `version` (ví dụ `1.0`) |
 | `horses` | mảng | Có | Ít nhất 1 phần tử, xem bảng dưới |
@@ -2070,6 +2076,8 @@ Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
+| 400 | `The recipient's name and phone number are required (or set RecipientIsCustomer = true to receive the horses yourself).` | Thiếu người nhận |
+| 400 | `Add a phone number to your profile to receive the horses yourself, or enter another recipient.` | `recipientIsCustomer = true` nhưng hồ sơ khách chưa có SĐT |
 | 400 | `You must accept the service policy to send a request.` | Không gửi `acceptPolicy = true` |
 | 400 | `The service policy has changed (current version 1.1). Please read the latest policy and accept it again.` | `policyVersion` thiếu hoặc khác phiên bản hiện hành: tải lại `GET /api/policy`, cho khách đọc và tích lại |
 | 400 | `PickupWindowStart must be on or after ...` | Chọn ngày pickup quá gần (xem mục xem giá) |
@@ -2280,6 +2288,10 @@ Ngoài các trường của danh sách, chi tiết có thêm:
 | `quotedAt`, `quoteExpiresAt` | Lúc gửi báo giá chốt và hạn chấp nhận + đặt cọc (R-10); `null` khi chưa có báo giá chốt hoặc đơn cũ |
 | `quoteAcceptedAt` | Lúc khách chấp nhận báo giá chốt |
 | `docsDueAt` | Hạn khách nộp đủ giấy tờ (BE-06); có sau khi cọc. Hiện đếm ngược trên trang đơn |
+| `recipientName`, `recipientPhone`, `recipientEmail`, `recipientIdNumber`, `recipientIsCustomer` | Người nhận ngựa (mục 7d); `null` với đơn cũ |
+| `recipientConfirmedAt` | Lúc khách xác nhận người nhận sẽ có mặt; `null` = chưa xác nhận |
+| `recipientNotifiedWindowStart`, `recipientNotifiedWindowEnd` | Khung giờ dự kiến tới điểm giao đã báo người nhận (giờ dự kiến ± 1 giờ); căn cứ tính phí chờ |
+| `alternateRecipientName`, `alternateRecipientApprovedAt` | Người nhận thay khách đã xác nhận được ký e-POD |
 | `routeChangeCancelUntil` | Có giá trị khi công ty đổi tuyến thêm nước mới: tới lúc này khách được hủy và hoàn 100% (hiện nút "Hủy và hoàn 100%") |
 | `policyVersion`, `policyAcceptedAt` | Phiên bản Chính sách dịch vụ khách đã đồng ý gần nhất (lúc gửi đơn, cập nhật lại khi chấp nhận báo giá) và thời điểm đồng ý |
 | `horses[].bookingHorseId` | Mã "ngựa trong đơn", dùng khi xếp chuyến và khi Manager chốt giá trị |
@@ -2937,6 +2949,90 @@ Chuyến chở ngựa của đơn **hàng không** (`transportMode = Air`) có t
 | 400 | `AirWaybillFilePath is not a valid uploaded file path (...)` | Đường dẫn file không do `POST /api/files` trả về |
 | 400 | `Trip TRP-2026-0001 is already Completed.` | Chuyến đã xong / đã hủy |
 | 403 | `You do not have access to this trip.` | Khách không có ngựa trên chuyến |
+
+## 7d. Người nhận ngựa
+
+Mỗi đơn có **người nhận ngựa** (Chính sách mục 10): họ tên + SĐT bắt buộc, email nên có, số giấy tờ tùy chọn; hoặc "Tôi tự nhận" (`recipientIsCustomer = true`). Khách nhập khi gửi đơn (`POST /api/bookings`) và **sửa được tới khi xe check-in điểm giao** của đơn.
+
+Hệ thống tự liên hệ người nhận (chỉ email, không SMS; người nhận không có email thì bỏ qua):
+
+| Khi nào | Email gửi người nhận |
+|---|---|
+| Quản lý duyệt chuyến chở ngựa của đơn | "Chuyến đã lên lịch": mã đơn, tên ngựa, ngày dự kiến tới, SĐT tài xế |
+| Xe xuất phát | "Xe đã xuất phát" kèm giờ dự kiến tới; hệ thống ghi **khung giờ đã báo** = giờ dự kiến ± 1 giờ (`recipientNotifiedWindowStart/End`) |
+| Xe rời mốc ngay trước điểm giao của đơn | "Xe sắp tới" kèm khung giờ mới + SĐT tài xế (khung giờ đã báo được cập nhật) |
+
+**24 giờ trước giờ dự kiến tới**, khách nhận thông báo + email nhắc **xác nhận người nhận sẽ có mặt** (`POST /api/bookings/{id}/confirm-recipient`) hoặc đổi người nhận. Đổi người nhận thì phải xác nhận lại.
+
+**Ký e-POD:** người ký (`recipientName` trong `POST /api/trips/{id}/handover`) phải là người nhận trong đơn, hoặc người khách đã cho phép nhận thay (`POST /api/bookings/{id}/approve-alternate-recipient`). So tên không phân biệt hoa thường, dấu và khoảng trắng thừa. Sai người → `400 ... is not the recipient of booking ...`. Ký xong khách nhận thông báo + email "Bàn giao thành công". Đơn cũ chưa có người nhận thì không kiểm tra.
+
+Đổi người nhận sau khi đã giao kết hợp đồng → hệ thống tạo **bản hợp đồng mới** (`reason = RecipientChanged`, mục 7c) để khách xem và chấp nhận; người nhận mới có hiệu lực ngay cho việc giao nhận.
+
+### PUT /api/bookings/{id}/recipient — Khách sửa người nhận
+
+- **Ai gọi được:** Customer (chủ đơn)
+- **Khi nào:** đơn chưa đóng và xe chưa check-in điểm giao của đơn
+- **Dữ liệu gửi lên:** JSON, cùng các trường người nhận như lúc tạo đơn
+
+```json
+{
+  "recipientIsCustomer": false,
+  "recipientName": "Trần Thị B",
+  "recipientPhone": "+84 912 345 678",
+  "recipientEmail": "tranthib@example.com",
+  "recipientIdNumber": "001190012345"
+}
+```
+
+Response `200`: `data` là chi tiết đơn với người nhận mới. Nếu chuyến đã lên lịch: người nhận mới nhận email "Chuyến đã lên lịch", đoàn xe nhận thông báo.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `The recipient's name and phone number are required (...)` | Thiếu tên / SĐT |
+| 400 | `The vehicle has already arrived at the drop-off point; the recipient can no longer be changed in the app. Please call the crew.` | Xe đã tới điểm giao |
+| 400 | `The recipient can no longer be changed (booking status: Completed).` | Đơn đã đóng |
+| 403 | `You can only manage the recipient of your own bookings.` | Đơn của khách khác |
+
+### POST /api/bookings/{id}/confirm-recipient — Xác nhận người nhận sẽ có mặt
+
+- **Ai gọi được:** Customer (chủ đơn). Không có body.
+- Response `200`: chi tiết đơn với `recipientConfirmedAt`.
+
+### POST /api/bookings/{id}/approve-alternate-recipient — Cho người khác nhận thay
+
+- **Ai gọi được:** Customer (chủ đơn)
+- **Dữ liệu gửi lên:** `{ "name": "Lê Văn C", "idNumber": "079088001122" }` (`name` bắt buộc, `idNumber` tùy chọn)
+- Response `200`: chi tiết đơn với `alternateRecipientName`, `alternateRecipientApprovedAt`. Đoàn xe nhận thông báo.
+
+### GET /api/trips/{id}/recipients — Người nhận của từng đơn trên chuyến
+
+Cho app tài xế: điền sẵn e-POD, nút gọi điện (`tel:`), xem khách đã xác nhận / người nhận thay.
+
+- **Ai gọi được:** nhân sự; tài xế chỉ chuyến mình (khách hàng nhận `403`)
+
+Response `200` — `data` là mảng:
+
+```json
+[
+  {
+    "bookingId": 1,
+    "bookingCode": "BKG-2026-0001",
+    "dropoffCheckpointId": 4,
+    "dropoffCheckpointName": "Trường đua Tùng Hóa (Đích)",
+    "recipientName": "Trần Thị B",
+    "recipientPhone": "0912345678",
+    "recipientEmail": "tranthib@example.com",
+    "recipientIdNumber": null,
+    "recipientIsCustomer": false,
+    "recipientConfirmedAt": "2026-11-19T08:00:00+00:00",
+    "alternateRecipientName": null,
+    "alternateRecipientIdNumber": null,
+    "alternateRecipientApprovedAt": null,
+    "notifiedWindowStart": "2026-11-20T09:00:00+00:00",
+    "notifiedWindowEnd": "2026-11-20T11:00:00+00:00"
+  }
+]
+```
 
 ---
 
@@ -5550,6 +5646,7 @@ Lỗi thường gặp:
 | 400 | `Horses can only be handed over while the trip is under way or has arrived (current status: Scheduled).` | Chuyến chưa xuất phát hoặc đã đóng |
 | 400 | `Booking BKG-2026-0202 has no horses on board to hand over.` | Không còn con nào của đơn trên xe (đã giao, hoặc đã rời chuyến hết) |
 | 400 | `Microchip check failed. Not scanned: Golden Pegasus (Kim Mã) (982000412345672).` | Thiếu mã vi mạch của một con ngựa; `message` nêu tên con còn thiếu |
+| 400 | `Nguyen Van X is not the recipient of booking BKG-2026-0001 (Trần Thị B). Ask the customer to approve this person as an alternate recipient in the app before handing over.` | Người ký không phải người nhận trong đơn và chưa được khách cho nhận thay (mục 7d) |
 | 400 | `Microchip check failed. These microchips do not belong to booking BKG-2026-0002 on this trip: 999.` | Có mã vi mạch không thuộc đơn này |
 | 400 | `Booking BKG-2026-0002 has already been handed over at 'Quảng Châu' on trip TRP-2026-0003.` | Đơn này đã có biên bản ở điểm trả trên chuyến |
 | 400 | `Sakura Wind can only be handed over on site after an OffloadHorse plan with HandOverHere is approved (status: InTransit).` | Gửi `tripHorseId` cho con ngựa chưa có phương án `HandOverHere` được duyệt |
@@ -8164,6 +8261,10 @@ Tổng cộng 121 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/bookings/{id}/decline-quote` | Khách từ chối báo giá chốt (→ `Cancelled`) | Customer (chủ đơn) |
 | PUT | `/api/bookings/{id}/locations` | Khách đổi điểm đón / trả trước khi trả tiền (lập tuyến + báo giá lại) | Customer (chủ đơn) |
 | POST | `/api/bookings/{id}/cancel-route-change` | Khách hủy vì công ty đổi tuyến, hoàn 100% | Customer (chủ đơn) |
+| PUT | `/api/bookings/{id}/recipient` | Khách sửa người nhận ngựa | Customer (chủ đơn) |
+| POST | `/api/bookings/{id}/confirm-recipient` | Khách xác nhận người nhận sẽ có mặt | Customer (chủ đơn) |
+| POST | `/api/bookings/{id}/approve-alternate-recipient` | Khách cho người khác nhận thay | Customer (chủ đơn) |
+| GET | `/api/trips/{id}/recipients` | Người nhận của từng đơn trên chuyến | Nhân sự; tài xế của chuyến |
 | POST | `/api/bookings/{id}/approve` | Duyệt sơ bộ đơn (→ `PreApproved`) | LogisticsManager, Admin |
 | PUT | `/api/bookings/{id}/horse-values` | Chốt giá trị thỏa thuận từng con trước khi báo giá | LogisticsManager, Admin |
 | POST | `/api/bookings/{id}/reject` | Từ chối đơn (trước khi gửi báo giá) | LogisticsManager, Admin |

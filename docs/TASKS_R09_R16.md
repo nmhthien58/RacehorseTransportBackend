@@ -267,7 +267,8 @@ Làm:
 - Đi đường vòng tốn thêm tiền (`BorderClosed` + `Reroute`): phương án kèm `extraCostForCustomer`; Manager duyệt xong thì **khách phải đồng ý** trên app (`POST /api/incidents/{id}/customer-consent`) trước khi áp tuyến; khách từ chối → phương án chuyển `ReturnToOrigin`.
 - Test hàm tính hoàn cho 3 nguyên nhân.
 
-### [ ] BE-15 · Người nhận và thông báo người nhận (R-16)
+### [x] BE-15 · Người nhận và thông báo người nhận (R-16)
+Đã làm: cột người nhận + `recipient_confirm_requested_at`, `alternate_recipient_*` trên `booking_requests`; logic gom ở `RecipientService` (luồng chuyến chỉ thêm một dòng gọi ở duyệt chuyến, xuất phát, rời mốc, e-POD). Tạo đơn bắt tên + SĐT hoặc `recipientIsCustomer = true` (lấy theo hồ sơ khách). Khung giờ đã báo = ETA (tính bằng `LiveEtaCalculator`) ± 1 giờ, ghi lúc xuất phát và cập nhật lúc "xe sắp tới". Email người nhận chỉ gửi khi có email. So tên người ký e-POD bỏ dấu / hoa thường (`RecipientRules`). Thông tin người nhận cho đoàn xe ở API riêng `GET /api/trips/{id}/recipients` (không sửa chi tiết chuyến để tránh đụng BE-07). Đổi người nhận sau khi giao kết hợp đồng → `CreateAmendmentAsync(RecipientChanged)`, người nhận mới có hiệu lực ngay (bản hợp đồng mới để ghi nhận). Hợp đồng PDF in người nhận.
 Làm:
 - `booking_requests`: `recipient_name`, `recipient_phone`, `recipient_email`, `recipient_id_number`, `recipient_is_customer`, `recipient_confirmed_at`, `recipient_notified_window_start`, `recipient_notified_window_end`. Bắt buộc tên + SĐT khi tạo đơn mới. Khách sửa được tới khi xe check-in điểm trả (`PUT /api/bookings/{id}/recipient`).
 - Email người nhận (BE-19, hàm `EmailAddressAsync`): chuyến được duyệt (`RecipientScheduled`); xe xuất phát (`RecipientDeparted`, ghi ETA làm khung giờ đã báo); xe rời mốc ngay trước điểm trả của đơn (`RecipientArrivingSoon`).

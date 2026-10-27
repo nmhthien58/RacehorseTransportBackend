@@ -119,6 +119,19 @@ CREATE TABLE booking.booking_requests (
     docs_due_at              timestamptz,
     docs_reminders_sent      integer       NOT NULL DEFAULT 0,
     route_change_cancel_until timestamptz,
+    -- R-16 (BE-15): người nhận ngựa, xác nhận có mặt, khung giờ đã báo, người nhận thay được khách duyệt
+    recipient_name                   varchar(100),
+    recipient_phone                  varchar(20),
+    recipient_email                  varchar(255),
+    recipient_id_number              varchar(50),
+    recipient_is_customer            boolean       NOT NULL DEFAULT false,
+    recipient_confirm_requested_at   timestamptz,
+    recipient_confirmed_at           timestamptz,
+    recipient_notified_window_start  timestamptz,
+    recipient_notified_window_end    timestamptz,
+    alternate_recipient_name         varchar(100),
+    alternate_recipient_id_number    varchar(50),
+    alternate_recipient_approved_at  timestamptz,
     currency_code            char(3)       NOT NULL DEFAULT 'USD',
     -- Vòng đời: Submitted -> AwaitingDeposit (Manager duyệt, chờ cọc) -> Approved (đã cọc: làm hồ sơ, xếp chuyến)
     --           -> Completed, hoặc -> AwaitingFinalPayment (còn chi phí phát sinh) -> Completed

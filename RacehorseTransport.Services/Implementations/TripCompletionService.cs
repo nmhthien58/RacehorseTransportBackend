@@ -43,6 +43,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ITrackingService _trackingService;
         private readonly IFileStorageService _fileStorage;
         private readonly INotificationService _notificationService;
+        private readonly IRecipientService _recipientService;
         private readonly ISystemSettingService _settingService;
         private readonly IUnitOfWork _unitOfWork;
 
@@ -58,6 +59,7 @@ namespace RacehorseTransport.Services.Implementations
             ITrackingService trackingService,
             IFileStorageService fileStorage,
             INotificationService notificationService,
+            IRecipientService recipientService,
             ISystemSettingService settingService,
             IUnitOfWork unitOfWork)
         {
@@ -72,6 +74,7 @@ namespace RacehorseTransport.Services.Implementations
             _trackingService = trackingService;
             _fileStorage = fileStorage;
             _notificationService = notificationService;
+            _recipientService = recipientService;
             _settingService = settingService;
             _unitOfWork = unitOfWork;
         }
@@ -165,6 +168,9 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Microchip check failed. These microchips do not belong to booking {booking.BookingCode} on this trip: {string.Join(", ", unknown)}.");
             }
 
+            // R-16: người ký phải là người nhận trong đơn, hoặc người nhận thay khách đã xác nhận trên app
+            await _recipientService.EnsureHandoverSignerAsync(model.BookingId, model.RecipientName);
+
             // Mọi kiểm tra nghiệp vụ đã qua mới đẩy ảnh chữ ký lên storage
             var signature = await _fileStorage.UploadAsync(
                 model.Signature.Content, model.Signature.FileName, model.Signature.SizeBytes, FileCategories.Signatures);
@@ -234,6 +240,9 @@ namespace RacehorseTransport.Services.Implementations
             });
 
             await _trackingService.InvalidateTripAsync(tripId);
+
+            // R-16: báo khách đã ký nhận (email HandoverCompleted)
+            await _recipientService.OnHandoverSignedAsync(booking.BookingId, handover.RecipientName, now, handover.OverallCondition);
 
             var saved = await QueryHandovers().FirstAsync(h => h.HandoverId == handover.HandoverId);
             return (await ToModelsAsync(new[] { saved }))[0];

@@ -109,7 +109,12 @@ namespace RacehorseTransport.Services.Implementations
                 CustomerName = booking.Customer?.FullName ?? string.Empty,
                 CustomerEmail = booking.Customer?.Email ?? string.Empty,
                 CustomerPhone = booking.Customer?.PhoneNumber,
-                RecipientInfo = null, // TODO(BE-15): thông tin người nhận trên đơn
+                RecipientInfo = string.IsNullOrWhiteSpace(booking.RecipientName)
+                    ? null
+                    : booking.RecipientIsCustomer
+                        ? $"Khách hàng tự nhận ({booking.RecipientName}, {booking.RecipientPhone})."
+                        : string.Join(" · ", new[] { booking.RecipientName, booking.RecipientPhone, booking.RecipientEmail, booking.RecipientIdNumber }
+                            .Where(v => !string.IsNullOrWhiteSpace(v))) + ".",
                 TransportMode = booking.TransportMode,
                 PickupAddress = booking.PickupAddress,
                 PickupCountryCode = booking.PickupCountryCode,

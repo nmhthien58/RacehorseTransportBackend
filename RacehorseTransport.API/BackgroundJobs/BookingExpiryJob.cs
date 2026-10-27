@@ -57,6 +57,14 @@ namespace RacehorseTransport.API.BackgroundJobs
                         _logger.LogInformation("Processed {Count} document deadline(s) (reminders or cancellations).", docs);
                     }
 
+                    // R-16 (BE-15): 24 giờ trước ETA tới điểm giao -> nhắc khách xác nhận người nhận có mặt
+                    var recipientService = scope.ServiceProvider.GetRequiredService<IRecipientService>();
+                    int confirms = await recipientService.ProcessConfirmationRemindersAsync();
+                    if (confirms > 0)
+                    {
+                        _logger.LogInformation("Sent {Count} recipient confirmation reminder(s).", confirms);
+                    }
+
                     // R-02: nhắc nợ chi phí phát sinh quá hạn (ngày đến hạn, +3, +7)
                     var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentService>();
                     int reminded = await paymentService.SendOverdueRemindersAsync();
