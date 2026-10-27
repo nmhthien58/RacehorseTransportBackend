@@ -37,6 +37,8 @@ namespace RacehorseTransport.Repositories.Constants
     public static class BookingStatuses
     {
         public const string Submitted = "Submitted";
+        public const string PreApproved = "PreApproved";                   // R-10: Manager duyệt sơ bộ, chờ Coordinator lập tuyến
+        public const string RoutePlanned = "RoutePlanned";                 // R-10: Manager đã duyệt tuyến, chờ báo giá chốt
         public const string AwaitingDeposit = "AwaitingDeposit";           // Manager đã duyệt, chờ khách đặt cọc
         public const string Approved = "Approved";                         // đã cọc: làm hồ sơ, xếp chuyến
         public const string Assigned = "Assigned";                         // trạng thái cũ, không còn tạo mới
@@ -48,7 +50,7 @@ namespace RacehorseTransport.Repositories.Constants
 
         public static readonly string[] All =
         {
-            Submitted, AwaitingDeposit, Approved, Assigned, AwaitingFinalPayment, Completed, Rejected, Expired, Cancelled
+            Submitted, PreApproved, RoutePlanned, AwaitingDeposit, Approved, Assigned, AwaitingFinalPayment, Completed, Rejected, Expired, Cancelled
         };
     }
 
@@ -260,6 +262,30 @@ namespace RacehorseTransport.Repositories.Constants
 
         // Con ngựa còn phải chở / giao trên chuyến
         public static readonly string[] OnBoard = { Planned, InTransit };
+    }
+
+    // Tuyến dự kiến của đơn (R-10): Coordinator lập, Manager duyệt; mỗi đơn chỉ một bản Approved hiệu lực
+    public static class RoutePlanStatuses
+    {
+        public const string Draft = "Draft";
+        public const string Submitted = "Submitted";
+        public const string Approved = "Approved";
+        public const string Rejected = "Rejected";       // Coordinator sửa rồi trình lại (về Draft khi sửa)
+        public const string Superseded = "Superseded";   // bản đã duyệt bị thay bằng bản duyệt mới hơn
+
+        public static readonly string[] All = { Draft, Submitted, Approved, Rejected, Superseded };
+        public static readonly string[] Editable = { Draft, Rejected };
+    }
+
+    public static class RouteStopTypes
+    {
+        public const string Origin = "Origin";
+        public const string RestStop = "RestStop";
+        public const string BorderGate = "BorderGate";
+        public const string Destination = "Destination";
+
+        public static readonly string[] All = { Origin, RestStop, BorderGate, Destination };
+        public static readonly string[] Intermediate = { RestStop, BorderGate };
     }
 
     public static class CheckpointStatuses
