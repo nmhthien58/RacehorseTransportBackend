@@ -15,6 +15,9 @@ namespace RacehorseTransport.API.RequestModels
         [Range(1, 60, ErrorMessage = "DossierSubmitDays must be between 1 and 60.")]
         public int DossierSubmitDays { get; set; }
 
+        [Range(0, 10000, ErrorMessage = "StableFeePerHorsePerDayUsd must be between 0 and 10000.")]
+        public decimal StableFeePerHorsePerDayUsd { get; set; }
+
         [Range(0, 168, ErrorMessage = "DelayGraceHours must be between 0 and 168.")]
         public int DelayGraceHours { get; set; }
 

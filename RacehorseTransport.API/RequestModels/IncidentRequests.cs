@@ -57,6 +57,10 @@ namespace RacehorseTransport.API.RequestModels
         [Range(0, 1000000000, ErrorMessage = "AdditionalCost must be between 0 and 1,000,000,000.")]
         public decimal AdditionalCost { get; set; }
 
+        // R-14 (BE-14b): chỉ với Reroute. Tiền đi đường vòng khách phải trả thêm (tổng, chia theo số ngựa); > 0 thì phải hỏi ý khách
+        [Range(0, 1000000000, ErrorMessage = "ExtraCostForCustomer must be between 0 and 1,000,000,000.")]
+        public decimal ExtraCostForCustomer { get; set; }
+
         // Chỉ dùng với OffloadHorse (R-12). Bỏ trống AffectedTripHorseId = con ngựa đã chọn lúc báo sự cố.
         public int? AffectedTripHorseId { get; set; }
 
@@ -66,6 +70,13 @@ namespace RacehorseTransport.API.RequestModels
         // Đường dẫn biên bản thú y đã tải lên qua POST /api/files (category documents); bắt buộc khi Deceased
         [MaxLength(500, ErrorMessage = "VetReportPath cannot exceed 500 characters.")]
         public string? VetReportPath { get; set; }
+    }
+
+    // R-14 (BE-14b): khách đồng ý / từ chối đi đường vòng tốn thêm tiền
+    public class IncidentConsentRequest
+    {
+        [Required(ErrorMessage = "Accept is required.")]
+        public bool? Accept { get; set; }
     }
 
     // R-09: đóng sự cố phải chọn nguyên nhân

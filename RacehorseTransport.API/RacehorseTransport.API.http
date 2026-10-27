@@ -752,6 +752,54 @@ Content-Type: application/json
 POST {{baseUrl}}/api/bookings/2/cancel-route-change
 Authorization: Bearer {{customerToken}}
 
+### [ĐÚNG] Điều phối đề xuất quay về nơi đi (cửa khẩu từ chối / biên giới đóng); tuyến về do hệ thống dựng khi duyệt
+POST {{baseUrl}}/api/incidents/1/propose
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "proposedAction": "Cửa khẩu không cho qua, đoàn quay về nơi đi",
+  "responseAction": "ReturnToOrigin",
+  "additionalCost": 0
+}
+
+### [ĐÚNG] Điều phối đề xuất đi cửa khẩu khác, khách trả thêm 300 USD (phải chờ khách đồng ý)
+POST {{baseUrl}}/api/incidents/1/propose
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "proposedAction": "Đi cửa khẩu Tân Thanh",
+  "responseAction": "Reroute",
+  "extraCostForCustomer": 300,
+  "routeChange": {
+    "deactivateCheckpointIds": [3],
+    "newCheckpoints": [
+      { "checkpointName": "Cửa khẩu Tân Thanh", "checkpointType": "BorderGate", "address": "Tân Thanh, Lạng Sơn", "plannedTime": "2026-11-20T08:00:00+07:00", "mandatoryRestMinutes": 0 }
+    ]
+  }
+}
+
+### [ĐÚNG] Điều phối đề xuất gửi ngựa chuồng tạm chờ biên giới mở lại (phí chuồng tính khi đóng sự cố)
+POST {{baseUrl}}/api/incidents/1/propose
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "proposedAction": "Gửi ngựa chuồng tạm gần cửa khẩu",
+  "responseAction": "HoldAtStable",
+  "additionalCost": 0
+}
+
+### [ĐÚNG] Khách đồng ý đi đường vòng (sự cố đang AwaitingConsent)
+POST {{baseUrl}}/api/incidents/1/customer-consent
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "accept": true
+}
+
 ### [ĐÚNG] Khách sửa người nhận ngựa
 PUT {{baseUrl}}/api/bookings/2/recipient
 Authorization: Bearer {{customerToken}}
@@ -880,7 +928,7 @@ Authorization: Bearer {{managerToken}}
 GET {{baseUrl}}/api/settings/policy
 Authorization: Bearer {{customerToken}}
 
-### [ĐÚNG] Quản lý sửa cấu hình chính sách (gửi đủ 19 trường)
+### [ĐÚNG] Quản lý sửa cấu hình chính sách (gửi đủ 20 trường)
 PUT {{baseUrl}}/api/settings/policy
 Authorization: Bearer {{managerToken}}
 Content-Type: application/json
@@ -889,6 +937,7 @@ Content-Type: application/json
   "policyVersion": "1.0",
   "quoteAcceptDays": 3,
   "dossierSubmitDays": 7,
+  "stableFeePerHorsePerDayUsd": 50,
   "delayGraceHours": 6,
   "delayPercentPer12Hours": 5,
   "delayMaxPercent": 25,
@@ -916,6 +965,7 @@ Content-Type: application/json
   "policyVersion": "",
   "quoteAcceptDays": 3,
   "dossierSubmitDays": 7,
+  "stableFeePerHorsePerDayUsd": 50,
   "delayGraceHours": 6,
   "delayPercentPer12Hours": 5,
   "delayMaxPercent": 150,

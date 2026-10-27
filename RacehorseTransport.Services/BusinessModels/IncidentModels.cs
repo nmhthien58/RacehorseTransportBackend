@@ -31,6 +31,10 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? RevisedRouteNotes { get; set; }
         public decimal AdditionalCost { get; set; }
 
+        // R-14 (BE-14b): đi đường vòng tốn thêm tiền cho khách (tổng, chia theo số ngựa). > 0 (chỉ với Reroute) thì sau khi
+        // Manager duyệt phải chờ mọi khách có ngựa trên xe đồng ý; một khách từ chối -> phương án chuyển ReturnToOrigin
+        public decimal ExtraCostForCustomer { get; set; }
+
         // OffloadHorse (R-12): con ngựa rời chuyến (bỏ trống = con ngựa đã chọn lúc báo sự cố), hướng xử lý tiếp
         // và đường dẫn biên bản thú y đã tải lên qua POST /api/files (bắt buộc khi OffloadOutcome = Deceased)
         public int? AffectedTripHorseId { get; set; }
@@ -80,6 +84,18 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? OffloadOutcome { get; set; }
         public string? VetReportPath { get; set; }
         public string? VetReportUrl { get; set; } // link xem biên bản thú y (có hạn)
+
+        // R-14 (BE-14b)
+        public decimal ExtraCostForCustomer { get; set; }
+        public List<IncidentConsentModel> Consents { get; set; } = new();
+    }
+
+    public class IncidentConsentModel
+    {
+        public int BookingId { get; set; }
+        public string BookingCode { get; set; } = string.Empty;
+        public bool Accepted { get; set; }
+        public DateTimeOffset DecidedAt { get; set; }
     }
 
     // Thay đổi tuyến của một phương án, lưu dạng JSON ở trip_incidents.route_change.
@@ -91,6 +107,10 @@ namespace RacehorseTransport.Services.BusinessModels
         public List<RouteChangeRemovedCheckpointModel> RemovedCheckpoints { get; set; } = new();
         public List<RouteChangeNewCheckpointModel> NewCheckpoints { get; set; } = new();
         public DateTimeOffset? AppliedAt { get; set; }
+
+        // R-14 (BE-14b) ReturnToOrigin: tỉ lệ quãng đường chưa đi của từng đơn lúc quay đầu (theo BookingId), dùng để hoàn tiền khi đóng sự cố
+        public Dictionary<int, decimal>? ReturnUnusedRatios { get; set; }
+        public int? TurnAroundCheckpointId { get; set; }
     }
 
     public class RouteChangeRemovedCheckpointModel

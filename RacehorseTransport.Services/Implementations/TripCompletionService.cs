@@ -291,7 +291,7 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             // R-09: nguyên nhân sự cố quyết định KPI và bồi thường trễ, nên sự cố đã duyệt phải được đóng trước
-            var unresolved = trip.Incidents.Where(i => i.Status == IncidentStatuses.Approved).Select(i => i.IncidentCode).ToList();
+            var unresolved = trip.Incidents.Where(i => i.Status == IncidentStatuses.Approved || i.Status == IncidentStatuses.AwaitingConsent).Select(i => i.IncidentCode).ToList();
             if (unresolved.Count > 0)
             {
                 throw new BusinessException($"Resolve incident(s) {string.Join(", ", unresolved)} and choose their cause before closing the trip.");

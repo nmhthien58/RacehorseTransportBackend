@@ -30,6 +30,8 @@ namespace RacehorseTransport.API.ResponseModels
         public DateTimeOffset? ApprovedAt { get; set; }
         public DateTimeOffset? ResolvedAt { get; set; }
         public bool EmergencyOffload { get; set; }        // tài xế đã dỡ con ngựa ngay lúc báo sự cố
+        public decimal ExtraCostForCustomer { get; set; } // R-14: tiền đi đường vòng khách trả thêm (phải được khách đồng ý)
+        public List<RacehorseTransport.Services.BusinessModels.IncidentConsentModel> Consents { get; set; } = new();
         public string? OffloadOutcome { get; set; }       // hướng xử lý tiếp của phương án OffloadHorse
         public string? VetReportUrl { get; set; }         // link xem biên bản thú y (có hạn)
     }
@@ -42,6 +44,10 @@ namespace RacehorseTransport.API.ResponseModels
         public List<RouteChangeRemovedCheckpointResponse> RemovedCheckpoints { get; set; } = new();
         public List<RouteChangeNewCheckpointResponse> NewCheckpoints { get; set; } = new();
         public DateTimeOffset? AppliedAt { get; set; }
+
+        // R-14 ReturnToOrigin: tỉ lệ quãng đường chưa đi của từng đơn (theo bookingId) và mốc quay đầu
+        public Dictionary<int, decimal>? ReturnUnusedRatios { get; set; }
+        public int? TurnAroundCheckpointId { get; set; }
     }
 
     public class RouteChangeRemovedCheckpointResponse

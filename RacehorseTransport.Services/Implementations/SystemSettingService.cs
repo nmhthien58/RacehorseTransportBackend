@@ -31,6 +31,7 @@ namespace RacehorseTransport.Services.Implementations
         public const string PolicyVersionKey = "Policy.Version";
         public const string QuoteAcceptDaysKey = "Booking.QuoteAcceptDays";
         public const string DossierSubmitDaysKey = "Dossier.SubmitDays";
+        public const string StableFeePerHorsePerDayKey = "Stable.FeePerHorsePerDayUsd";
         public const string DelayGraceHoursKey = "Delay.GraceHours";
         public const string DelayPercentPer12HoursKey = "Delay.PercentPer12Hours";
         public const string DelayMaxPercentKey = "Delay.MaxPercent";
@@ -66,6 +67,8 @@ namespace RacehorseTransport.Services.Implementations
                 m => Num(m.QuoteAcceptDays), (m, v) => m.QuoteAcceptDays = ParseInt(v, m.QuoteAcceptDays)),
             new(DossierSubmitDaysKey, "Số ngày khách có để nộp đủ giấy tờ, tính từ lúc đặt cọc",
                 m => Num(m.DossierSubmitDays), (m, v) => m.DossierSubmitDays = ParseInt(v, m.DossierSubmitDays)),
+            new(StableFeePerHorsePerDayKey, "Phí chuồng tạm + chăm sóc (USD / con / ngày)",
+                m => Num(m.StableFeePerHorsePerDayUsd), (m, v) => m.StableFeePerHorsePerDayUsd = ParseDec(v, m.StableFeePerHorsePerDayUsd)),
             new(DelayGraceHoursKey, "Số giờ trễ được miễn bồi thường",
                 m => Num(m.DelayGraceHours), (m, v) => m.DelayGraceHours = ParseInt(v, m.DelayGraceHours)),
             new(DelayPercentPer12HoursKey, "% tiền cước bồi thường cho mỗi 12 giờ trễ sau ân hạn",
@@ -320,6 +323,7 @@ namespace RacehorseTransport.Services.Implementations
 
             Between(model.QuoteAcceptDays, 1, 30, QuoteAcceptDaysKey);
             Between(model.DossierSubmitDays, 1, 60, DossierSubmitDaysKey);
+            NonNegative(model.StableFeePerHorsePerDayUsd, StableFeePerHorsePerDayKey);
 
             Between(model.DelayGraceHours, 0, 168, DelayGraceHoursKey);
             Percent(model.DelayPercentPer12Hours, DelayPercentPer12HoursKey);

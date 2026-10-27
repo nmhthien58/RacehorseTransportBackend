@@ -42,6 +42,7 @@ namespace RacehorseTransport.API.Mappers
                 RouteChange = request.RouteChange?.ToBusinessModel(),
                 RevisedRouteNotes = string.IsNullOrWhiteSpace(request.RevisedRouteNotes) ? null : request.RevisedRouteNotes.Trim(),
                 AdditionalCost = request.AdditionalCost,
+                ExtraCostForCustomer = request.ExtraCostForCustomer,
                 AffectedTripHorseId = request.AffectedTripHorseId,
                 OffloadOutcome = string.IsNullOrWhiteSpace(request.OffloadOutcome) ? null : request.OffloadOutcome.Trim(),
                 VetReportPath = string.IsNullOrWhiteSpace(request.VetReportPath) ? null : request.VetReportPath.Trim()
@@ -84,6 +85,8 @@ namespace RacehorseTransport.API.Mappers
                     InsertAfterCheckpointId = model.RouteChange.InsertAfterCheckpointId,
                     InsertAfterName = model.RouteChange.InsertAfterName,
                     AppliedAt = model.RouteChange.AppliedAt,
+                    ReturnUnusedRatios = model.RouteChange.ReturnUnusedRatios,
+                    TurnAroundCheckpointId = model.RouteChange.TurnAroundCheckpointId,
                     RemovedCheckpoints = model.RouteChange.RemovedCheckpoints.Select(c => new RouteChangeRemovedCheckpointResponse
                     {
                         CheckpointId = c.CheckpointId,
@@ -110,6 +113,8 @@ namespace RacehorseTransport.API.Mappers
                 ApprovedAt = model.ApprovedAt,
                 ResolvedAt = model.ResolvedAt,
                 EmergencyOffload = model.EmergencyOffload,
+                ExtraCostForCustomer = model.ExtraCostForCustomer,
+                Consents = model.Consents,
                 OffloadOutcome = model.OffloadOutcome,
                 VetReportUrl = model.VetReportUrl
             };

@@ -437,10 +437,10 @@ Các trường dưới đây chỉ nhận đúng những giá trị liệt kê, 
 | Trạng thái ngựa trong đơn | `Pending` chờ duyệt · `Approved` đã duyệt · `Cancelled` đã hủy · `Deceased` chết trên đường |
 | `feedStatus` (ăn uống) | `Normal` bình thường · `Reduced` ăn ít · `Refused` bỏ ăn |
 | `stressLevel` | `Calm` bình tĩnh · `MildStress` hơi căng thẳng · `Agitated` kích động |
-| `incidentType` (loại sự cố) | `MechanicalBreakdown` hỏng xe · `BorderCongestion` tắc biên · `EquineHealthIssue` sức khỏe ngựa · `Weather` thời tiết · `ClimateControlFailure` hỏng điều hòa · `CustomsHold` bị giữ ở hải quan · `Other` khác |
+| `incidentType` (loại sự cố) | `MechanicalBreakdown` hỏng xe · `BorderCongestion` tắc biên · `EquineHealthIssue` sức khỏe ngựa · `Weather` thời tiết · `ClimateControlFailure` hỏng điều hòa · `CustomsHold` bị giữ ở hải quan · `BorderRejected` cửa khẩu từ chối cho qua · `BorderClosed` biên giới đóng · `CrewUnavailable` tài xế / người áp tải không thể tiếp tục · `RecipientUnavailable` người nhận vắng mặt / từ chối · `Other` khác |
 | `severity` (mức độ sự cố) | `Minor` nhẹ · `Moderate` vừa · `Major` nặng · `Critical` nghiêm trọng |
 | Nguyên nhân sự cố (`faultParty`) | `Company` lỗi công ty · `Customer` lỗi khách · `ForceMajeure` bất khả kháng. Chọn khi đóng sự cố; quyết định ai chịu chi phí và có bồi thường giao trễ không (Chính sách mục 9.1) |
-| Trạng thái sự cố | `Reported` mới báo · `PlanProposed` đã có phương án chờ duyệt · `Approved` phương án được duyệt · `Rejected` phương án bị từ chối · `Resolved` đã xử lý xong |
+| Trạng thái sự cố | `Reported` mới báo · `PlanProposed` đã có phương án chờ duyệt · `Approved` phương án được duyệt · `Rejected` phương án bị từ chối · `Resolved` đã xử lý xong · `AwaitingConsent` quản lý đã duyệt đi đường vòng tốn thêm tiền, chờ khách đồng ý |
 | `overallCondition` (tình trạng khi bàn giao) | `Excellent` tốt · `NormalFatigue` mệt bình thường · `Injured` bị thương |
 | `onTimeStatus` (kết quả đúng giờ của chuyến) | `OnTime` đúng giờ · `Delayed_AcceptableForceMajeure` trễ do bất khả kháng · `Delayed_OperationalFault` trễ do lỗi vận hành |
 | Loại phương tiện (`assetType`) | `HorseTruck_AirSuspension` xe tải giảm xóc khí · `HorseVan` xe van · `AirStall` chuồng hàng không |
@@ -5036,7 +5036,29 @@ Reported ──(điều phối đề xuất)──> PlanProposed ──(quản l
 
 Nắn tuyến chỉ làm được khi sự cố đang Approved. Khi nắn tuyến, chuyến chuyển sang EmergencyRerouting;
 khi đóng sự cố, chuyến trở lại InTransit.
+
+Đi đường vòng tốn thêm tiền cho khách (extraCostForCustomer > 0):
+PlanProposed ──(quản lý duyệt)──> AwaitingConsent ──(mọi khách có ngựa trên xe đồng ý)──> Approved (áp tuyến vòng)
+                                        └──(một khách từ chối)──> Approved với phương án ReturnToOrigin (cả đoàn quay về)
 ```
+
+**Cửa khẩu từ chối, biên giới đóng, quay về (R-14, Chính sách mục 9).** Loại sự cố `BorderRejected`, `BorderClosed`. Ba cách xử lý:
+
+| Cách | Phương án (`responseAction`) | Hệ thống làm gì |
+|---|---|---|
+| Bổ sung / sửa giấy rồi thử lại, hoặc chờ biên giới mở lại | `HoldAtStable` (ngựa vào chuồng tạm) hoặc `WaitAndContinue` | `HoldAtStable`: khi đóng sự cố, **phí chuồng tạm** = số ngày (từ lúc duyệt tới lúc đóng, chưa đủ ngày tính tròn) × số ngựa trên xe × `Stable.FeePerHorsePerDayUsd` (mặc định 50 USD), cộng vào `additionalCost` |
+| Đi cửa khẩu khác | `Reroute` + `routeChange` | Như nắn tuyến. Nếu tốn thêm tiền cho khách: gửi `extraCostForCustomer` → phải chờ khách đồng ý (`POST /api/incidents/{id}/customer-consent`) |
+| Quay về nơi đi | `ReturnToOrigin` | Khi duyệt, hệ thống **tự dựng tuyến về**: bỏ mọi mốc chưa tới (kể cả điểm đón / trả / đích cũ), thêm các mốc đã đi theo chiều ngược (tên có hậu tố "(quay về)"), mốc cuối là điểm xuất phát với loại `Destination` → **e-POD ký ở nơi đi**. Ngựa chưa được đón rời chuyến (`Cancelled`). Lưu tỉ lệ quãng đường chưa đi của từng đơn (`routeChange.returnUnusedRatios`) |
+
+Khi **đóng** sự cố có phương án `ReturnToOrigin`, server **tự hoàn tiền** cho từng đơn theo nguyên nhân (bảng 9.1):
+
+| `faultParty` | Tiền hoàn |
+|---|---|
+| `Company` | 100% số khách đã trả |
+| `Customer` | Không hoàn; chi phí quay đầu (`additionalCost`) là khoản phát sinh của khách |
+| `ForceMajeure` | Tiền cước × tỉ lệ quãng đường chưa đi (tiền cước = giá chốt trừ bảo hiểm và phí thủ tục, nên phí thủ tục đã nộp không được hoàn); không quá số đã trả. Điều phối chỉ nên đưa vào `additionalCost` phần khách chịu (chuồng tạm, thú y) |
+
+Tỉ lệ chưa đi = quãng từ chỗ quay đầu tới điểm giao của đơn / quãng từ điểm đón tới điểm giao (theo km các chặng; thiếu km thì theo giờ dự kiến). Khoản hoàn hiện trong `GET /api/bookings/{id}/payments`.
 
 Thứ tự gọi thông thường:
 
@@ -5250,11 +5272,12 @@ Các trường gửi lên:
 
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
-| `responseAction` | chuỗi | Có | Loại hành động: `WaitAndContinue` (chờ rồi đi tiếp), `RepairAndContinue` (sửa xe / thiết bị rồi đi tiếp), `Reroute` (đổi tuyến), `VeterinaryCare` (dừng chăm sóc thú y), `OffloadHorse` (cho ngựa rời chuyến), `Other` |
+| `responseAction` | chuỗi | Có | Loại hành động: `WaitAndContinue` (chờ rồi đi tiếp), `RepairAndContinue` (sửa xe / thiết bị rồi đi tiếp), `Reroute` (đổi tuyến), `VeterinaryCare` (dừng chăm sóc thú y), `OffloadHorse` (cho ngựa rời chuyến), `ReturnToOrigin` (cả đoàn quay về nơi đi; **không gửi** `routeChange`, hệ thống tự dựng tuyến về), `HoldAtStable` (gửi ngựa chuồng tạm, tính phí chuồng khi đóng), `Other` |
 | `proposedAction` | chuỗi | Có | Chỉ đạo cho đoàn xe, tối đa 255 ký tự |
 | `routeChange` | object | Không (bắt buộc khi `responseAction` là `Reroute`) | Thay đổi tuyến, cùng dạng body của `apply-reroute` bên dưới: `deactivateCheckpointIds`, `newCheckpoints`, `insertAfterCheckpointId`. Phải có ít nhất một mốc bỏ hoặc thêm. Mỗi mốc mới bắt buộc có `address` |
 | `revisedRouteNotes` | chuỗi | Không | Ghi chú thêm về tuyến đường, tối đa 2000 ký tự |
 | `additionalCost` | số | Không | Chi phí phát sinh, không âm (mặc định 0) |
+| `extraCostForCustomer` | số | Không | Chỉ với `Reroute`: tiền đi đường vòng khách phải trả thêm (tổng, chia cho các đơn theo số ngựa). > 0 thì sau khi quản lý duyệt, sự cố chuyển `AwaitingConsent` và tuyến **chưa** đổi cho tới khi mọi khách có ngựa trên xe đồng ý |
 | `affectedTripHorseId` | số | Không | Chỉ dùng với `OffloadHorse`: con ngựa rời chuyến. Bỏ trống = con ngựa đã chọn lúc báo sự cố. Sự cố dỡ khẩn cấp thì phải là đúng con đã dỡ |
 | `offloadOutcome` | chuỗi | Có khi `responseAction` là `OffloadHorse` | Hướng xử lý tiếp: `WaitRecover`, `ReturnToOrigin`, `HandOverHere`, `Deceased` (bảng ở đầu mục 11) |
 | `vetReportPath` | chuỗi | Có khi `offloadOutcome` là `Deceased` | Đường dẫn biên bản thú y: tải file lên trước bằng `POST /api/files` với `category = documents` (PDF hoặc ảnh), rồi gửi `path` nhận được |
@@ -5354,6 +5377,8 @@ Tham số trên đường dẫn:
 |---|---|
 | `id` | Mã sự cố |
 
+Phương án `ReturnToOrigin`: tuyến về được dựng và áp ngay (xem đầu mục 11), chuyến `EmergencyRerouting`. Phương án `Reroute` có `extraCostForCustomer > 0`: sự cố chuyển `AwaitingConsent`, tuyến chưa đổi; khách có ngựa trên xe nhận thông báo + email xin đồng ý.
+
 Phương án `OffloadHorse`: con ngựa `affectedTripHorseId` đổi trạng thái theo `offloadOutcome` (bảng ở đầu mục 11): `Deceased` → ngựa `Deceased` cả trên chuyến và trong đơn; các hướng khác → `Offloaded` kèm `offloadOutcome`. Khách của con ngựa nhận thông báo + email; với `WaitRecover`, người lập chuyến được báo để xếp chuyến khác.
 
 Response `200`: sự cố với `status` là `Approved`, có `approvedByName`, `approvedAt`; `rejectionReason` thành `null`.
@@ -5365,6 +5390,24 @@ Lỗi thường gặp:
 | 400 | `Only a proposed plan can be reviewed (current status: Reported).` | Chưa có phương án, hoặc phương án đã được xử lý |
 | 400 | `The offload plan can no longer be applied (Sakura Wind is Delivered). Reject the plan so the coordinator can propose a new one.` | Từ lúc đề xuất tới lúc duyệt con ngựa đã được giao / đổi trạng thái, hoặc phương án `OffloadHorse` cũ (đề xuất trước bản này) chưa có hướng xử lý. Từ chối để điều phối viên đề xuất lại |
 | 400 | `The proposed route change no longer fits the current route: ... Reject the plan so the coordinator can propose a new one.` | Từ lúc đề xuất tới lúc duyệt, đoàn xe đã đi qua mốc liên quan (hoặc chuyến không còn trên đường). Từ chối để điều phối viên đề xuất lại |
+
+### POST /api/incidents/{id}/customer-consent — Khách đồng ý / từ chối đi đường vòng
+
+Khi sự cố `AwaitingConsent` (đi vòng tốn thêm `extraCostForCustomer`). Mỗi khách có ngựa trên xe trả lời cho các đơn của mình; trả lời lại được tới khi có kết quả.
+
+- **Ai gọi được:** Customer có ngựa đang trên xe của chuyến
+- **Dữ liệu gửi lên:** `{ "accept": true }` hoặc `{ "accept": false }`
+
+Kết quả:
+- **Mọi** đơn có ngựa trên xe đồng ý → tuyến vòng được áp, `extraCostForCustomer` cộng vào `additionalCost` (khoản phát sinh, chia theo số ngựa khi đóng chuyến), sự cố `Approved`; đơn đã giao kết hợp đồng có bản hợp đồng mới `DetourAccepted` (mục 7c).
+- **Một** khách từ chối → phương án thành `ReturnToOrigin`, tuyến về được áp ngay, không thu tiền đi vòng (Chính sách 9.4).
+
+Response `200`: sự cố, có `consents[]` (`bookingId`, `bookingCode`, `accepted`, `decidedAt`).
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `This incident is not waiting for your agreement (status: Approved).` | Không ở `AwaitingConsent` |
+| 403 | `Only customers with horses on this trip can answer.` | Không có ngựa trên xe |
 
 ### POST /api/incidents/{id}/reject — Từ chối phương án
 
@@ -5458,7 +5501,7 @@ Lỗi thường gặp:
 
 ### POST /api/incidents/{id}/resolve — Đóng sự cố
 
-Ghi nhận sự cố đã xử lý xong và **chọn nguyên nhân** (bắt buộc). Chỉ đóng được sự cố có phương án đã duyệt (`Approved`). Nếu chuyến đang `EmergencyRerouting` và không còn sự cố nào khác đang xử lý, chuyến trở lại `InTransit`.
+Ghi nhận sự cố đã xử lý xong và **chọn nguyên nhân** (bắt buộc). Chỉ đóng được sự cố có phương án đã duyệt (`Approved`; `AwaitingConsent` thì chưa). Phương án `HoldAtStable`: cộng phí chuồng tạm vào `additionalCost`. Phương án `ReturnToOrigin`: tự hoàn tiền từng đơn theo nguyên nhân (đầu mục 11). Phương án `OffloadHorse` (trừ `WaitRecover`): tự hoàn **phần cước chưa đi của con ngựa đó** = tiền cước của đơn / số ngựa của đơn × tỉ lệ quãng đường chưa đi (tính từ mốc dỡ ngựa), khi nguyên nhân là `Company` hoặc `ForceMajeure`; `Customer` thì không hoàn. Nếu chuyến đang `EmergencyRerouting` và không còn sự cố nào khác đang xử lý, chuyến trở lại `InTransit`.
 
 Nguyên nhân quyết định tiền (Chính sách mục 9.1), nên frontend nên hiện ngay dưới ô chọn hệ quả của từng lựa chọn:
 
@@ -7253,6 +7296,10 @@ Response `200`:
       "Weather",
       "ClimateControlFailure",
       "CustomsHold",
+      "BorderRejected",
+      "BorderClosed",
+      "CrewUnavailable",
+      "RecipientUnavailable",
       "Other"
     ],
     "incidentSeverities": [
@@ -7266,7 +7313,8 @@ Response `200`:
       "PlanProposed",
       "Approved",
       "Rejected",
-      "Resolved"
+      "Resolved",
+      "AwaitingConsent"
     ],
     "handoverConditions": [
       "Excellent",
@@ -8026,7 +8074,7 @@ Response `200`:
       "proofThresholdUsd": 50000
     },
     "horse": { "minAgeMonths": 6, "gestationDays": 340, "latePregnancyPercent": 90, "postFoalingDays": 7 },
-    "delivery": { "freeWaitingHours": 2, "waitingFeePerHourUsd": 40, "maxWaitingHours": 24, "decisionHours": 24 },
+    "delivery": { "stableFeePerHorsePerDayUsd": 50, "freeWaitingHours": 2, "waitingFeePerHourUsd": 40, "maxWaitingHours": 24, "decisionHours": 24 },
     "values": {
       "Policy.Version": "1.0",
       "Payment.DepositPercent": 30,
@@ -8036,6 +8084,7 @@ Response `200`:
       "Payment.ExtraPaymentDueDays": 7,
       "Booking.QuoteAcceptDays": 3,
       "Dossier.SubmitDays": 7,
+      "Stable.FeePerHorsePerDayUsd": 50,
       "Delay.GraceHours": 6,
       "Delay.PercentPer12Hours": 5,
       "Delay.MaxPercent": 25,
@@ -8065,6 +8114,7 @@ Response `200`:
 | `payment` | % cọc, % hoàn cọc khi hủy, tỉ giá USD → VND, hạn trả phần còn lại, hạn trả phát sinh (giống `GET /api/settings/payment`) |
 | `booking.quoteAcceptDays` | Số ngày khách có để chấp nhận báo giá chốt và đặt cọc |
 | `booking.dossierSubmitDays` | Số ngày khách có để nộp đủ giấy tờ, tính từ lúc đặt cọc |
+| `delivery.stableFeePerHorsePerDayUsd` | Phí chuồng tạm + chăm sóc (USD / con / ngày) |
 | `delay.graceHours` | Số giờ trễ được miễn bồi thường |
 | `delay.percentPer12Hours`, `delay.maxPercent` | % tiền cước bồi thường cho mỗi 12 giờ trễ sau ân hạn, và mức tối đa |
 | `insurance.premiumPercent` | % phí bảo hiểm toàn giá trị trên giá trị thỏa thuận mỗi con |
@@ -8104,6 +8154,7 @@ Response `200`:
     "policyVersion": "1.0",
     "quoteAcceptDays": 3,
     "dossierSubmitDays": 7,
+    "stableFeePerHorsePerDayUsd": 50,
     "delayGraceHours": 6,
     "delayPercentPer12Hours": 5,
     "delayMaxPercent": 25,
@@ -8139,13 +8190,14 @@ Response `200`:
 Giá trị mới áp dụng từ lúc lưu. Đơn đã đồng ý chính sách giữ phiên bản đã đồng ý. Khi đổi nội dung quy tắc, nhớ **tăng `policyVersion`** (ví dụ `1.0` → `1.1`) để các đơn mới lưu đúng phiên bản.
 
 - **Ai gọi được:** LogisticsManager, Admin
-- **Dữ liệu gửi lên:** JSON, gửi **đủ cả 19 trường** (kể cả trường không đổi)
+- **Dữ liệu gửi lên:** JSON, gửi **đủ cả 20 trường** (kể cả trường không đổi)
 
 | Trường | Kiểu | Giới hạn | Khóa cấu hình |
 |---|---|---|---|
 | `policyVersion` | chuỗi | Bắt buộc, tối đa 20 ký tự | `Policy.Version` |
 | `quoteAcceptDays` | số nguyên | 1 – 30 | `Booking.QuoteAcceptDays` |
 | `dossierSubmitDays` | số nguyên | 1 – 60 | `Dossier.SubmitDays` |
+| `stableFeePerHorsePerDayUsd` | số | ≥ 0 | `Stable.FeePerHorsePerDayUsd` |
 | `delayGraceHours` | số nguyên | 0 – 168 | `Delay.GraceHours` |
 | `delayPercentPer12Hours` | số | 0 – 100 | `Delay.PercentPer12Hours` |
 | `delayMaxPercent` | số | 0 – 100 | `Delay.MaxPercent` |
@@ -8339,7 +8391,8 @@ Tổng cộng 121 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/incidents/{id}/approve` | Duyệt phương án | LogisticsManager, Admin |
 | POST | `/api/incidents/{id}/reject` | Từ chối phương án | LogisticsManager, Admin |
 | POST | `/api/incidents/{id}/apply-reroute` | Nắn tuyến | FleetCoordinator, Admin |
-| POST | `/api/incidents/{id}/resolve` | Đóng sự cố, chọn nguyên nhân (`faultParty`) | FleetCoordinator, Admin |
+| POST | `/api/incidents/{id}/resolve` | Đóng sự cố, chọn nguyên nhân (`faultParty`); quay về thì tự hoàn tiền | FleetCoordinator, Admin |
+| POST | `/api/incidents/{id}/customer-consent` | Khách đồng ý / từ chối đi đường vòng tốn thêm tiền | Customer có ngựa trên xe |
 | GET | `/api/delay-compensations` | Danh sách bồi thường giao trễ | LogisticsManager, Admin |
 | GET | `/api/bookings/{bookingId}/delay-compensations` | Bồi thường giao trễ của một đơn | Khách của đơn, nhân sự |
 | POST | `/api/delay-compensations/{id}/approve` | Duyệt bồi thường (có thể sửa số tiền) | LogisticsManager, Admin |

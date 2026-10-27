@@ -121,6 +121,22 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
+        /// Customer with horses on the trip accepts or declines a detour that costs extra. All accept -> the detour is applied;
+        /// one declines -> the plan becomes ReturnToOrigin.
+        /// </summary>
+        [HttpPost("{id:int}/customer-consent")]
+        [Authorize(Roles = UserRoles.Customer)]
+        [ProducesResponseType(typeof(ApiResponse<IncidentResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> CustomerConsent(int id, [FromBody] IncidentConsentRequest request)
+        {
+            var incident = await _incidentService.RecordCustomerConsentAsync(id, request.Accept!.Value, User.ToCurrentUser());
+            return Ok(ApiResponse<IncidentResponse>.SuccessResult(incident.ToResponse(), "Your answer has been recorded"));
+        }
+
+        /// <summary>
         /// Reject the proposed plan with a reason. The coordinator can propose again.
         /// </summary>
         [HttpPost("{id:int}/reject")]
