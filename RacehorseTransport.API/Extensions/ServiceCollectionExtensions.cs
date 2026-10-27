@@ -112,6 +112,18 @@ namespace RacehorseTransport.API.Extensions
 
             // Nghiệp vụ
             services.AddHttpClient<IDistanceService, DistanceService>(client => client.Timeout = TimeSpan.FromSeconds(5));
+
+            // Bản đồ (BE-01): Goong cho Việt Nam, Nominatim + OSRM cho phần còn lại. Thứ tự đăng ký = thứ tự ưu tiên.
+            services.Configure<GeoOptions>(configuration.GetSection(GeoOptions.SectionName));
+            // Goong nhận khóa trên URL: tắt log mặc định của HttpClient (log in cả URL) để khóa không lộ ra log
+            services.AddHttpClient<GoongGeoProvider>().RemoveAllLoggers();
+            services.AddHttpClient<NominatimGeocodingProvider>();
+            services.AddHttpClient<OsrmRoutingProvider>();
+            services.AddScoped<IGeocodingProvider>(sp => sp.GetRequiredService<GoongGeoProvider>());
+            services.AddScoped<IGeocodingProvider>(sp => sp.GetRequiredService<NominatimGeocodingProvider>());
+            services.AddScoped<IRoutingProvider>(sp => sp.GetRequiredService<GoongGeoProvider>());
+            services.AddScoped<IRoutingProvider>(sp => sp.GetRequiredService<OsrmRoutingProvider>());
+            services.AddScoped<IGeoService, GeoService>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IHorseService, HorseService>();
