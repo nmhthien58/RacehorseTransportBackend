@@ -23,6 +23,7 @@ namespace RacehorseTransport.Repositories.Context
         public virtual DbSet<RoutePlanStop> RoutePlanStops { get; set; } = null!;
         public virtual DbSet<BookingContract> BookingContracts { get; set; } = null!;
         public virtual DbSet<IncidentConsent> IncidentConsents { get; set; } = null!;
+        public virtual DbSet<DeliveryFailure> DeliveryFailures { get; set; } = null!;
         public virtual DbSet<BookingHorse> BookingHorses { get; set; } = null!;
         public virtual DbSet<BookingTransitCountry> BookingTransitCountries { get; set; } = null!;
         public virtual DbSet<DocumentType> DocumentTypes { get; set; } = null!;
@@ -122,6 +123,15 @@ namespace RacehorseTransport.Repositories.Context
                 entity.HasOne(e => e.Booking).WithMany().HasForeignKey(e => e.BookingId);
                 entity.HasOne(e => e.PlannedBy).WithMany().HasForeignKey(e => e.PlannedByUserId);
                 entity.HasOne(e => e.ReviewedBy).WithMany().HasForeignKey(e => e.ReviewedByUserId);
+            });
+
+            modelBuilder.Entity<DeliveryFailure>(entity =>
+            {
+                entity.ToTable("delivery_failures", "acceptance");
+                entity.HasKey(e => e.FailureId);
+                entity.Property(e => e.PhotoPaths).HasColumnType("jsonb");
+                entity.HasOne(e => e.Trip).WithMany().HasForeignKey(e => e.TripId);
+                entity.HasOne(e => e.Booking).WithMany().HasForeignKey(e => e.BookingId);
             });
 
             modelBuilder.Entity<IncidentConsent>(entity =>

@@ -800,6 +800,44 @@ Content-Type: application/json
   "accept": true
 }
 
+### [ĐÚNG] Đoàn xe ghi không giao được (xe phải đang đứng ở điểm giao của đơn)
+POST {{baseUrl}}/api/trips/1/bookings/1/delivery-failed
+Authorization: Bearer {{driverToken}}
+Content-Type: application/json
+
+{
+  "reason": "RecipientAbsent",
+  "note": "Gọi 3 lần không nghe máy"
+}
+
+### [ĐÚNG] Khách chọn giao cho người nhận khác gần đó
+POST {{baseUrl}}/api/bookings/1/delivery-decision
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "decision": "AlternateRecipient",
+  "recipientName": "Lê Văn C",
+  "recipientPhone": "0987654321",
+  "address": "Trường đua Quảng Tây",
+  "lat": 22.85,
+  "lng": 108.25
+}
+
+### [SAI - 400] Giao người khác nhưng thiếu số điện thoại / địa chỉ
+POST {{baseUrl}}/api/bookings/1/delivery-decision
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "decision": "AlternateRecipient",
+  "recipientName": "Lê Văn C"
+}
+
+### [ĐÚNG] Các lần không giao được của đơn
+GET {{baseUrl}}/api/bookings/1/delivery-failures
+Authorization: Bearer {{customerToken}}
+
 ### [ĐÚNG] Khách sửa người nhận ngựa
 PUT {{baseUrl}}/api/bookings/2/recipient
 Authorization: Bearer {{customerToken}}
@@ -928,7 +966,7 @@ Authorization: Bearer {{managerToken}}
 GET {{baseUrl}}/api/settings/policy
 Authorization: Bearer {{customerToken}}
 
-### [ĐÚNG] Quản lý sửa cấu hình chính sách (gửi đủ 20 trường)
+### [ĐÚNG] Quản lý sửa cấu hình chính sách (gửi đủ 21 trường)
 PUT {{baseUrl}}/api/settings/policy
 Authorization: Bearer {{managerToken}}
 Content-Type: application/json
@@ -938,6 +976,7 @@ Content-Type: application/json
   "quoteAcceptDays": 3,
   "dossierSubmitDays": 7,
   "stableFeePerHorsePerDayUsd": 50,
+  "deliveryExtraKmFeeUsd": 2,
   "delayGraceHours": 6,
   "delayPercentPer12Hours": 5,
   "delayMaxPercent": 25,
@@ -966,6 +1005,7 @@ Content-Type: application/json
   "quoteAcceptDays": 3,
   "dossierSubmitDays": 7,
   "stableFeePerHorsePerDayUsd": 50,
+  "deliveryExtraKmFeeUsd": 2,
   "delayGraceHours": 6,
   "delayPercentPer12Hours": 5,
   "delayMaxPercent": 150,
