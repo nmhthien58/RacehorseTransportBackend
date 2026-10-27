@@ -34,7 +34,10 @@ namespace RacehorseTransport.Services.Mappers
                 ApprovedByUserId = entity.ApprovedByUserId,
                 ApprovedByName = entity.ApprovedBy?.FullName,
                 ApprovedAt = entity.ApprovedAt,
-                ResolvedAt = entity.ResolvedAt
+                ResolvedAt = entity.ResolvedAt,
+                EmergencyOffload = entity.EmergencyOffload,
+                OffloadOutcome = entity.OffloadOutcome,
+                VetReportPath = entity.VetReportPath
             };
         }
 

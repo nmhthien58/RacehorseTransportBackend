@@ -16,6 +16,8 @@ namespace RacehorseTransport.Services.Implementations
     //                    ^------- Rejected (Manager từ chối, Coordinator đề xuất lại)
     //   Phương án = loại hành động + chỉ đạo + (tùy chọn) thay đổi tuyến. Tuyến được kiểm tra lúc đề xuất và áp vào lộ trình
     //   khi Manager duyệt; sau đó Coordinator vẫn điều chỉnh tuyến thêm được. Tuyến đổi thì chuyến EmergencyRerouting tới khi Resolved.
+    //   Ngựa rời chuyến chỉ qua phương án OffloadHorse (R-12): duyệt xong con ngựa mới đổi trạng thái theo hướng xử lý tiếp.
+    //   Ngoại lệ: tài xế dỡ khẩn cấp lúc báo sự cố (EmergencyOffload), phương án vẫn phải được đề xuất và duyệt sau.
     public class IncidentService : IIncidentService
     {
         // Chuyến đang trên đường (kể cả lúc đang nắn tuyến vì sự cố)
@@ -35,6 +37,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ITrackingService _trackingService;
         private readonly ICodeGenerator _codeGenerator;
         private readonly INotificationService _notificationService;
+        private readonly IFileStorageService _fileStorage;
         private readonly IUnitOfWork _unitOfWork;
 
         public IncidentService(
@@ -46,6 +49,7 @@ namespace RacehorseTransport.Services.Implementations
             ITrackingService trackingService,
             ICodeGenerator codeGenerator,
             INotificationService notificationService,
+            IFileStorageService fileStorage,
             IUnitOfWork unitOfWork)
         {
             _incidentRepo = incidentRepo;
@@ -56,6 +60,7 @@ namespace RacehorseTransport.Services.Implementations
             _trackingService = trackingService;
             _codeGenerator = codeGenerator;
             _notificationService = notificationService;
+            _fileStorage = fileStorage;
             _unitOfWork = unitOfWork;
         }
 
@@ -104,7 +109,9 @@ namespace RacehorseTransport.Services.Implementations
             query = query.ApplySort(string.IsNullOrWhiteSpace(options.Sort) ? "-reportedAt" : options.Sort, nameof(TripIncident.IncidentId));
 
             // Paging
-            return await query.ToPagedResultAsync(options, i => i.ToBusinessModel());
+            var page = await query.ToPagedResultAsync(options, i => i.ToBusinessModel());
+            await ResolveVetReportUrlsAsync(page.Items);
+            return page;
         }
 
         public async Task<IReadOnlyList<IncidentModel>> GetTripIncidentsAsync(int tripId, CurrentUser currentUser)
@@ -118,7 +125,9 @@ namespace RacehorseTransport.Services.Implementations
                 .ThenByDescending(i => i.IncidentId)
                 .ToListAsync();
 
-            return incidents.Select(i => i.ToBusinessModel()).ToList();
+            var models = incidents.Select(i => i.ToBusinessModel()).ToList();
+            await ResolveVetReportUrlsAsync(models);
+            return models;
         }
 
         public async Task<IncidentModel> GetIncidentByIdAsync(int id, CurrentUser currentUser)
@@ -135,7 +144,9 @@ namespace RacehorseTransport.Services.Implementations
                 throw new ForbiddenException("You cannot view this incident.");
             }
 
-            return incident.ToBusinessModel();
+            var model = incident.ToBusinessModel();
+            await ResolveVetReportUrlsAsync(new[] { model });
+            return model;
         }
 
         // =============================================================================================
@@ -146,7 +157,8 @@ namespace RacehorseTransport.Services.Implementations
         {
             var trip = await _tripRepo.GetQueryable()
                 .Include(t => t.Crew)
-                .Include(t => t.TripHorses)
+                .Include(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Horse)
+                .Include(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Booking)
                 .FirstOrDefaultAsync(t => t.TripId == tripId);
 
             if (trip == null)
@@ -177,6 +189,21 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Trip horse with ID {model.AffectedTripHorseId} is not on trip {trip.TripCode}.");
             }
 
+            // Dỡ khẩn cấp (thú y bắt buộc dỡ ngay): con ngựa rời xe ngay, hướng xử lý tiếp chờ phương án được duyệt
+            TripHorse? emergencyHorse = null;
+            if (model.EmergencyOffload)
+            {
+                if (!model.AffectedTripHorseId.HasValue)
+                {
+                    throw new BusinessException("Choose the horse that is offloaded in an emergency (AffectedTripHorseId).");
+                }
+                emergencyHorse = trip.TripHorses.First(th => th.TripHorseId == model.AffectedTripHorseId.Value);
+                if (!TripHorseStatuses.OnBoard.Contains(emergencyHorse.Status))
+                {
+                    throw new BusinessException($"{emergencyHorse.BookingHorse!.Horse!.Name} is not on the vehicle (status: {emergencyHorse.Status}), so it cannot be offloaded.");
+                }
+            }
+
             var customerIds = await GetCustomerIdsAsync(tripId);
             var bookingRecipients = await _tripHorseRepo.GetQueryable().GetBookingRecipientsAsync(tripId);
 
@@ -192,12 +219,24 @@ namespace RacehorseTransport.Services.Implementations
                     Location = model.Location,
                     Description = model.Description,
                     AffectedTripHorseId = model.AffectedTripHorseId,
+                    EmergencyOffload = model.EmergencyOffload,
                     Status = IncidentStatuses.Reported
                 };
+
+                if (emergencyHorse != null)
+                {
+                    emergencyHorse.Status = TripHorseStatuses.Offloaded;
+                    emergencyHorse.OffloadedAt = DateTimeOffset.UtcNow;
+                    emergencyHorse.OffloadReason = Truncate(model.Description, OffloadReasonMaxLength);
+                    emergencyHorse.OffloadOutcome = null;
+                }
                 await _incidentRepo.AddAsync(created);
 
                 string title = $"Incident {created.IncidentCode} on trip {trip.TripCode}";
-                string message = $"{created.Severity} {created.IncidentType} at {created.Location}: {created.Description}";
+                string emergencyText = emergencyHorse == null
+                    ? string.Empty
+                    : $" {emergencyHorse.BookingHorse!.Horse!.Name} was taken off the vehicle in an emergency; propose an OffloadHorse plan with the next step for the horse.";
+                string message = $"{created.Severity} {created.IncidentType} at {created.Location}: {created.Description}{emergencyText}";
 
                 // Người lập chuyến phụ trách xử lý; chuyến không có người lập thì báo mọi Coordinator
                 if (trip.PlannedByUserId.HasValue)
@@ -220,6 +259,18 @@ namespace RacehorseTransport.Services.Implementations
                     $"{created.IncidentType} at {created.Location}. Our team is working on it and will keep you updated.",
                     NotificationReferenceTypes.Incident,
                     created.IncidentId);
+
+                if (emergencyHorse != null)
+                {
+                    var owner = emergencyHorse.BookingHorse!.Booking!;
+                    await _notificationService.SendAsync(
+                        owner.CustomerUserId,
+                        $"{emergencyHorse.BookingHorse.Horse!.Name} was taken off trip {trip.TripCode}",
+                        $"On the veterinarian's instruction the horse was offloaded at {created.Location}. We will tell you the next step as soon as it is decided.",
+                        NotificationReferenceTypes.Booking,
+                        owner.BookingId,
+                        emailCustomers: true);
+                }
 
                 foreach (var recipient in bookingRecipients)
                 {
@@ -263,6 +314,22 @@ namespace RacehorseTransport.Services.Implementations
 
             var trip = incident.Trip!;
 
+            // OffloadHorse (R-12): chọn con ngựa + hướng xử lý tiếp; con đã dỡ khẩn cấp thì phương án phải là OffloadHorse cho chính con đó
+            TripHorse? offloadHorse = null;
+            if (model.ResponseAction == IncidentResponseActions.OffloadHorse)
+            {
+                offloadHorse = ResolveOffloadHorse(incident, model.AffectedTripHorseId);
+                OffloadRules.ValidatePlan(model.OffloadOutcome, incident.Severity, model.VetReportPath);
+                if (!string.IsNullOrWhiteSpace(model.VetReportPath) && !_fileStorage.IsValidPath(model.VetReportPath.Trim(), FileCategories.Documents))
+                {
+                    throw new BusinessException("VetReportPath is not a valid file path. Upload the report with POST /api/files (category 'documents') and send the returned path.");
+                }
+            }
+            else if (incident.EmergencyOffload)
+            {
+                throw new BusinessException($"A horse was offloaded in an emergency on this incident, so the plan must be {IncidentResponseActions.OffloadHorse} with the next step for that horse.");
+            }
+
             // Thay đổi tuyến đi kèm: kiểm tra ngay trên lộ trình hiện tại để Manager duyệt đúng tuyến sẽ đi
             var change = model.RouteChange;
             bool hasChange = change != null && (change.DeactivateCheckpointIds.Count > 0 || change.NewCheckpoints.Count > 0);
@@ -285,14 +352,23 @@ namespace RacehorseTransport.Services.Implementations
                 incident.RouteChange = IncidentMapper.SerializeRouteChange(plan == null ? null : ToRouteChange(plan, change!.InsertAfterCheckpointId));
                 incident.RevisedRouteNotes = model.RevisedRouteNotes;
                 incident.AdditionalCost = model.AdditionalCost;
+                incident.OffloadOutcome = offloadHorse == null ? null : model.OffloadOutcome;
+                incident.VetReportPath = offloadHorse == null || string.IsNullOrWhiteSpace(model.VetReportPath) ? null : model.VetReportPath.Trim();
+                if (offloadHorse != null)
+                {
+                    incident.AffectedTripHorseId = offloadHorse.TripHorseId;
+                }
                 incident.Status = IncidentStatuses.PlanProposed;
                 await _incidentRepo.UpdateAsync(incident);
 
                 string routeText = plan == null ? string.Empty : $" Route change: {DescribeRouteChange(plan.Removed, plan.Added)}";
+                string offloadText = offloadHorse == null
+                    ? string.Empty
+                    : $" {offloadHorse.BookingHorse!.Horse!.Name} leaves the trip ({incident.OffloadOutcome}).";
                 await _notificationService.SendToRoleAsync(
                     UserRoles.LogisticsManager,
                     $"Plan for incident {incident.IncidentCode} needs approval",
-                    $"Trip {trip.TripCode}: {incident.ProposedAction} (additional cost {incident.AdditionalCost:0.##}).{routeText}",
+                    $"Trip {trip.TripCode}: {incident.ProposedAction} (additional cost {incident.AdditionalCost:0.##}).{routeText}{offloadText}",
                     NotificationReferenceTypes.Incident,
                     incident.IncidentId);
             });
@@ -326,6 +402,19 @@ namespace RacehorseTransport.Services.Implementations
                 }
             }
 
+            // Con ngựa có thể đã được giao / đổi trạng thái từ lúc đề xuất; phương án cũ (chưa có hướng xử lý) cũng phải đề xuất lại
+            TripHorse? offloadHorse = null;
+            if (incident.ResponseAction == IncidentResponseActions.OffloadHorse)
+            {
+                offloadHorse = trip.TripHorses.FirstOrDefault(th => th.TripHorseId == incident.AffectedTripHorseId);
+                if (offloadHorse == null || incident.OffloadOutcome == null || !OffloadRules.CanBeOffloaded(offloadHorse, incident))
+                {
+                    string state = offloadHorse == null ? "no horse is selected" : $"{offloadHorse.BookingHorse!.Horse!.Name} is {offloadHorse.Status}";
+                    string outcomeText = incident.OffloadOutcome == null ? ", no next step chosen" : string.Empty;
+                    throw new BusinessException($"The offload plan can no longer be applied ({state}{outcomeText}). Reject the plan so the coordinator can propose a new one.");
+                }
+            }
+
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 incident.Status = IncidentStatuses.Approved;
@@ -342,6 +431,10 @@ namespace RacehorseTransport.Services.Implementations
                     }
                     routeChange!.AppliedAt = DateTimeOffset.UtcNow;
                     incident.RouteChange = IncidentMapper.SerializeRouteChange(routeChange);
+                }
+                if (offloadHorse != null)
+                {
+                    await ApplyOffloadAsync(trip, incident, offloadHorse);
                 }
                 await _incidentRepo.UpdateAsync(incident);
 
@@ -665,6 +758,98 @@ namespace RacehorseTransport.Services.Implementations
             return await GetIncidentByIdAsync(incidentId, currentUser);
         }
 
+        // =============================================================================================
+        // Ngựa rời chuyến qua sự cố (R-12)
+        // =============================================================================================
+
+        private const int OffloadReasonMaxLength = 300; // độ dài cột trip_horses.offload_reason
+
+        // Con ngựa của phương án OffloadHorse: chọn trong request, không có thì lấy con đã chọn lúc báo sự cố
+        private static TripHorse ResolveOffloadHorse(TripIncident incident, int? requestedTripHorseId)
+        {
+            var trip = incident.Trip!;
+            int? tripHorseId = requestedTripHorseId ?? incident.AffectedTripHorseId;
+            if (!tripHorseId.HasValue)
+            {
+                throw new BusinessException("Choose the horse that leaves the trip (AffectedTripHorseId).");
+            }
+            if (incident.EmergencyOffload && tripHorseId != incident.AffectedTripHorseId)
+            {
+                throw new BusinessException("This incident is about the horse offloaded in an emergency; the plan must be for that horse.");
+            }
+
+            var tripHorse = trip.TripHorses.FirstOrDefault(th => th.TripHorseId == tripHorseId.Value)
+                ?? throw new BusinessException($"Trip horse with ID {tripHorseId} is not on trip {trip.TripCode}.");
+            if (!OffloadRules.CanBeOffloaded(tripHorse, incident))
+            {
+                throw new BusinessException($"{tripHorse.BookingHorse!.Horse!.Name} cannot leave the trip (status: {tripHorse.Status}).");
+            }
+            return tripHorse;
+        }
+
+        // Duyệt phương án OffloadHorse (gọi trong transaction): đổi trạng thái con ngựa theo hướng xử lý và báo các bên
+        private async Task ApplyOffloadAsync(Trip trip, TripIncident incident, TripHorse tripHorse)
+        {
+            string outcome = incident.OffloadOutcome!;
+            var bookingHorse = tripHorse.BookingHorse!;
+            var booking = bookingHorse.Booking!;
+            string horseName = bookingHorse.Horse!.Name;
+
+            tripHorse.Status = OffloadRules.StatusFor(outcome);
+            tripHorse.OffloadOutcome = outcome;
+            tripHorse.OffloadedAt ??= DateTimeOffset.UtcNow;
+            tripHorse.OffloadReason ??= Truncate($"{incident.IncidentCode}: {incident.Description}", OffloadReasonMaxLength);
+            if (outcome == OffloadOutcomes.Deceased)
+            {
+                bookingHorse.Status = BookingHorseStatuses.Deceased;
+                // TODO(BE-12): tự mở hồ sơ bồi thường bảo hiểm cho con ngựa này
+            }
+            // TODO(BE-14b): hoàn phần cước chưa đi của con ngựa theo fault_party (trừ WaitRecover vì con ngựa còn đi chuyến sau)
+
+            var (title, message) = outcome switch
+            {
+                OffloadOutcomes.WaitRecover => (
+                    $"{horseName} left trip {trip.TripCode} to recover",
+                    $"The horse stays near {incident.Location} under veterinary care and will travel on a later trip once it has recovered. Costs follow section 9.1 of the service policy."),
+                OffloadOutcomes.ReturnToOrigin => (
+                    $"{horseName} will be returned to the pickup point",
+                    $"The horse left trip {trip.TripCode} at {incident.Location} and our team will bring it back to {booking.PickupAddress}. Refunds and costs follow section 9.1 of the service policy."),
+                OffloadOutcomes.HandOverHere => (
+                    $"{horseName} can be collected at {incident.Location}",
+                    "Please send the recipient there to sign the handover (e-POD) with our crew. The unused part of the fare follows section 9.1 of the service policy."),
+                _ => (
+                    $"We are deeply sorry: {horseName} has died",
+                    $"The horse died during trip {trip.TripCode}. A veterinary report has been recorded and our team will contact you about the insurance claim.")
+            };
+            await _notificationService.SendAsync(
+                booking.CustomerUserId, title, message, NotificationReferenceTypes.Booking, booking.BookingId, emailCustomers: true);
+
+            if (outcome == OffloadOutcomes.WaitRecover)
+            {
+                string planTitle = $"{horseName} is back in the planning queue";
+                string planMessage = $"Booking {booking.BookingCode}: the horse left trip {trip.TripCode} to recover. Plan another trip once it is fit to travel.";
+                if (trip.PlannedByUserId.HasValue)
+                {
+                    await _notificationService.SendAsync(trip.PlannedByUserId.Value, planTitle, planMessage, NotificationReferenceTypes.Trip, trip.TripId);
+                }
+                else
+                {
+                    await _notificationService.SendToRoleAsync(UserRoles.FleetCoordinator, planTitle, planMessage, NotificationReferenceTypes.Trip, trip.TripId);
+                }
+            }
+        }
+
+        private async Task ResolveVetReportUrlsAsync(IEnumerable<IncidentModel> models)
+        {
+            await _fileStorage.ResolveViewUrlsAsync(models, m => m.VetReportPath, (m, url) => m.VetReportUrl = url);
+        }
+
+        private static string Truncate(string value, int maxLength)
+        {
+            value = value.Trim();
+            return value.Length <= maxLength ? value : value[..maxLength];
+        }
+
         // ---------------------------------------------------------------------------------------------
 
         private IQueryable<TripIncident> QueryIncidents()
@@ -696,6 +881,9 @@ namespace RacehorseTransport.Services.Implementations
             var incident = await _incidentRepo.GetQueryable()
                 .Include(i => i.Trip!).ThenInclude(t => t.Crew)
                 .Include(i => i.Trip!).ThenInclude(t => t.Checkpoints)
+                .Include(i => i.Trip!).ThenInclude(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Horse)
+                .Include(i => i.Trip!).ThenInclude(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Booking)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(i => i.IncidentId == incidentId);
 
             if (incident == null)
