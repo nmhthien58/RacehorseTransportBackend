@@ -8,6 +8,13 @@ namespace RacehorseTransport.Services.Interfaces
     {
         Task<PaymentSettingsModel> GetPaymentSettingsAsync();
         Task<PaymentSettingsModel> UpdatePaymentSettingsAsync(PaymentSettingsModel model, CurrentUser currentUser);
+
+        // BE-17: cấu hình dùng trong Chính sách dịch vụ (báo giá, giao trễ, bảo hiểm, ngựa, giao nhận, phiên bản)
+        Task<PolicySettingsModel> GetPolicySettingsAsync();
+        Task<PolicySettingsModel> UpdatePolicySettingsAsync(PolicySettingsModel model, CurrentUser currentUser);
+
+        // Trang Chính sách công khai: phiên bản + mọi giá trị cấu hình chính sách nhắc tới (kể cả Payment.*)
+        Task<PublicPolicyModel> GetPublicPolicyAsync();
     }
 
     // Một cổng thanh toán (VNPay thật hoặc cổng giả lập)
