@@ -269,11 +269,139 @@ public class PricingServiceTests
         Assert.True(quote.Total > 0);
     }
 
-    private static PricingService CreateService(int? clearanceDays = null)
+    // ---------- R-10: khoảng giá ước tính (BE-03) ----------
+
+    // Đường bộ, khoảng đón xa (không Express), 1 con chuồng ghép, không bảo hiểm
+    private static QuoteInputModel GroundInput(string origin, string destination, bool withCoordinates = true)
+    {
+        DateTimeOffset pickupStart = EarliestPickup().AddDays(Options.ExpressWindowDays + 30);
+        return new QuoteInputModel
+        {
+            TransportMode = TransportModes.Ground,
+            PickupCountryCode = origin,
+            DropoffCountryCode = destination,
+            PickupLat = withCoordinates ? 21.0285m : null,
+            PickupLng = withCoordinates ? 105.8542m : null,
+            DropoffLat = withCoordinates ? 13.7563m : null,
+            DropoffLng = withCoordinates ? 100.5018m : null,
+            PickupWindowStart = pickupStart,
+            PickupWindowEnd = pickupStart.AddDays(2),
+            DeliveryDeadline = pickupStart.AddDays(40),
+            StallClasses = new List<string> { StallClasses.Shared }
+        };
+    }
+
+    [Fact]
+    public async Task QuoteRange_UsesMapDistanceAndCountriesAlongTheRoute()
+    {
+        var geo = new FakeGeoService(500, "VN", "LA", "TH");
+        var service = CreateService(geo: geo);
+
+        var quote = await service.CalculateQuoteRangeAsync(GroundInput("VN", "TH"));
+
+        Assert.Equal(500, quote.DistanceKm);
+        Assert.Equal(new[] { "LA" }, quote.TransitCountryCodes);
+        Assert.True(geo.Called);
+        Assert.Contains(quote.Lines, l => l.Code == "FEE_TRANSIT");
+        Assert.Equal(quote.Total, quote.QuoteMin);
+    }
+
+    [Fact]
+    public async Task QuoteRange_MaxAddsLongerDistanceAndOneReserveTransitCountry()
+    {
+        var service = CreateService(geo: new FakeGeoService(500, "VN", "LA", "TH"));
+
+        var quote = await service.CalculateQuoteRangeAsync(GroundInput("VN", "TH"));
+
+        // 500 km × 1,25 = 625 km: cước +250 (2 USD/km), phụ phí nhiên liệu 8% trên phần tăng +20, + 1 nước dự phòng 150
+        Assert.Equal(quote.QuoteMin + 250 + 20 + 150, quote.QuoteMax);
+    }
+
+    [Fact]
+    public async Task QuoteRange_DomesticRoute_HasNoReserveCountry()
+    {
+        var service = CreateService(geo: new FakeGeoService(500, "VN"));
+
+        var quote = await service.CalculateQuoteRangeAsync(GroundInput("VN", "VN"));
+
+        Assert.Empty(quote.TransitCountryCodes);
+        Assert.Equal(quote.QuoteMin + 250 + 20, quote.QuoteMax);
+    }
+
+    [Fact]
+    public async Task QuoteRange_WithoutCoordinates_IgnoresTransitCountriesTypedByCustomer()
+    {
+        var service = CreateService(geo: new FakeGeoService(500, "VN", "LA", "TH"));
+        var input = GroundInput("VN", "TH", withCoordinates: false);
+        input.DistanceKm = 500;
+        input.TransitCountryCodes = new List<string> { "LA" };
+
+        var quote = await service.CalculateQuoteRangeAsync(input);
+
+        Assert.Empty(quote.TransitCountryCodes);
+        Assert.DoesNotContain(quote.Lines, l => l.Code == "FEE_TRANSIT");
+    }
+
+    [Fact]
+    public async Task QuoteRange_Air_MinEqualsMax()
+    {
+        var service = CreateService(geo: new FakeGeoService(500));
+
+        var quote = await service.CalculateQuoteRangeAsync(CreateInput(new[] { StallClasses.Shared }));
+
+        Assert.Equal(quote.QuoteMin, quote.QuoteMax);
+    }
+
+    [Fact]
+    public async Task QuoteRange_FlagsEstimatedRoute()
+    {
+        var service = CreateService(geo: new FakeGeoService(500, "VN") { IsEstimate = true });
+
+        var quote = await service.CalculateQuoteRangeAsync(GroundInput("VN", "VN"));
+
+        Assert.True(quote.RouteIsEstimate);
+    }
+
+    private sealed class FakeGeoService : IGeoService
+    {
+        private readonly decimal _km;
+        private readonly List<string> _countries;
+        public bool IsEstimate { get; init; }
+        public bool Called { get; private set; }
+
+        public FakeGeoService(decimal km, params string[] countries)
+        {
+            _km = km;
+            _countries = countries.ToList();
+        }
+
+        public Task<IReadOnlyList<GeoPlaceModel>> SearchAsync(string query, string? countryCode, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<GeoPlaceModel?> ReverseAsync(double lat, double lng, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<GeoRouteModel> RouteAsync(IReadOnlyList<GeoPointModel> points, bool includeCountries = false, CancellationToken cancellationToken = default)
+        {
+            Called = true;
+            return Task.FromResult(new GeoRouteModel
+            {
+                TotalDistanceKm = _km,
+                IsEstimate = IsEstimate,
+                CountryCodes = includeCountries ? _countries : null
+            });
+        }
+
+        public Task<IReadOnlyList<string>> CountriesAlongAsync(IReadOnlyList<GeoPointModel> polyline, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>(_countries);
+    }
+
+    private static PricingService CreateService(int? clearanceDays = null, IGeoService? geo = null)
     {
         var prices = new List<PriceItem>
         {
             Price("FREIGHT", PriceCategories.Freight, PriceCalcTypes.PerHorse, 1000m, TransportModes.Air, "TH"),
+            Price("FREIGHT", PriceCategories.Freight, PriceCalcTypes.PerKmPerHorse, 2m, TransportModes.Ground),
             Price("STALL_SHARED", PriceCategories.StallClass, PriceCalcTypes.Multiplier, 1m),
             Price("STALL_COMFORT", PriceCategories.StallClass, PriceCalcTypes.Multiplier, 1.4m),
             Price("STALL_PRIVATE", PriceCategories.StallClass, PriceCalcTypes.Multiplier, 2.2m),
@@ -298,6 +426,7 @@ public class PricingServiceTests
             new UnusedDistanceService(),
             new TransitTimeEstimator(Microsoft.Extensions.Options.Options.Create(new TransitOptions())),
             new FixedClearanceSchedule(clearanceDays ?? Options.DefaultClearanceDays),
+            geo ?? new FakeGeoService(0),
             Microsoft.Extensions.Options.Options.Create(Options));
     }
 
