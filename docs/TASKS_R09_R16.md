@@ -143,7 +143,7 @@ Làm:
 - `GET /api/policy` **không cần đăng nhập**: trả phiên bản chính sách + toàn bộ giá trị cấu hình mà `CHINH_SACH_DICH_VU.md` nhắc tới (kể cả các khóa `Payment.*` đã có), để frontend dựng trang Chính sách.
 - Giá trị không hợp lệ (âm, % > 100…) → 400.
 
-### [ ] BE-01 · Dịch vụ bản đồ (R-11)
+### [x] BE-01 · Dịch vụ bản đồ (R-11)
 Không dùng Google Maps (Việt Nam và Trung Quốc nằm trong danh sách cấm của Google Maps Platform). Dùng **Goong** trong Việt Nam (đã có `Goong:ApiKey`), **Nominatim** (tìm địa chỉ) + **OSRM** (chỉ đường) ngoài Việt Nam. Thiết kế qua interface để thay nhà cung cấp (vd Mapbox) mà không sửa nơi gọi.
 
 Làm:
@@ -157,6 +157,8 @@ Làm:
 - Cấu hình URL các nhà cung cấp trong `appsettings` (`Geo:NominatimUrl`, `Geo:OsrmUrl`).
 
 Xong khi: unit test với `HttpMessageHandler` giả cho từng nhà cung cấp + trường hợp lỗi rơi về dự phòng.
+
+Đã làm: `IGeoService` điều phối các `IGeocodingProvider` / `IRoutingProvider` (Goong, Nominatim, OSRM; thứ tự đăng ký trong DI = thứ tự ưu tiên, thêm Mapbox chỉ cần một class mới). Dự phòng khi lỗi: đường chim bay × `Geo:FallbackRoadFactor` (1,3), tốc độ `Transit:TruckAverageSpeedKmh`. `CountriesAlongAsync` chia đôi đoạn đường thay vì lấy mẫu đều để ít gọi Nominatim. Goong chỉ chạy khi có `Goong:ApiKey` (máy dev hiện chưa có khóa, nên đã thử thật với Nominatim + OSRM).
 
 ### [ ] BE-03 · Khoảng giá ước tính khi tạo đơn (R-10)
 Làm:

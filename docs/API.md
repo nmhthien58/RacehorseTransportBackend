@@ -16,6 +16,7 @@ Tài liệu này hướng dẫn gọi API của hệ thống vận chuyển ng�
 4. [Đăng nhập và tài khoản của tôi](#4-đăng-nhập-và-tài-khoản-của-tôi)
 5. [Quản lý người dùng](#5-quản-lý-người-dùng)
 6. [Ngựa](#6-ngựa)
+6b. [Bản đồ: tìm địa chỉ, chỉ đường](#6b-bản-đồ-tìm-địa-chỉ-chỉ-đường)
 7. [Flow 1 – Đơn vận chuyển](#7-flow-1--đơn-vận-chuyển)
 8. [Flow 2 – Hồ sơ kiểm dịch](#8-flow-2--hồ-sơ-kiểm-dịch)
 9. [Flow 3 – Lập kế hoạch chuyến](#9-flow-3--lập-kế-hoạch-chuyến)
@@ -1457,6 +1458,201 @@ Lỗi thường gặp:
 |---|---|---|
 | 403 | `You can only modify your own horses.` | Xóa hồ sơ ngựa của người khác |
 | 404 | `Document with ID 12 was not found for horse 1.` | Hồ sơ không có hoặc không thuộc con ngựa này |
+
+---
+
+## 6b. Bản đồ: tìm địa chỉ, chỉ đường
+
+Dùng cho component bản đồ (FE-01): ô tìm địa chỉ có gợi ý, ghim điểm trên bản đồ, vẽ tuyến. **Không dùng Google Maps** (Việt Nam và Trung Quốc nằm trong danh sách cấm của Google Maps Platform). Backend tự chọn nhà cung cấp:
+
+| Việc | Trong Việt Nam | Ngoài Việt Nam |
+|---|---|---|
+| Tìm địa chỉ, tọa độ → địa chỉ | Goong | Nominatim (OpenStreetMap) |
+| Chỉ đường | Goong (xe tải), khi **cả hai đầu chặng** ở Việt Nam | OSRM (OpenStreetMap) |
+
+Frontend chỉ gọi 3 API dưới đây, không gọi thẳng nhà cung cấp nào và không cần khóa API. Bản đồ nền dùng **Leaflet + OpenStreetMap**.
+
+Vài điều nên biết:
+
+- Kết quả được lưu đệm 7 ngày, nên lần gọi sau với cùng địa chỉ / tọa độ trả về ngay.
+- Nominatim chỉ cho **1 request / giây**: chờ 400 ms sau khi người dùng ngừng gõ rồi mới gọi `search` (debounce), đừng gọi theo từng phím.
+- Nhà cung cấp chỉ đường bị lỗi thì chặng đó được **ước tính** theo đường chim bay × 1,3, thời gian theo tốc độ xe chở ngựa trung bình; chặng đó có `isEstimate: true` và đường vẽ là đoạn thẳng. Nên hiện chú thích "khoảng cách ước tính".
+- Tọa độ luôn là số thập phân: `lat` (vĩ độ, −90 … 90), `lng` (kinh độ, −180 … 180). Mã nước là mã ISO 2 chữ in hoa (`VN`, `CN`, `KH`...).
+
+### GET /api/geo/search — Gợi ý địa chỉ
+
+- **Ai gọi được:** Mọi người đã đăng nhập
+
+Tham số query:
+
+| Tham số | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `q` | chuỗi | Có | Chữ người dùng gõ, 2–200 ký tự |
+| `country` | chuỗi | Không | Mã nước 2 chữ để thu hẹp tìm kiếm. `VN` dùng Goong; bỏ trống = tìm khắp nơi |
+
+Ví dụ: `GET /api/geo/search?q=Nam%20Ninh`
+
+Response `200`: `data` là mảng gợi ý (tối đa 5), có thể rỗng:
+
+```json
+{
+  "success": true,
+  "message": "Request processed successfully",
+  "data": [
+    {
+      "displayName": "Nam Ninh, Quảng Tây, Trung Quốc",
+      "lat": 22.8158,
+      "lng": 108.318,
+      "countryCode": "CN",
+      "provider": "Nominatim"
+    }
+  ],
+  "errors": null
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `displayName` | Địa chỉ đầy đủ để hiện trong danh sách gợi ý và điền vào ô địa chỉ |
+| `lat`, `lng` | Tọa độ để ghim lên bản đồ và gửi khi tạo đơn |
+| `countryCode` | Nước của địa điểm |
+| `provider` | Nhà cung cấp trả kết quả (`Goong`, `Nominatim`), chỉ để tham khảo |
+
+Ví dụ ô tìm có debounce:
+
+```js
+let timer;
+function onAddressInput(text) {
+  clearTimeout(timer);
+  if (text.trim().length < 2) return;
+  timer = setTimeout(async () => {
+    const res = await api.get("/api/geo/search", { params: { q: text } });
+    setSuggestions(res.data.data);
+  }, 400);
+}
+```
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Validation failed` (`q must have at least 2 characters.`) | `q` quá ngắn / quá dài |
+| 400 | `Validation failed` (`country must be a 2-letter ISO code such as VN.`) | `country` sai dạng |
+| 401 | | Chưa đăng nhập |
+
+### GET /api/geo/reverse — Tọa độ → địa chỉ
+
+Khi người dùng bấm lên bản đồ hoặc kéo ghim: lấy địa chỉ và nước của điểm đó để điền vào ô địa chỉ.
+
+- **Ai gọi được:** Mọi người đã đăng nhập
+
+| Tham số | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `lat` | số | Có | Vĩ độ, −90 … 90 |
+| `lng` | số | Có | Kinh độ, −180 … 180 |
+
+Ví dụ: `GET /api/geo/reverse?lat=10.7769&lng=106.7009`
+
+Response `200`: `data` là một địa điểm (dạng như `search`). `lat`, `lng` giữ đúng điểm người dùng đã chọn.
+
+```json
+{
+  "displayName": "Khu phố 3, Phường Sài Gòn, Thành phố Hồ Chí Minh, 71016, Việt Nam",
+  "lat": 10.7769,
+  "lng": 106.7009,
+  "countryCode": "VN",
+  "provider": "Nominatim"
+}
+```
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Validation failed` (`lat must be between -90 and 90.`) | Tọa độ ngoài khoảng |
+| 404 | `No address was found at this location. Pick a point on land or search for the address.` | Bấm giữa biển, hoặc nhà cung cấp tạm lỗi |
+
+### POST /api/geo/route — Chỉ đường qua nhiều điểm
+
+Tính đường bộ đi qua các điểm **theo đúng thứ tự gửi lên**: quãng đường, thời gian lái từng chặng, tổng, và đường để vẽ. Dùng để hiện quãng đường A → B khi tạo đơn, và để vẽ tuyến có nhiều mốc khi lập tuyến.
+
+- **Ai gọi được:** Mọi người đã đăng nhập
+- **Dữ liệu gửi lên:** JSON
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `points` | mảng | Có | 2–25 điểm theo thứ tự đi |
+| `points[].lat`, `points[].lng` | số | Có | Tọa độ |
+| `points[].countryCode` | chuỗi | Không | Nước của điểm (lấy từ kết quả `search` / `reverse`). Gửi kèm thì backend khỏi tra lại, nhanh hơn |
+| `includeCountries` | true/false | Không (mặc định `false`) | `true` = trả thêm các nước tuyến đi qua theo thứ tự. Lần đầu có thể mất vài giây đến vài chục giây với tuyến dài (mỗi điểm phải tra nước, 1 lần / giây); các lần sau lấy từ bộ nhớ đệm |
+
+Ví dụ request:
+
+```json
+{
+  "points": [
+    { "lat": 21.0285, "lng": 105.8542, "countryCode": "VN" },
+    { "lat": 22.817, "lng": 108.3665, "countryCode": "CN" }
+  ],
+  "includeCountries": true
+}
+```
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Request processed successfully",
+  "data": {
+    "legs": [
+      {
+        "fromIndex": 0,
+        "toIndex": 1,
+        "distanceKm": 385.14,
+        "durationHours": 4.92,
+        "provider": "Osrm",
+        "isEstimate": false,
+        "polyline": [[21.0285, 105.8542], [21.0312, 105.8601], [22.817, 108.3665]]
+      }
+    ],
+    "totalDistanceKm": 385.14,
+    "totalDurationHours": 4.92,
+    "isEstimate": false,
+    "polyline": [[21.0285, 105.8542], [21.0312, 105.8601], [22.817, 108.3665]],
+    "countryCodes": ["VN", "CN"]
+  },
+  "errors": null
+}
+```
+
+(Mảng `polyline` thật có hàng trăm đến vài nghìn điểm, ở đây rút gọn.)
+
+| Trường | Ý nghĩa |
+|---|---|
+| `legs[]` | Từng chặng giữa hai điểm liên tiếp: `fromIndex` → `toIndex` là vị trí trong mảng `points` gửi lên |
+| `legs[].distanceKm`, `durationHours` | Quãng đường (km) và thời gian lái (giờ) của chặng, chưa tính nghỉ / qua cửa khẩu. Dùng để hiện nhãn trên từng đoạn đường |
+| `legs[].provider` | `Goong`, `Osrm`, hoặc `Estimate` (ước tính khi nhà cung cấp lỗi) |
+| `legs[].isEstimate` | `true` = chặng ước tính theo đường chim bay |
+| `legs[].polyline` | Đường vẽ của chặng: mảng `[vĩ độ, kinh độ]` |
+| `totalDistanceKm`, `totalDurationHours` | Tổng các chặng |
+| `isEstimate` | `true` nếu có ít nhất một chặng ước tính |
+| `polyline` | Đường vẽ cả tuyến, tối đa 2000 điểm |
+| `countryCodes` | Các nước đi qua theo thứ tự (chỉ có khi `includeCountries: true`, ngược lại `null`) |
+
+Vẽ bằng react-leaflet:
+
+```jsx
+import { MapContainer, TileLayer, Polyline } from "react-leaflet";
+
+<MapContainer center={[16, 106]} zoom={5} style={{ height: 320 }}>
+  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+             attribution="&copy; OpenStreetMap contributors" />
+  <Polyline positions={route.polyline} />
+</MapContainer>
+```
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Validation failed` (`points must have at least 2 points.`) | Ít hơn 2 điểm hoặc quá 25 điểm |
+| 400 | `Validation failed` (`lat must be between -90 and 90.`) | Tọa độ sai |
+| 401 | | Chưa đăng nhập |
 
 ---
 
@@ -6967,6 +7163,9 @@ Tổng cộng 118 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | GET | `/api/horses/{id}/documents` | Danh sách hồ sơ thú y của ngựa | Chủ ngựa, hoặc nhân sự |
 | POST | `/api/horses/{id}/documents` | Thêm một hồ sơ thú y | Chủ ngựa (Customer) |
 | DELETE | `/api/horses/{id}/documents/{documentId}` | Xóa một hồ sơ thú y | Chủ ngựa (Customer) |
+| GET | `/api/geo/search` | Gợi ý địa chỉ khi gõ | Mọi người đã đăng nhập |
+| GET | `/api/geo/reverse` | Tọa độ → địa chỉ + nước | Mọi người đã đăng nhập |
+| POST | `/api/geo/route` | Chỉ đường qua nhiều điểm: từng chặng, tổng, đường vẽ, các nước đi qua | Mọi người đã đăng nhập |
 
 **7. Flow 1 – Đơn vận chuyển**
 
