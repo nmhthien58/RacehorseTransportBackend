@@ -16,6 +16,8 @@ namespace RacehorseTransport.Services.Implementations
     //   R-12: con ngựa rời chuyến với hướng xử lý HandOverHere ký e-POD riêng tại nơi dỡ (TripHorseId), nên một đơn
     //   có thể có nhiều biên bản trên cùng chuyến. Ngựa chết / đưa về nơi đi cũng được tính là đã xong với đơn.
     //   Tới Destination + đủ biên bản -> Manager đóng chuyến, chốt KPI, chia chi phí phát sinh cho các đơn.
+    //   R-09: mọi sự cố đã duyệt phải đóng (có nguyên nhân) trước; chuyến trễ do lỗi công ty thì tính bồi thường giao trễ
+    //   cho từng đơn, chờ Manager duyệt (DelayCompensationService).
     public class TripCompletionService : ITripCompletionService
     {
         // Chuyến đang chạy: ký e-POD ở mốc DropOff giữa đường được
@@ -34,6 +36,8 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IRepository<HandoverAcceptance> _handoverRepo;
         private readonly IRepository<BookingRequest> _bookingRepo;
         private readonly IRepository<TransportAsset> _assetRepo;
+        private readonly IRepository<DelayCompensation> _compensationRepo;
+        private readonly IPricingService _pricingService;
         private readonly ITripService _tripService;
         private readonly IBookingService _bookingService;
         private readonly ITrackingService _trackingService;
@@ -47,6 +51,8 @@ namespace RacehorseTransport.Services.Implementations
             IRepository<HandoverAcceptance> handoverRepo,
             IRepository<BookingRequest> bookingRepo,
             IRepository<TransportAsset> assetRepo,
+            IRepository<DelayCompensation> compensationRepo,
+            IPricingService pricingService,
             ITripService tripService,
             IBookingService bookingService,
             ITrackingService trackingService,
@@ -59,6 +65,8 @@ namespace RacehorseTransport.Services.Implementations
             _handoverRepo = handoverRepo;
             _bookingRepo = bookingRepo;
             _assetRepo = assetRepo;
+            _compensationRepo = compensationRepo;
+            _pricingService = pricingService;
             _tripService = tripService;
             _bookingService = bookingService;
             _trackingService = trackingService;
@@ -273,9 +281,19 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"The trip cannot be closed: {string.Join("; ", pending)}.");
             }
 
+            // R-09: nguyên nhân sự cố quyết định KPI và bồi thường trễ, nên sự cố đã duyệt phải được đóng trước
+            var unresolved = trip.Incidents.Where(i => i.Status == IncidentStatuses.Approved).Select(i => i.IncidentCode).ToList();
+            if (unresolved.Count > 0)
+            {
+                throw new BusinessException($"Resolve incident(s) {string.Join(", ", unresolved)} and choose their cause before closing the trip.");
+            }
+
             var acceptedIncidents = trip.Incidents.Where(i => AcceptedIncidentStatuses.Contains(i.Status)).ToList();
+            bool companyFault = DelayCompensationRules.IsCompanyFault(acceptedIncidents.Select(i => i.FaultParty).ToList());
             var now = DateTimeOffset.UtcNow;
-            var kpi = TripKpiCalculator.Calculate(trip.PlannedEndDate, trip.ActualEndDate ?? now, acceptedIncidents.Count > 0);
+            // Trễ chỉ được miễn (DelayedForceMajeure) khi mọi sự cố đều do bất khả kháng / khách
+            var kpi = TripKpiCalculator.Calculate(trip.PlannedEndDate, trip.ActualEndDate ?? now, hasForceMajeure: !companyFault);
+            var compensations = companyFault ? await BuildDelayCompensationsAsync(trip) : new List<DelayCompensation>();
 
             var bookingIds = trip.TripHorses.Select(th => th.BookingHorse!.BookingId).Distinct().ToList();
             var customerIds = trip.TripHorses.Select(th => th.BookingHorse!.Booking!.CustomerUserId).Distinct().ToList();
@@ -304,6 +322,21 @@ namespace RacehorseTransport.Services.Implementations
 
                 var (completedBookings, awaitingPayment) = await CompleteFinishedBookingsAsync(
                     bookingIds, extras, paymentSettings.ExtraPaymentDueDays);
+
+                if (compensations.Count > 0)
+                {
+                    await _compensationRepo.AddRangeAsync(compensations);
+                    foreach (var compensation in compensations)
+                    {
+                        var booking = trip.TripHorses.Select(th => th.BookingHorse!.Booking!).First(b => b.BookingId == compensation.BookingId);
+                        await _notificationService.SendToRoleAsync(
+                            UserRoles.LogisticsManager,
+                            $"Delay compensation to approve: {booking.BookingCode}",
+                            $"Trip {trip.TripCode} delivered {compensation.DelayHours:0.##} hour(s) late. Suggested compensation: {compensation.CalculatedAmount:N2} {compensation.CurrencyCode} ({compensation.Percent:0.##}% of freight).",
+                            NotificationReferenceTypes.Booking,
+                            booking.BookingId);
+                    }
+                }
 
                 var recipients = new List<int>(trip.Crew.Select(c => c.UserId));
                 if (trip.PlannedByUserId.HasValue)
@@ -434,6 +467,51 @@ namespace RacehorseTransport.Services.Implementations
                 .Sum(p => p.Amount);
         }
 
+        // R-09: bồi thường giao trễ cho từng đơn đã ký e-POD trên chuyến (chuyến đã xác định là trễ do lỗi công ty).
+        // Đơn tạo trước khi có thanh toán (DepositPercent = null) và đơn đã có bồi thường cho chuyến này thì bỏ qua.
+        private async Task<List<DelayCompensation>> BuildDelayCompensationsAsync(Trip trip)
+        {
+            var settings = await _settingService.GetPolicySettingsAsync();
+            var result = new List<DelayCompensation>();
+
+            var bookings = trip.TripHorses.Select(th => th.BookingHorse!.Booking!).DistinctBy(b => b.BookingId).ToList();
+            foreach (var booking in bookings.Where(b => b.DepositPercent.HasValue))
+            {
+                var deliveredAt = trip.Handovers.Where(h => h.BookingId == booking.BookingId).Select(h => (DateTimeOffset?)h.HandoverDateTime).Max();
+                if (deliveredAt == null)
+                {
+                    continue;
+                }
+
+                double lateMinutes = (deliveredAt.Value - booking.DeliveryDeadline).TotalMinutes;
+                decimal percent = DelayCompensationRules.Percent(lateMinutes, settings);
+                if (percent <= 0)
+                {
+                    continue;
+                }
+
+                decimal freight = DelayCompensationRules.FreightAmount(_pricingService.ParseLines(booking.QuoteBreakdown), booking.EstimatedCost);
+                decimal amount = DelayCompensationRules.Amount(freight, percent);
+                if (amount <= 0 || await _compensationRepo.ExistsAsync(c => c.BookingId == booking.BookingId && c.TripId == trip.TripId))
+                {
+                    continue;
+                }
+
+                result.Add(new DelayCompensation
+                {
+                    BookingId = booking.BookingId,
+                    TripId = trip.TripId,
+                    DelayHours = DelayCompensationRules.DelayHours(deliveredAt.Value, booking.DeliveryDeadline),
+                    FreightAmount = freight,
+                    Percent = percent,
+                    CalculatedAmount = amount,
+                    CurrencyCode = booking.CurrencyCode,
+                    Status = DelayCompensationStatuses.AwaitingApproval
+                });
+            }
+            return result;
+        }
+
         private static string PendingReason(TripHorse tripHorse)
         {
             if (tripHorse.Status != TripHorseStatuses.Offloaded)
@@ -455,7 +533,8 @@ namespace RacehorseTransport.Services.Implementations
             void Add(int bookingId, decimal amount) =>
                 result[bookingId] = (result.TryGetValue(bookingId, out var current) ? current : 0) + amount;
 
-            foreach (var incident in acceptedIncidents.Where(i => i.AdditionalCost > 0))
+            // Chính sách 9.1: sự cố do lỗi công ty thì công ty chịu chi phí, không tính vào phát sinh của khách
+            foreach (var incident in acceptedIncidents.Where(i => i.AdditionalCost > 0 && i.FaultParty != FaultParties.Company))
             {
                 var affected = incident.AffectedTripHorseId.HasValue
                     ? trip.TripHorses.FirstOrDefault(th => th.TripHorseId == incident.AffectedTripHorseId.Value)

@@ -23,6 +23,8 @@ namespace RacehorseTransport.API.ResponseModels
         public string? RevisedRouteNotes { get; set; }
         public decimal AdditionalCost { get; set; }
         public string? RejectionReason { get; set; }
+        public string? FaultParty { get; set; }   // Company | Customer | ForceMajeure, có khi sự cố đã đóng
+        public string? FaultNote { get; set; }
         public int? ApprovedByUserId { get; set; }
         public string? ApprovedByName { get; set; }
         public DateTimeOffset? ApprovedAt { get; set; }

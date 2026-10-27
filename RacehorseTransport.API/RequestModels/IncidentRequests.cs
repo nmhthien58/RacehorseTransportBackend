@@ -68,6 +68,17 @@ namespace RacehorseTransport.API.RequestModels
         public string? VetReportPath { get; set; }
     }
 
+    // R-09: đóng sự cố phải chọn nguyên nhân
+    public class ResolveIncidentRequest
+    {
+        // Company | Customer | ForceMajeure
+        [Required(ErrorMessage = "FaultParty is required.")]
+        public string FaultParty { get; set; } = string.Empty;
+
+        [MaxLength(500, ErrorMessage = "FaultNote cannot exceed 500 characters.")]
+        public string? FaultNote { get; set; }
+    }
+
     public class RejectIncidentPlanRequest
     {
         [Required(ErrorMessage = "Reason is required.")]
