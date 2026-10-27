@@ -44,6 +44,14 @@ namespace RacehorseTransport.API.Mappers
                 PickupLng = request.PickupLng,
                 DropoffLat = request.DropoffLat,
                 DropoffLng = request.DropoffLng,
+                Recipient = new RecipientInputModel
+                {
+                    RecipientIsCustomer = request.RecipientIsCustomer,
+                    RecipientName = request.RecipientName,
+                    RecipientPhone = request.RecipientPhone,
+                    RecipientEmail = request.RecipientEmail,
+                    RecipientIdNumber = request.RecipientIdNumber
+                },
                 AcceptPolicy = request.AcceptPolicy,
                 PolicyVersion = request.PolicyVersion?.Trim(),
                 Horses = request.Horses.Select(h => new CreateBookingHorseModel
@@ -204,6 +212,16 @@ namespace RacehorseTransport.API.Mappers
                 RequiresClimateControl = model.RequiresClimateControl,
                 DeclaredValue = model.DeclaredValue,
                 RejectionReason = model.RejectionReason,
+                RecipientName = model.RecipientName,
+                RecipientPhone = model.RecipientPhone,
+                RecipientEmail = model.RecipientEmail,
+                RecipientIdNumber = model.RecipientIdNumber,
+                RecipientIsCustomer = model.RecipientIsCustomer,
+                RecipientConfirmedAt = model.RecipientConfirmedAt,
+                RecipientNotifiedWindowStart = model.RecipientNotifiedWindowStart,
+                RecipientNotifiedWindowEnd = model.RecipientNotifiedWindowEnd,
+                AlternateRecipientName = model.AlternateRecipientName,
+                AlternateRecipientApprovedAt = model.AlternateRecipientApprovedAt,
                 DocsDueAt = model.DocsDueAt,
                 RouteChangeCancelUntil = model.RouteChangeCancelUntil,
                 QuotedAt = model.QuotedAt,

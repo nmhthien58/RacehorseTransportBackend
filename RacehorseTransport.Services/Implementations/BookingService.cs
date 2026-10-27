@@ -54,6 +54,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IFileStorageService _fileStorage;
         private readonly IBookingActivator _bookingActivator;
         private readonly INotificationService _notificationService;
+        private readonly IRecipientService _recipientService;
         private readonly ICodeGenerator _codeGenerator;
         private readonly IUnitOfWork _unitOfWork;
         private readonly BookingOptions _options;
@@ -72,6 +73,7 @@ namespace RacehorseTransport.Services.Implementations
             IFileStorageService fileStorage,
             IBookingActivator bookingActivator,
             INotificationService notificationService,
+            IRecipientService recipientService,
             ICodeGenerator codeGenerator,
             IUnitOfWork unitOfWork,
             IOptions<BookingOptions> options)
@@ -89,6 +91,7 @@ namespace RacehorseTransport.Services.Implementations
             _fileStorage = fileStorage;
             _bookingActivator = bookingActivator;
             _notificationService = notificationService;
+            _recipientService = recipientService;
             _codeGenerator = codeGenerator;
             _unitOfWork = unitOfWork;
             _options = options.Value;
@@ -388,6 +391,8 @@ namespace RacehorseTransport.Services.Implementations
                     }).ToList()
                 };
 
+                // R-16: người nhận ngựa
+                await _recipientService.ApplyRecipientAsync(booking, model.Recipient);
                 await _bookingRepo.AddAsync(booking);
 
                 await _notificationService.SendToRoleAsync(

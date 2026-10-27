@@ -24,6 +24,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ITripService _tripService;
         private readonly ITrackingService _trackingService;
         private readonly INotificationService _notificationService;
+        private readonly IRecipientService _recipientService;
         private readonly IFileStorageService _fileStorage;
         private readonly IUnitOfWork _unitOfWork;
 
@@ -36,6 +37,7 @@ namespace RacehorseTransport.Services.Implementations
             ITripService tripService,
             ITrackingService trackingService,
             INotificationService notificationService,
+            IRecipientService recipientService,
             IFileStorageService fileStorage,
             IUnitOfWork unitOfWork)
         {
@@ -47,6 +49,7 @@ namespace RacehorseTransport.Services.Implementations
             _tripService = tripService;
             _trackingService = trackingService;
             _notificationService = notificationService;
+            _recipientService = recipientService;
             _fileStorage = fileStorage;
             _unitOfWork = unitOfWork;
         }
@@ -146,6 +149,9 @@ namespace RacehorseTransport.Services.Implementations
                     NotificationReferenceTypes.Trip,
                     trip.TripId);
             });
+
+            // R-16: email người nhận kèm giờ dự kiến tới (ghi khung giờ đã báo)
+            await _recipientService.OnTripStartedAsync(tripId);
 
             await _trackingService.InvalidateTripAsync(tripId);
             await _trackingService.NotifyLateDeliveriesAsync(tripId);
@@ -328,6 +334,9 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             await _checkpointRepo.UpdateAsync(checkpoint);
+
+            // R-16: rời mốc ngay trước điểm giao của đơn nào thì báo người nhận đơn đó xe sắp tới
+            await _recipientService.OnCheckpointDepartedAsync(trip.TripId, checkpoint.CheckpointId);
 
             await _trackingService.InvalidateTripAsync(trip.TripId);
             await _trackingService.NotifyLateDeliveriesAsync(trip.TripId);

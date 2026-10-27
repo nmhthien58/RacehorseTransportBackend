@@ -273,6 +273,9 @@ namespace RacehorseTransport.Services.Implementations
                     NotificationReferenceTypes.Trip,
                     trip.TripId);
 
+                // R-16: email người nhận "chuyến đã lên lịch"
+                await _recipientService.OnTripApprovedAsync(trip.TripId);
+
                 foreach (var b in balances)
                 {
                     await _notificationService.EmailCustomerAsync(

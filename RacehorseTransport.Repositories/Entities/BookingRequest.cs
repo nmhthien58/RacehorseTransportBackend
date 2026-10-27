@@ -36,6 +36,22 @@ namespace RacehorseTransport.Repositories.Entities
         public int DocsRemindersSent { get; set; }
         // Công ty đổi tuyến thêm nước mới: tới thời điểm này khách được hủy và hoàn 100%
         public DateTimeOffset? RouteChangeCancelUntil { get; set; }
+
+        // R-16 (BE-15): người nhận ngựa. RecipientIsCustomer = khách tự nhận (tên / SĐT / email lấy theo hồ sơ khách lúc lưu)
+        public string? RecipientName { get; set; }
+        public string? RecipientPhone { get; set; }
+        public string? RecipientEmail { get; set; }
+        public string? RecipientIdNumber { get; set; }
+        public bool RecipientIsCustomer { get; set; }
+        public DateTimeOffset? RecipientConfirmRequestedAt { get; set; }  // đã nhắc khách xác nhận người nhận có mặt (24 giờ trước ETA)
+        public DateTimeOffset? RecipientConfirmedAt { get; set; }
+        // Khung giờ dự kiến tới điểm giao đã báo người nhận (gửi lúc xe xuất phát / sắp tới): căn cứ tính phí chờ (BE-16)
+        public DateTimeOffset? RecipientNotifiedWindowStart { get; set; }
+        public DateTimeOffset? RecipientNotifiedWindowEnd { get; set; }
+        // Người nhận thay được khách xác nhận trên app
+        public string? AlternateRecipientName { get; set; }
+        public string? AlternateRecipientIdNumber { get; set; }
+        public DateTimeOffset? AlternateRecipientApprovedAt { get; set; }
         // Khoảng ngày ngựa sẵn sàng được đón và hạn giao trễ nhất; ngày chạy thật nằm ở chuyến
         public DateTimeOffset PickupWindowStart { get; set; }
         public DateTimeOffset PickupWindowEnd { get; set; }

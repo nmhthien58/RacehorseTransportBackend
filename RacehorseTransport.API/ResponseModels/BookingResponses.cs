@@ -89,6 +89,17 @@ namespace RacehorseTransport.API.ResponseModels
 
     public class BookingDetailResponse : BookingSummaryResponse
     {
+        // R-16 (BE-15): người nhận ngựa
+        public string? RecipientName { get; set; }
+        public string? RecipientPhone { get; set; }
+        public string? RecipientEmail { get; set; }
+        public string? RecipientIdNumber { get; set; }
+        public bool RecipientIsCustomer { get; set; }
+        public DateTimeOffset? RecipientConfirmedAt { get; set; }
+        public DateTimeOffset? RecipientNotifiedWindowStart { get; set; }
+        public DateTimeOffset? RecipientNotifiedWindowEnd { get; set; }
+        public string? AlternateRecipientName { get; set; }
+        public DateTimeOffset? AlternateRecipientApprovedAt { get; set; }
         // R-10 (BE-06): hạn nộp giấy; công ty đổi tuyến thêm nước mới -> khách được hủy hoàn 100% tới routeChangeCancelUntil
         public DateTimeOffset? DocsDueAt { get; set; }
         public DateTimeOffset? RouteChangeCancelUntil { get; set; }

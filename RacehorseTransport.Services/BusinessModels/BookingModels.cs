@@ -29,6 +29,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public decimal? DeclaredValue { get; set; }
         public string? SpecialInstructions { get; set; }
 
+        // R-16 (BE-15): người nhận ngựa (bắt buộc tên + SĐT, hoặc RecipientIsCustomer = true)
+        public RecipientInputModel Recipient { get; set; } = new();
+
         // R-10: khách phải đồng ý Chính sách dịch vụ đúng phiên bản hiện hành khi gửi đơn
         public bool AcceptPolicy { get; set; }
         public string? PolicyVersion { get; set; }
@@ -106,6 +109,17 @@ namespace RacehorseTransport.Services.BusinessModels
         public bool RequiresClimateControl { get; set; }
         public decimal? DeclaredValue { get; set; }
         public string? RejectionReason { get; set; }
+        // R-16 (BE-15): người nhận ngựa
+        public string? RecipientName { get; set; }
+        public string? RecipientPhone { get; set; }
+        public string? RecipientEmail { get; set; }
+        public string? RecipientIdNumber { get; set; }
+        public bool RecipientIsCustomer { get; set; }
+        public DateTimeOffset? RecipientConfirmedAt { get; set; }
+        public DateTimeOffset? RecipientNotifiedWindowStart { get; set; }
+        public DateTimeOffset? RecipientNotifiedWindowEnd { get; set; }
+        public string? AlternateRecipientName { get; set; }
+        public DateTimeOffset? AlternateRecipientApprovedAt { get; set; }
         // R-10 (BE-06): hạn nộp giấy; công ty đổi tuyến thêm nước mới thì khách được hủy hoàn 100% tới RouteChangeCancelUntil
         public DateTimeOffset? DocsDueAt { get; set; }
         public DateTimeOffset? RouteChangeCancelUntil { get; set; }
@@ -174,5 +188,35 @@ namespace RacehorseTransport.Services.BusinessModels
         public string DropoffCountryCode { get; set; } = string.Empty;
         public decimal? DropoffLat { get; set; }
         public decimal? DropoffLng { get; set; }
+    }
+
+    // R-16 (BE-15): người nhận ngựa khách nhập
+    public class RecipientInputModel
+    {
+        public bool RecipientIsCustomer { get; set; }
+        public string? RecipientName { get; set; }
+        public string? RecipientPhone { get; set; }
+        public string? RecipientEmail { get; set; }
+        public string? RecipientIdNumber { get; set; }
+    }
+
+    // R-16 (BE-15): người nhận của từng đơn trên chuyến (đoàn xe: e-POD điền sẵn, gọi điện)
+    public class TripRecipientModel
+    {
+        public int BookingId { get; set; }
+        public string BookingCode { get; set; } = string.Empty;
+        public int? DropoffCheckpointId { get; set; }
+        public string? DropoffCheckpointName { get; set; }
+        public string? RecipientName { get; set; }
+        public string? RecipientPhone { get; set; }
+        public string? RecipientEmail { get; set; }
+        public string? RecipientIdNumber { get; set; }
+        public bool RecipientIsCustomer { get; set; }
+        public DateTimeOffset? RecipientConfirmedAt { get; set; }
+        public string? AlternateRecipientName { get; set; }
+        public string? AlternateRecipientIdNumber { get; set; }
+        public DateTimeOffset? AlternateRecipientApprovedAt { get; set; }
+        public DateTimeOffset? NotifiedWindowStart { get; set; }
+        public DateTimeOffset? NotifiedWindowEnd { get; set; }
     }
 }
