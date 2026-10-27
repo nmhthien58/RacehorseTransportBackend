@@ -131,7 +131,9 @@ Làm sau cùng, khi các task kia đã merge.
 
 ## Việc của Thiên
 
-### [ ] BE-17 · Cấu hình mới + API chính sách công khai (Chung) — làm đầu tiên
+### [x] BE-17 · Cấu hình mới + API chính sách công khai (Chung) — làm đầu tiên
+Đã làm: `GET /api/policy` (công khai, có `values` theo đúng tên khóa để thay các chỗ `[...]` trong văn bản), `GET/PUT /api/settings/policy` (đọc: nhân sự; sửa: Manager / Admin). Hằng tên khóa trong `SystemSettingService` (`*Key`), đọc qua `ISystemSettingService.GetPolicySettingsAsync()`. Task sau cần khóa mới (vd `Dossier.SubmitDays`, hệ số thai kỳ) thì thêm vào `PolicySettingsModel` + mảng `PolicyKeys` + seed / script.
+
 Làm:
 - Thêm các khóa vào `common.system_settings` (seed + script) và vào model cấu hình, có API đọc / sửa cho Admin / Manager như nhóm `Payment.*` hiện có:
   - `Booking.QuoteAcceptDays` = 3

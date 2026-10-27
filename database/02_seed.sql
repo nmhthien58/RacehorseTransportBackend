@@ -363,7 +363,23 @@ INSERT INTO common.system_settings (setting_key, setting_value, description) VAL
 ('Payment.CancelRefundPercent',          '50',    '% tiền cọc được hoàn khi khách hủy đơn trước khi xuất phát'),
 ('Payment.UsdVndRate',                   '26000', 'Tỉ giá quy đổi USD -> VND khi thanh toán qua VNPay'),
 ('Payment.BalanceDueDaysBeforeDeparture','2',     'Phần còn lại phải trả trước ngày xuất phát bao nhiêu ngày'),
-('Payment.ExtraPaymentDueDays',          '7',     'Hạn trả chi phí phát sinh (ngày) tính từ khi đóng chuyến');
+('Payment.ExtraPaymentDueDays',          '7',     'Hạn trả chi phí phát sinh (ngày) tính từ khi đóng chuyến'),
+-- BE-17: giá trị cấu hình của Chính sách dịch vụ (docs/CHINH_SACH_DICH_VU.md)
+('Policy.Version',                       '1.0',   'Phiên bản Chính sách dịch vụ hiện hành (lưu vào đơn khi khách đồng ý)'),
+('Booking.QuoteAcceptDays',              '3',     'Số ngày khách được xem và chấp nhận báo giá chốt + đặt cọc'),
+('Delay.GraceHours',                     '6',     'Số giờ trễ được miễn bồi thường'),
+('Delay.PercentPer12Hours',              '5',     '% tiền cước bồi thường cho mỗi 12 giờ trễ sau ân hạn'),
+('Delay.MaxPercent',                     '25',    '% tiền cước bồi thường giao trễ tối đa'),
+('Insurance.PremiumPercent',             '1',     '% phí bảo hiểm toàn giá trị trên giá trị thỏa thuận mỗi con'),
+('Insurance.BaseLiabilityUsd',           '5000',  'Trách nhiệm tối đa (USD / con) khi ngựa chết / mất mà không mua bảo hiểm'),
+('Insurance.BaseVetCapUsd',              '1000',  'Chi phí thú y tối đa (USD / con) khi ngựa bị thương mà không mua bảo hiểm'),
+('Insurance.VetCapPercent',              '20',    '% giá trị thỏa thuận tối đa cho chi phí thú y khi có bảo hiểm'),
+('Insurance.ProofThresholdUsd',          '50000', 'Giá trị khai báo (USD / con) từ mức này phải kèm chứng từ'),
+('Horse.MinAgeMonths',                   '6',     'Tuổi tối thiểu (tháng) của ngựa, tính tới ngày cuối của khoảng đón'),
+('Delivery.FreeWaitingHours',            '2',     'Số giờ xe chờ miễn phí tại điểm giao'),
+('Delivery.WaitingFeePerHourUsd',        '40',    'Phí chờ (USD / giờ) sau thời gian chờ miễn phí'),
+('Delivery.MaxWaitingHours',             '24',    'Số giờ chờ tính phí tối đa'),
+('Delivery.DecisionHours',               '24',    'Số giờ khách có để chọn cách xử lý khi không giao được');
 
 INSERT INTO common.system_notifications (recipient_user_id, title, message, reference_type, reference_id, is_read, created_at) VALUES
 (5, 'Đơn BKG-2026-0001 đã được phê duyệt', 'Yêu cầu vận chuyển của bạn đã được phê duyệt và phân công nhân sự phụ trách.', 'Booking', 1, true,  '2026-09-20 09:00:00+07'),

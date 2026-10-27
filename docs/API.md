@@ -29,8 +29,9 @@ Tài liệu này hướng dẫn gọi API của hệ thống vận chuyển ng�
 17. [Bảng giá](#17-bảng-giá)
 18. [Danh mục giá trị cho dropdown](#18-danh-mục-giá-trị-cho-dropdown)
 19. [Thanh toán (đặt cọc, phần còn lại, phát sinh, hoàn tiền)](#19-thanh-toán-đặt-cọc-phần-còn-lại-phát-sinh-hoàn-tiền)
-20. [Những phần chưa có API](#20-những-phần-chưa-có-api)
-21. [Bảng tra nhanh mọi endpoint](#21-bảng-tra-nhanh-mọi-endpoint)
+20. [Chính sách dịch vụ và cấu hình](#20-chính-sách-dịch-vụ-và-cấu-hình)
+21. [Những phần chưa có API](#21-những-phần-chưa-có-api)
+22. [Bảng tra nhanh mọi endpoint](#22-bảng-tra-nhanh-mọi-endpoint)
 
 ---
 
@@ -6912,7 +6913,188 @@ Response `200`: `data` là cấu hình sau khi lưu (dạng giống GET).
 
 ---
 
-## 20. Những phần chưa có API
+## 20. Chính sách dịch vụ và cấu hình
+
+Trang **Chính sách dịch vụ** cho khách xem các quy tắc: thanh toán, hủy đơn, giao trễ, bảo hiểm, điều kiện ngựa, giao nhận. Văn bản chính sách nằm ở `docs/CHINH_SACH_DICH_VU.md`; các con số trong ngoặc vuông của văn bản (ví dụ `[Delay.GraceHours = 6]`) là **giá trị cấu hình**, frontend phải đọc từ API dưới đây thay vì viết cứng. Quản lý sửa được các giá trị này; trang Chính sách tự hiện đúng giá trị mới.
+
+Khi khách gửi yêu cầu vận chuyển và khi chấp nhận báo giá, khách phải tích "Tôi đã đọc và đồng ý với Chính sách dịch vụ"; frontend gửi kèm `policyVersion` lấy từ `GET /api/policy` (các API đó sẽ có ở BE-03 / BE-05).
+
+### GET /api/policy — Chính sách dịch vụ (công khai)
+
+Phiên bản chính sách hiện hành và mọi giá trị cấu hình mà chính sách nhắc tới, kể cả các khóa thanh toán `Payment.*`. **Không cần đăng nhập**, dùng cho trang Chính sách, ô đồng ý chính sách và bảng so sánh gói bảo hiểm.
+
+- **Ai gọi được:** Mọi người, không cần đăng nhập
+- **Dữ liệu gửi lên:** không có
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Request processed successfully",
+  "data": {
+    "version": "1.0",
+    "updatedAt": "2026-10-27T07:05:09.094261+00:00",
+    "payment": {
+      "depositPercent": 30,
+      "cancelRefundPercent": 50,
+      "usdVndRate": 26000,
+      "balanceDueDaysBeforeDeparture": 2,
+      "extraPaymentDueDays": 7
+    },
+    "booking": { "quoteAcceptDays": 3 },
+    "delay": { "graceHours": 6, "percentPer12Hours": 5, "maxPercent": 25 },
+    "insurance": {
+      "premiumPercent": 1,
+      "baseLiabilityUsd": 5000,
+      "baseVetCapUsd": 1000,
+      "vetCapPercent": 20,
+      "proofThresholdUsd": 50000
+    },
+    "horse": { "minAgeMonths": 6 },
+    "delivery": { "freeWaitingHours": 2, "waitingFeePerHourUsd": 40, "maxWaitingHours": 24, "decisionHours": 24 },
+    "values": {
+      "Policy.Version": "1.0",
+      "Payment.DepositPercent": 30,
+      "Payment.CancelRefundPercent": 50,
+      "Payment.UsdVndRate": 26000,
+      "Payment.BalanceDueDaysBeforeDeparture": 2,
+      "Payment.ExtraPaymentDueDays": 7,
+      "Booking.QuoteAcceptDays": 3,
+      "Delay.GraceHours": 6,
+      "Delay.PercentPer12Hours": 5,
+      "Delay.MaxPercent": 25,
+      "Insurance.PremiumPercent": 1,
+      "Insurance.BaseLiabilityUsd": 5000,
+      "Insurance.BaseVetCapUsd": 1000,
+      "Insurance.VetCapPercent": 20,
+      "Insurance.ProofThresholdUsd": 50000,
+      "Horse.MinAgeMonths": 6,
+      "Delivery.FreeWaitingHours": 2,
+      "Delivery.WaitingFeePerHourUsd": 40,
+      "Delivery.MaxWaitingHours": 24,
+      "Delivery.DecisionHours": 24
+    }
+  },
+  "errors": null
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `version` | Phiên bản chính sách hiện hành. Gửi kèm khi khách đồng ý chính sách (`policyVersion`) |
+| `updatedAt` | Lần sửa cấu hình gần nhất (thanh toán hoặc chính sách) |
+| `payment` | % cọc, % hoàn cọc khi hủy, tỉ giá USD → VND, hạn trả phần còn lại, hạn trả phát sinh (giống `GET /api/settings/payment`) |
+| `booking.quoteAcceptDays` | Số ngày khách có để chấp nhận báo giá chốt và đặt cọc |
+| `delay.graceHours` | Số giờ trễ được miễn bồi thường |
+| `delay.percentPer12Hours`, `delay.maxPercent` | % tiền cước bồi thường cho mỗi 12 giờ trễ sau ân hạn, và mức tối đa |
+| `insurance.premiumPercent` | % phí bảo hiểm toàn giá trị trên giá trị thỏa thuận mỗi con |
+| `insurance.baseLiabilityUsd`, `baseVetCapUsd` | Không mua bảo hiểm: trách nhiệm tối đa mỗi con khi ngựa chết / mất, và chi phí thú y tối đa khi ngựa bị thương (USD) |
+| `insurance.vetCapPercent` | Có bảo hiểm: chi phí thú y tối đa, % giá trị thỏa thuận |
+| `insurance.proofThresholdUsd` | Giá trị khai báo mỗi con từ mức này phải kèm chứng từ |
+| `horse.minAgeMonths` | Tuổi tối thiểu (tháng) của ngựa |
+| `delivery.freeWaitingHours`, `waitingFeePerHourUsd`, `maxWaitingHours` | Phí chờ tại điểm giao: số giờ miễn phí, phí mỗi giờ (USD), số giờ tính phí tối đa |
+| `delivery.decisionHours` | Số giờ khách có để chọn cách xử lý khi không giao được |
+| `values` | Cùng các giá trị trên, theo **đúng tên khóa** trong văn bản chính sách. Dùng để thay các chỗ `[Tên.Khóa = ...]` trong văn bản |
+
+Ví dụ thay giá trị vào văn bản chính sách:
+
+```js
+const { data } = (await api.get("/api/policy")).data;
+
+// "[Delay.GraceHours = 6]" -> "6"
+const render = (text) =>
+  text.replace(/\[([A-Za-z]+\.[A-Za-z0-9]+)\s*=\s*[^\]]*\]/g,
+    (whole, key) => (key in data.values ? String(data.values[key]) : whole));
+```
+
+### GET /api/settings/policy — Xem cấu hình chính sách (màn quản trị)
+
+- **Ai gọi được:** Mọi nhân sự (không phải khách hàng). Khách dùng `GET /api/policy`
+- **Dữ liệu gửi lên:** không có
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Request processed successfully",
+  "data": {
+    "policyVersion": "1.0",
+    "quoteAcceptDays": 3,
+    "delayGraceHours": 6,
+    "delayPercentPer12Hours": 5,
+    "delayMaxPercent": 25,
+    "insurancePremiumPercent": 1,
+    "insuranceBaseLiabilityUsd": 5000,
+    "insuranceBaseVetCapUsd": 1000,
+    "insuranceVetCapPercent": 20,
+    "insuranceProofThresholdUsd": 50000,
+    "horseMinAgeMonths": 6,
+    "deliveryFreeWaitingHours": 2,
+    "deliveryWaitingFeePerHourUsd": 40,
+    "deliveryMaxWaitingHours": 24,
+    "deliveryDecisionHours": 24,
+    "updatedAt": "2026-10-27T07:05:09.094261+00:00",
+    "updatedByName": "Trần Quốc Bảo"
+  },
+  "errors": null
+}
+```
+
+Ý nghĩa từng trường giống bảng của `GET /api/policy`, chỉ khác cách đặt tên: ở đây tên trường ghép cả nhóm, ví dụ `deliveryWaitingFeePerHourUsd` tương ứng `delivery.waitingFeePerHourUsd`. Bảng khóa cấu hình của từng trường xem ở `PUT` bên dưới. `updatedByName` là người sửa gần nhất.
+
+| Lỗi | Khi nào |
+|---|---|
+| 401 | Chưa đăng nhập |
+| 403 | Khách hàng gọi API này |
+
+### PUT /api/settings/policy — Sửa cấu hình chính sách
+
+Giá trị mới áp dụng từ lúc lưu. Đơn đã đồng ý chính sách giữ phiên bản đã đồng ý. Khi đổi nội dung quy tắc, nhớ **tăng `policyVersion`** (ví dụ `1.0` → `1.1`) để các đơn mới lưu đúng phiên bản.
+
+- **Ai gọi được:** LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON, gửi **đủ cả 15 trường** (kể cả trường không đổi)
+
+| Trường | Kiểu | Giới hạn | Khóa cấu hình |
+|---|---|---|---|
+| `policyVersion` | chuỗi | Bắt buộc, tối đa 20 ký tự | `Policy.Version` |
+| `quoteAcceptDays` | số nguyên | 1 – 30 | `Booking.QuoteAcceptDays` |
+| `delayGraceHours` | số nguyên | 0 – 168 | `Delay.GraceHours` |
+| `delayPercentPer12Hours` | số | 0 – 100 | `Delay.PercentPer12Hours` |
+| `delayMaxPercent` | số | 0 – 100 | `Delay.MaxPercent` |
+| `insurancePremiumPercent` | số | 0 – 100 | `Insurance.PremiumPercent` |
+| `insuranceBaseLiabilityUsd` | số | ≥ 0 | `Insurance.BaseLiabilityUsd` |
+| `insuranceBaseVetCapUsd` | số | ≥ 0 | `Insurance.BaseVetCapUsd` |
+| `insuranceVetCapPercent` | số | 0 – 100 | `Insurance.VetCapPercent` |
+| `insuranceProofThresholdUsd` | số | ≥ 0 | `Insurance.ProofThresholdUsd` |
+| `horseMinAgeMonths` | số nguyên | 0 – 240 | `Horse.MinAgeMonths` |
+| `deliveryFreeWaitingHours` | số nguyên | 0 – 72 | `Delivery.FreeWaitingHours` |
+| `deliveryWaitingFeePerHourUsd` | số | ≥ 0 | `Delivery.WaitingFeePerHourUsd` |
+| `deliveryMaxWaitingHours` | số nguyên | 1 – 168 | `Delivery.MaxWaitingHours` |
+| `deliveryDecisionHours` | số nguyên | 1 – 168 | `Delivery.DecisionHours` |
+
+Ví dụ request (cách dễ nhất: lấy `data` của `GET /api/settings/policy`, sửa vài trường rồi gửi lại):
+
+```js
+const current = (await api.get("/api/settings/policy")).data.data;
+await api.put("/api/settings/policy", {
+  ...current,
+  policyVersion: "1.1",
+  deliveryWaitingFeePerHourUsd: 45,
+});
+```
+
+Response `200`: `data` là cấu hình sau khi lưu (dạng giống GET).
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Validation failed`, kèm `errors`, ví dụ `["PolicyVersion is required.", "DelayMaxPercent must be between 0 and 100."]` | Thiếu trường hoặc giá trị ngoài giới hạn; `errors` liệt kê mọi lỗi cùng lúc |
+| 403 | | Không phải quản lý / Admin |
+
+---
+
+## 21. Những phần chưa có API
 
 Các phần dưới đây backend chưa làm. Frontend có thể dựng giao diện trước nhưng chưa nối được.
 
@@ -6924,9 +7106,9 @@ Tiến độ từng phần xem ở [TASKS.md](TASKS.md).
 
 ---
 
-## 21. Bảng tra nhanh mọi endpoint
+## 22. Bảng tra nhanh mọi endpoint
 
-Tổng cộng 118 endpoint. Chi tiết từng cái xem ở mục tương ứng.
+Tổng cộng 121 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 
 **4. Đăng nhập và tài khoản của tôi**
 
@@ -7126,3 +7308,6 @@ Tổng cộng 118 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/payments/{id}/mark-refunded` | Đánh dấu đã hoàn tiền thủ công | LogisticsManager, Admin |
 | GET | `/api/settings/payment` | Xem cấu hình thanh toán | Mọi người đã đăng nhập |
 | PUT | `/api/settings/payment` | Sửa cấu hình thanh toán | LogisticsManager, Admin |
+| GET | `/api/policy` | Chính sách dịch vụ: phiên bản + giá trị cấu hình (công khai) | Mọi người, không cần đăng nhập |
+| GET | `/api/settings/policy` | Xem cấu hình chính sách | Mọi nhân sự |
+| PUT | `/api/settings/policy` | Sửa cấu hình chính sách | LogisticsManager, Admin |
