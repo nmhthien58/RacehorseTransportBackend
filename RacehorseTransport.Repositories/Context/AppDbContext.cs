@@ -41,6 +41,8 @@ namespace RacehorseTransport.Repositories.Context
         public virtual DbSet<HandoverAcceptance> HandoverAcceptances { get; set; } = null!;
         public virtual DbSet<SystemNotification> SystemNotifications { get; set; } = null!;
         public virtual DbSet<PriceItem> PriceItems { get; set; } = null!;
+        public virtual DbSet<Country> Countries { get; set; } = null!;
+        public virtual DbSet<Airport> Airports { get; set; } = null!;
         public virtual DbSet<Payment> Payments { get; set; } = null!;
         public virtual DbSet<DelayCompensation> DelayCompensations { get; set; } = null!;
         public virtual DbSet<SystemSetting> SystemSettings { get; set; } = null!;
@@ -391,6 +393,23 @@ namespace RacehorseTransport.Repositories.Context
                 entity.ToTable("price_items", "pricing");
                 entity.HasKey(e => e.PriceItemId);
                 entity.Property(e => e.Value).HasPrecision(18, 4);
+            });
+
+            // ---------- phạm vi dịch vụ (R-18) ----------
+            modelBuilder.Entity<Country>(entity =>
+            {
+                entity.ToTable("countries", "common");
+                entity.HasKey(e => e.CountryCode);
+                entity.Property(e => e.CountryCode).HasMaxLength(2).IsFixedLength();
+            });
+
+            modelBuilder.Entity<Airport>(entity =>
+            {
+                entity.ToTable("airports", "common");
+                entity.HasKey(e => e.AirportId);
+                entity.Property(e => e.CountryCode).HasMaxLength(2).IsFixedLength();
+                entity.Property(e => e.IataCode).HasMaxLength(3).IsFixedLength();
+                entity.HasOne(e => e.Country).WithMany(c => c.Airports).HasForeignKey(e => e.CountryCode);
             });
 
             // ---------- billing (R-02) ----------

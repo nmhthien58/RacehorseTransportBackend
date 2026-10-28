@@ -55,6 +55,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IBookingActivator _bookingActivator;
         private readonly INotificationService _notificationService;
         private readonly IRecipientService _recipientService;
+        private readonly ICountryService _countryService;
         private readonly ICodeGenerator _codeGenerator;
         private readonly IUnitOfWork _unitOfWork;
         private readonly BookingOptions _options;
@@ -74,6 +75,7 @@ namespace RacehorseTransport.Services.Implementations
             IBookingActivator bookingActivator,
             INotificationService notificationService,
             IRecipientService recipientService,
+            ICountryService countryService,
             ICodeGenerator codeGenerator,
             IUnitOfWork unitOfWork,
             IOptions<BookingOptions> options)
@@ -92,6 +94,7 @@ namespace RacehorseTransport.Services.Implementations
             _bookingActivator = bookingActivator;
             _notificationService = notificationService;
             _recipientService = recipientService;
+            _countryService = countryService;
             _codeGenerator = codeGenerator;
             _unitOfWork = unitOfWork;
             _options = options.Value;
@@ -298,6 +301,12 @@ namespace RacehorseTransport.Services.Implementations
             {
                 model.DeclaredValue = model.Horses.Sum(h => h.DeclaredValue!.Value);
             }
+
+            // R-18: nước đi, nước đến và phương thức phải nằm trong phạm vi dịch vụ công ty đang nhận
+            await _countryService.EnsureRouteAvailableAsync(
+                string.IsNullOrWhiteSpace(model.PickupCountryCode) ? "VN" : model.PickupCountryCode,
+                model.DropoffCountryCode,
+                model.TransportMode);
 
             // Báo giá trước: đồng thời kiểm tra phương thức, hạng chuồng, tuyến có giá, DistanceKm,
             // khoảng pickup (đủ xa, không quá dài) và hạn giao (đủ thời gian vận chuyển)

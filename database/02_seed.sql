@@ -419,3 +419,123 @@ SELECT setval(pg_get_serial_sequence('tracking.horse_welfare_logs', 'log_id'),  
 SELECT setval(pg_get_serial_sequence('incident.trip_incidents', 'incident_id'),        (SELECT max(incident_id) FROM incident.trip_incidents));
 SELECT setval(pg_get_serial_sequence('acceptance.handover_acceptances', 'handover_id'), (SELECT max(handover_id) FROM acceptance.handover_acceptances));
 SELECT setval(pg_get_serial_sequence('billing.payments', 'payment_id'),                 (SELECT max(payment_id) FROM billing.payments));
+
+-- ---------- Phạm vi dịch vụ: quốc gia, sân bay, cước và giấy tờ cho các tuyến mới (R-18) ----------
+-- Các nước trong phạm vi dịch vụ. Mông Cổ, Kazakhstan chủ yếu để quá cảnh (không có cước nên không làm nước đến).
+INSERT INTO common.countries (country_code, name_vi, name_en, sort_order) VALUES
+('VN', 'Việt Nam',        'Vietnam',              1),
+('CN', 'Trung Quốc',      'China',                2),
+('LA', 'Lào',             'Laos',                 3),
+('KH', 'Campuchia',       'Cambodia',             4),
+('TH', 'Thái Lan',        'Thailand',             5),
+('MY', 'Malaysia',        'Malaysia',             6),
+('SG', 'Singapore',       'Singapore',            7),
+('HK', 'Hong Kong',       'Hong Kong',            8),
+('JP', 'Nhật Bản',        'Japan',                9),
+('KR', 'Hàn Quốc',        'South Korea',          10),
+('AE', 'UAE (Dubai)',     'United Arab Emirates', 11),
+('AU', 'Úc',              'Australia',            12),
+('FR', 'Pháp',            'France',               13),
+('GB', 'Vương quốc Anh',  'United Kingdom',       14),
+('DE', 'Đức',             'Germany',              15),
+('US', 'Hoa Kỳ',          'United States',        16),
+('RU', 'Nga',             'Russia',               17),
+('MN', 'Mông Cổ',         'Mongolia',             18),
+('KZ', 'Kazakhstan',      'Kazakhstan',           19)
+ON CONFLICT (country_code) DO NOTHING;
+
+-- Sân bay nhận ngựa. Lào, Campuchia không có (gần như không có chuyến bay chở hàng nhận ngựa): chỉ đi đường bộ.
+INSERT INTO common.airports (country_code, iata_code, name, city) VALUES
+('VN', 'HAN', 'Sân bay Quốc tế Nội Bài',              'Hà Nội'),
+('VN', 'SGN', 'Sân bay Quốc tế Tân Sơn Nhất',         'TP. Hồ Chí Minh'),
+('VN', 'DAD', 'Sân bay Quốc tế Đà Nẵng',              'Đà Nẵng'),
+('CN', 'CAN', 'Sân bay Quốc tế Bạch Vân',             'Quảng Châu'),
+('CN', 'PVG', 'Sân bay Quốc tế Phố Đông',             'Thượng Hải'),
+('CN', 'PEK', 'Sân bay Quốc tế Thủ đô Bắc Kinh',      'Bắc Kinh'),
+('TH', 'BKK', 'Sân bay Quốc tế Suvarnabhumi',         'Bangkok'),
+('TH', 'DMK', 'Sân bay Don Mueang',                   'Bangkok'),
+('MY', 'KUL', 'Sân bay Quốc tế Kuala Lumpur',         'Kuala Lumpur'),
+('SG', 'SIN', 'Sân bay Quốc tế Changi',               'Singapore'),
+('HK', 'HKG', 'Sân bay Quốc tế Hong Kong',            'Hong Kong'),
+('JP', 'NRT', 'Sân bay Quốc tế Narita',               'Tokyo'),
+('JP', 'HND', 'Sân bay Quốc tế Haneda',               'Tokyo'),
+('JP', 'KIX', 'Sân bay Quốc tế Kansai',               'Osaka'),
+('KR', 'ICN', 'Sân bay Quốc tế Incheon',              'Seoul'),
+('AE', 'DXB', 'Sân bay Quốc tế Dubai',                'Dubai'),
+('AE', 'DWC', 'Sân bay Quốc tế Al Maktoum',           'Dubai'),
+('AU', 'SYD', 'Sân bay Quốc tế Sydney',               'Sydney'),
+('AU', 'MEL', 'Sân bay Quốc tế Melbourne',            'Melbourne'),
+('AU', 'BNE', 'Sân bay Quốc tế Brisbane',             'Brisbane'),
+('FR', 'CDG', 'Sân bay Charles de Gaulle',            'Paris'),
+('FR', 'ORY', 'Sân bay Orly',                         'Paris'),
+('GB', 'STN', 'Sân bay Stansted',                     'London'),
+('GB', 'LHR', 'Sân bay Heathrow',                     'London'),
+('DE', 'FRA', 'Sân bay Quốc tế Frankfurt',            'Frankfurt'),
+('DE', 'MUC', 'Sân bay Quốc tế Munich',               'Munich'),
+('US', 'JFK', 'Sân bay Quốc tế John F. Kennedy',      'New York'),
+('US', 'LAX', 'Sân bay Quốc tế Los Angeles',          'Los Angeles'),
+('US', 'ORD', 'Sân bay Quốc tế O''Hare',              'Chicago'),
+('US', 'MIA', 'Sân bay Quốc tế Miami',                'Miami'),
+('RU', 'SVO', 'Sân bay Quốc tế Sheremetyevo',         'Moscow')
+ON CONFLICT (iata_code) DO NOTHING;
+
+-- Cước mới theo quy tắc: đi liền đất và khả thi thì có đường bộ, đi được cả hai thì mở cả hai.
+--   Đường bộ: Malaysia, Singapore (qua Campuchia, Thái Lan), Hong Kong (qua Trung Quốc), Việt Nam (đơn từ nước khác về VN).
+--   Đường bay: Trung Quốc, Nga (Moscow), Việt Nam.
+INSERT INTO pricing.price_items (category, item_code, item_name, transport_mode, dest_country_code, calc_type, value, min_horses)
+SELECT v.category, v.item_code, v.item_name, v.transport_mode, v.dest_country_code, v.calc_type, v.value, NULL
+FROM (VALUES
+    ('Freight', 'FREIGHT', 'Zone G1 - Đường bộ (Malaysia)',  'Ground', 'MY', 'PerKmPerHorse', 1.00),
+    ('Freight', 'FREIGHT', 'Zone G1 - Đường bộ (Singapore)', 'Ground', 'SG', 'PerKmPerHorse', 1.00),
+    ('Freight', 'FREIGHT', 'Zone G1 - Đường bộ (Hong Kong)', 'Ground', 'HK', 'PerKmPerHorse', 1.00),
+    ('Freight', 'FREIGHT', 'Zone G1 - Đường bộ (Việt Nam)',  'Ground', 'VN', 'PerKmPerHorse', 1.00),
+    ('Freight', 'FREIGHT', 'Zone A - Đông Nam Á (Việt Nam)', 'Air',    'VN', 'PerHorse',      3000),
+    ('Freight', 'FREIGHT', 'Zone B - Đông Á (Trung Quốc)',   'Air',    'CN', 'PerHorse',      5000),
+    ('Freight', 'FREIGHT', 'Zone D - Châu Âu (Nga)',         'Air',    'RU', 'PerHorse',      8000)
+) AS v (category, item_code, item_name, transport_mode, dest_country_code, calc_type, value)
+WHERE NOT EXISTS (
+    SELECT 1 FROM pricing.price_items p
+    WHERE p.item_code = v.item_code AND p.transport_mode = v.transport_mode AND p.dest_country_code = v.dest_country_code);
+
+-- Giấy tờ (dữ liệu minh họa) cho các tuyến mới mở:
+--   nhập khẩu vào Việt Nam, quá cảnh Mông Cổ / Kazakhstan (tuyến đường bộ đi Nga).
+INSERT INTO clearance.country_doc_requirements (country_code, direction, doc_type_id, validity_days, is_mandatory, regulation_note)
+SELECT c.country_code, c.direction, d.doc_type_id, c.validity_days, c.is_mandatory, c.note
+FROM (VALUES
+    ('VN', 'Import',  'HORSE_PASSPORT', NULL, true, 'Hộ chiếu ngựa còn hiệu lực'),
+    ('VN', 'Import',  'IMPORT_PERMIT',  NULL, true, 'Giấy phép kiểm dịch nhập khẩu của Cục Chăn nuôi và Thú y'),
+    ('VN', 'Import',  'HEALTH_CERT',    10,   true, 'Chứng nhận kiểm dịch trong 10 ngày trước khi nhập cảnh'),
+    ('VN', 'Import',  'COGGINS_EIA',    30,   true, 'EIA âm tính trong 30 ngày'),
+    ('VN', 'Import',  'VACCINE',        180,  true, 'Tiêm phòng cúm ngựa trong 6 tháng'),
+    ('MN', 'Transit', 'TRANSIT_PERMIT', NULL, true, 'Giấy phép quá cảnh của Tổng cục Thú y Mông Cổ'),
+    ('MN', 'Transit', 'HEALTH_CERT',    10,   true, 'Chứng nhận kiểm dịch còn hạn khi vào Mông Cổ'),
+    ('KZ', 'Transit', 'TRANSIT_PERMIT', NULL, true, 'Giấy phép quá cảnh của Ủy ban Kiểm soát Thú y Kazakhstan'),
+    ('KZ', 'Transit', 'HEALTH_CERT',    10,   true, 'Chứng nhận kiểm dịch còn hạn khi vào Kazakhstan')
+) AS c (country_code, direction, doc_code, validity_days, is_mandatory, note)
+JOIN clearance.document_types d ON d.code = c.doc_code
+ON CONFLICT (country_code, direction, doc_type_id) DO NOTHING;
+
+-- Khách được đặt từ mọi nước trong phạm vi dịch vụ: nước nào chưa có quy định xuất khẩu thì thêm mức tối thiểu
+-- (hộ chiếu ngựa + chứng nhận kiểm dịch xuất khẩu của cơ quan thú y nước đó). Manager sửa / bổ sung ở trang Quốc gia.
+INSERT INTO clearance.country_doc_requirements (country_code, direction, doc_type_id, validity_days, is_mandatory, regulation_note)
+SELECT c.country_code, 'Export', d.doc_type_id,
+       CASE WHEN d.code = 'HEALTH_CERT' THEN 10 END, true,
+       CASE WHEN d.code = 'HEALTH_CERT' THEN 'Cơ quan thú y nước xuất khẩu cấp trong 10 ngày trước ngày đi'
+            ELSE 'Hộ chiếu ngựa còn hiệu lực' END
+FROM common.countries c
+CROSS JOIN clearance.document_types d
+WHERE d.code IN ('HORSE_PASSPORT', 'HEALTH_CERT')
+  AND NOT EXISTS (SELECT 1 FROM clearance.country_doc_requirements r WHERE r.country_code = c.country_code AND r.direction = 'Export')
+ON CONFLICT (country_code, direction, doc_type_id) DO NOTHING;
+
+-- Số ngày cần để có giấy cho các dòng mới (không ghi đè số liệu đã sửa)
+UPDATE clearance.country_doc_requirements r
+SET processing_days = CASE
+        WHEN d.code IN ('IMPORT_PERMIT', 'TRANSIT_PERMIT') THEN 14
+        WHEN d.code IN ('COGGINS_EIA', 'GLANDERS_TEST', 'PIROPLASMOSIS_TEST', 'EVA_TEST') THEN 7
+        WHEN d.code = 'HEALTH_CERT' THEN 3
+        ELSE NULL
+    END
+FROM clearance.document_types d
+WHERE d.doc_type_id = r.doc_type_id
+  AND r.processing_days IS NULL;

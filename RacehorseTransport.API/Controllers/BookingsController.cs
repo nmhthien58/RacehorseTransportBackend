@@ -252,9 +252,11 @@ namespace RacehorseTransport.API.Controllers
         [HttpPost("quote-preview")]
         [ProducesResponseType(typeof(ApiResponse<QuoteResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> PreviewQuote([FromBody] QuotePreviewRequest request)
+        public async Task<IActionResult> PreviewQuote([FromBody] QuotePreviewRequest request, [FromServices] ICountryService countryService)
         {
-            var quote = await _pricingService.CalculateQuoteRangeAsync(request.ToBusinessModel());
+            var input = request.ToBusinessModel();
+            await countryService.EnsureRouteAvailableAsync(input.PickupCountryCode ?? "VN", input.DropoffCountryCode, input.TransportMode);
+            var quote = await _pricingService.CalculateQuoteRangeAsync(input);
             return Ok(ApiResponse<QuoteResponse>.SuccessResult(quote.ToResponse(), "Quote calculated successfully"));
         }
 

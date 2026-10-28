@@ -31,6 +31,7 @@ Tài liệu này hướng dẫn gọi API của hệ thống vận chuyển ng�
 15. [Quản lý phương tiện](#15-quản-lý-phương-tiện)
 16. [Quy định giấy tờ theo quốc gia](#16-quy-định-giấy-tờ-theo-quốc-gia)
 17. [Bảng giá](#17-bảng-giá)
+17b. [Quốc gia, phương thức và sân bay (R-18)](#17b-quốc-gia-phương-thức-và-sân-bay-r-18)
 18. [Danh mục giá trị cho dropdown](#18-danh-mục-giá-trị-cho-dropdown)
 19. [Thanh toán (đặt cọc, phần còn lại, phát sinh, hoàn tiền)](#19-thanh-toán-đặt-cọc-phần-còn-lại-phát-sinh-hoàn-tiền)
 19b. [Bồi thường giao trễ](#19b-bồi-thường-giao-trễ)
@@ -1913,6 +1914,11 @@ Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
+| 400 | `We do not currently pick up horses in country 'XX'.` | Nước đi chưa có hoặc đang tắt (mục 17b) |
+| 400 | `We do not currently deliver horses to country 'XX'.` | Nước đến chưa có hoặc đang tắt |
+| 400 | `Ground transport to 'JP' is not offered at the moment. Please choose air transport.` | Nước đến không có cước đường bộ đang bật |
+| 400 | `Air transport to 'LA' is not offered at the moment. Please choose ground transport.` | Nước đến không có cước bay đang bật hoặc không có sân bay mở |
+| 400 | `There is no airport we can fly horses from in 'LA'. Please choose ground transport.` | Đường bay mà nước đi không có sân bay mở |
 | 400 | `No freight rate is configured ...` | Tuyến này chưa có trong bảng giá |
 | 400 | `Validation failed` | Thiếu trường, mã nước không phải 2 chữ cái, không có con ngựa nào |
 | 400 | `PickupWindowStart must be on or after 2026-11-15: a booking on this route needs about 28 days ...` | Chọn ngày pickup quá gần |
@@ -2080,6 +2086,7 @@ Lỗi thường gặp:
 | 400 | `The recipient's name and phone number are required (or set RecipientIsCustomer = true to receive the horses yourself).` | Thiếu người nhận |
 | 400 | `Add a phone number to your profile to receive the horses yourself, or enter another recipient.` | `recipientIsCustomer = true` nhưng hồ sơ khách chưa có SĐT |
 | 400 | `You must accept the service policy to send a request.` | Không gửi `acceptPolicy = true` |
+| 400 | `Ground transport to 'JP' is not offered at the moment. Please choose air transport.` | Tuyến / phương thức ngoài phạm vi dịch vụ (đủ các lỗi xem ở mục xem giá và mục 17b) |
 | 400 | `The service policy has changed (current version 1.1). Please read the latest policy and accept it again.` | `policyVersion` thiếu hoặc khác phiên bản hiện hành: tải lại `GET /api/policy`, cho khách đọc và tích lại |
 | 400 | `PickupWindowStart must be on or after ...` | Chọn ngày pickup quá gần (xem mục xem giá) |
 | 400 | `DeliveryDeadline must be on or after ...` | Hạn giao không đủ thời gian vận chuyển |
@@ -3160,6 +3167,7 @@ Response `200` — phần `data`:
       "docTypeCode": "COGGINS_EIA",
       "docTypeName": "Xét nghiệm thiếu máu truyền nhiễm (EIA/Coggins)",
       "isMandatory": true,
+      "providedBy": "Customer",
       "validityDays": 30,
       "regulationNote": "Xét nghiệm EIA âm tính trong 30 ngày",
       "requiredBy": [
@@ -3235,6 +3243,7 @@ Response `200` — phần `data`:
 | `checklist[]` | Mỗi dòng là một loại giấy cần có |
 | `checklist[].docTypeId`, `docTypeName` | Loại giấy; `docTypeId` dùng khi nộp |
 | `checklist[].isMandatory` | Giấy bắt buộc hay không |
+| `checklist[].providedBy` | **Ai lo giấy này** (R-19). `Customer`: khách tải lên (hộ chiếu, tiêm phòng, xét nghiệm). `Company`: chuyên viên xin với cơ quan nhà nước (kiểm dịch xuất khẩu, giấy phép nhập khẩu, giấy phép quá cảnh). Màn khách: dòng `Company` **không có nút tải lên**, hiện "Công ty đang làm thủ tục" khi `state` là `Missing` và "Đã có" khi `Approved` |
 | `checklist[].validityDays` | Giấy phải còn hiệu lực trong bao nhiêu ngày; `null` là không quy định |
 | `checklist[].regulationNote` | Ghi chú quy định, nên hiện cho khách đọc |
 | `checklist[].requiredBy` | Nước nào yêu cầu, theo thứ tự đường đi: `VN Export` (nước đi), `CN Transit` (nước quá cảnh), `RU Import` (nước đến) |
@@ -3292,6 +3301,8 @@ Lỗi thường gặp:
 
 Nộp file cho **một** loại giấy của hồ sơ. Mỗi loại giấy chỉ có một bản: nộp lại (sau khi bị từ chối) là thay file cũ. Hồ sơ chuyển sang `Reviewing` và chuyên viên nhận thông báo.
 
+**Giấy công ty lo (`providedBy = Company`, R-19):** khách **không** tải lên được. Chuyên viên tải lên khi đã xin được giấy; giấy được tính là **đã duyệt ngay** (`state = Approved`, không cần bước duyệt), hồ sơ giữ nguyên trạng thái và khách nhận thông báo "đã có giấy". Giấy phải còn hiệu lực tới ngày cuối khoảng pickup.
+
 - **Ai gọi được:** Chủ ngựa (Customer), chuyên viên phụ trách, Admin
 - **Dữ liệu gửi lên:** `multipart/form-data` (xem mục 2.5)
 
@@ -3332,6 +3343,8 @@ Lỗi thường gặp:
 | 400 | `'...' has already been approved and cannot be replaced.` | Giấy này đã được duyệt |
 | 400 | `'...' was rejected 3 times and can no longer be resubmitted. Please contact the specialist.` | Khách đã hết lượt nộp lại |
 | 400 | `The document has already expired.` | `expiryDate` ở quá khứ |
+| 400 | `'Giấy phép nhập khẩu' is obtained by our specialist from the authorities. You do not need to upload it.` | Khách tải lên giấy `providedBy = Company` |
+| 400 | `'Giấy phép nhập khẩu' expires on 2026-11-01, before the end of the pickup window 2026-12-06.` | Chuyên viên tải giấy `Company` hết hạn trước ngày cuối khoảng pickup |
 | 400 | `File is required.` | Không gửi file |
 | 403 | `You cannot upload documents to this dossier.` | Không phải chủ ngựa hay chuyên viên phụ trách |
 
@@ -5987,18 +6000,21 @@ Lỗi thường gặp:
 
 Danh mục các loại giấy tờ dùng trong hồ sơ kiểm dịch (hộ chiếu ngựa, chứng nhận sức khỏe...). Mọi người đọc được; chuyên viên thủ tục và Admin quản lý.
 
-Danh mục dùng chung cho hồ sơ kiểm dịch của đơn (mục 8) và hồ sơ thú y của ngựa (mục 6). Dữ liệu mẫu có 8 loại:
+Danh mục dùng chung cho hồ sơ kiểm dịch của đơn (mục 8) và hồ sơ thú y của ngựa (mục 6). Dữ liệu mẫu có 9 loại:
 
-| `code` | Tên | Mặc định bắt buộc |
-|---|---|---|
-| `HORSE_PASSPORT` | Hộ chiếu ngựa | Có |
-| `COGGINS_EIA` | Xét nghiệm thiếu máu truyền nhiễm (EIA/Coggins) | Có |
-| `HEALTH_CERT` | Giấy chứng nhận kiểm dịch xuất khẩu | Có |
-| `VACCINE` | Chứng nhận tiêm phòng cúm ngựa | Có |
-| `IMPORT_PERMIT` | Giấy phép nhập khẩu | Không |
-| `GLANDERS_TEST` | Xét nghiệm bệnh tỵ (Glanders) | Không |
-| `PIROPLASMOSIS_TEST` | Xét nghiệm lê dạng trùng (Piroplasmosis) | Không |
-| `EVA_TEST` | Xét nghiệm viêm động mạch do virus (EVA) | Không |
+| `code` | Tên | Mặc định bắt buộc | Ai lo (`providedBy`) |
+|---|---|---|---|
+| `HORSE_PASSPORT` | Hộ chiếu ngựa | Có | Khách |
+| `COGGINS_EIA` | Xét nghiệm thiếu máu truyền nhiễm (EIA/Coggins) | Có | Khách |
+| `HEALTH_CERT` | Giấy chứng nhận kiểm dịch xuất khẩu | Có | Công ty |
+| `VACCINE` | Chứng nhận tiêm phòng cúm ngựa | Có | Khách |
+| `IMPORT_PERMIT` | Giấy phép nhập khẩu | Không | Công ty |
+| `GLANDERS_TEST` | Xét nghiệm bệnh tỵ (Glanders) | Không | Khách |
+| `PIROPLASMOSIS_TEST` | Xét nghiệm lê dạng trùng (Piroplasmosis) | Không | Khách |
+| `EVA_TEST` | Xét nghiệm viêm động mạch do virus (EVA) | Không | Khách |
+| `TRANSIT_PERMIT` | Giấy phép quá cảnh động vật | Không | Công ty |
+
+**Ai lo (`providedBy`, R-19):** `Customer` là giấy của con ngựa, khách tải lên và chuyên viên duyệt. `Company` là giấy phép của cơ quan nhà nước các nước, chuyên viên xin rồi tải lên; khách không bị nhắc, không bị hủy đơn vì thiếu giấy `Company`.
 
 "Mặc định bắt buộc" (`isMandatory`) chỉ dùng khi tuyến đi chưa có quy định riêng. Giấy nào bắt buộc cho tuyến nào thì xem mục 16: ví dụ đi Singapore cần thêm giấy phép nhập khẩu và xét nghiệm Glanders.
 
@@ -6010,7 +6026,8 @@ Một loại giấy tờ có dạng:
   "code": "HORSE_PASSPORT",
   "name": "Hộ chiếu ngựa",
   "description": "Hộ chiếu định danh cá thể (FEI hoặc hộ chiếu quốc gia có số UELN), có sơ đồ nhận dạng và lịch tiêm phòng",
-  "isMandatory": true
+  "isMandatory": true,
+  "providedBy": "Customer"
 }
 ```
 
@@ -7000,6 +7017,8 @@ Tham số query (gắn sau dấu `?`):
 | `category` | chuỗi | Không | Lọc theo nhóm (`Freight`, `StallClass`, `Surcharge`, `Discount`, `Clearance`, `Escort`, `Insurance`) |
 | `transportMode` | chuỗi | Không | `Ground` hoặc `Air` (chỉ lấy dòng ghi đúng phương thức đó, không gồm dòng `null`) |
 | `isActive` | true / false | Không | Lọc dòng đang bật / đã tắt |
+| `destCountryCode` | chuỗi | Không | Chỉ lấy dòng giá **riêng** của nước đến này (mã 2 chữ, ví dụ `JP`) |
+| `globalOnly` | true / false | Không | `true`: chỉ lấy dòng giá **chung** (không gắn nước đến). Dùng cho trang "Bảng giá chung" |
 | `sort` | chuỗi | Không | Trường sắp xếp, thêm `-` phía trước để giảm dần (ví dụ `-value`) |
 | `page` | số | Không | Trang, bắt đầu từ 1 (mặc định 1) |
 | `size` | số | Không | Số dòng mỗi trang, 1–100 (mặc định 10) |
@@ -7233,6 +7252,254 @@ Lỗi thường gặp:
 await api.patch(`/api/price-items/${item.priceItemId}/active`, { isActive: !item.isActive });
 ```
 
+## 17b. Quốc gia, phương thức và sân bay (R-18)
+
+Danh sách nước khách chọn được khi đặt chuyến, và tới mỗi nước công ty nhận **đường bộ**, **đường bay** hay cả hai. Trước đây danh sách này viết cứng trong frontend; giờ Manager cấu hình trên trang **Quốc gia**.
+
+**Quy tắc (backend kiểm tra khi xem giá và khi gửi đơn):**
+
+| Điều kiện | Ý nghĩa |
+|---|---|
+| Nước đi và nước đến đều **đang bật** | Nước tắt thì khách không chọn được, kể cả làm nước đi |
+| Nước đến có **cước `FREIGHT` đang bật** cho phương thức khách chọn | Công tắc "Đường bộ" / "Đường bay" của một nước **chính là** dòng cước đó trong bảng giá (mục 17). Không có cước là công ty chưa nhận tuyến đó |
+| Đường bay: nước đi **và** nước đến đều có **ít nhất một sân bay đang mở** | Lào, Campuchia không có sân bay trong dữ liệu mẫu nên chỉ đi đường bộ |
+
+- Nước có giấy quá cảnh mà không có cước (Mông Cổ, Kazakhstan) vẫn nằm trong danh sách: chúng là nước ngựa **đi ngang qua** trên tuyến đường bộ đi Nga, không phải nước đến.
+- Đường bộ giữa hai nước bất kỳ có đi được không (ví dụ Nhật → Hàn cách biển) thì hệ thống **không tự biết**. Manager xét khi duyệt đơn và từ chối kèm lý do.
+- Tên nước có sẵn tiếng Việt (`nameVi`) và tiếng Anh (`nameEn`): hiện theo ngôn ngữ đang chọn.
+
+**Dữ liệu mẫu:**
+
+| Nhóm | Nước |
+|---|---|
+| Cả đường bộ và đường bay | Việt Nam, Trung Quốc, Thái Lan, Malaysia, Singapore, Hong Kong, Nga |
+| Chỉ đường bộ | Lào, Campuchia |
+| Chỉ đường bay | Nhật Bản, Hàn Quốc, UAE, Úc, Pháp, Anh, Đức, Mỹ |
+| Chỉ quá cảnh | Mông Cổ, Kazakhstan |
+
+### GET /api/countries/catalog — Danh sách nước cho form đặt chuyến
+
+- **Ai gọi được:** Ai cũng gọi được, **không cần đăng nhập**
+- Chỉ trả nước **đang bật**, và chỉ sân bay **đang mở**.
+
+Ví dụ:
+
+```js
+const res = await api.get("/api/countries/catalog");
+const countries = res.data.data;
+// Nước đi: mọi nước trong danh sách
+// Nước đến: nước có groundAvailable hoặc airAvailable
+const destinations = countries.filter((c) => c.groundAvailable || c.airAvailable);
+```
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Country catalog retrieved successfully",
+  "data": [
+    {
+      "countryCode": "SG",
+      "nameVi": "Singapore",
+      "nameEn": "Singapore",
+      "groundAvailable": true,
+      "airAvailable": true,
+      "airports": [
+        { "airportId": 10, "countryCode": "SG", "iataCode": "SIN", "name": "Sân bay Quốc tế Changi", "city": "Singapore", "isActive": true }
+      ]
+    },
+    {
+      "countryCode": "KZ",
+      "nameVi": "Kazakhstan",
+      "nameEn": "Kazakhstan",
+      "groundAvailable": false,
+      "airAvailable": false,
+      "airports": []
+    }
+  ],
+  "errors": null
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `countryCode` | Mã nước ISO 2 chữ |
+| `nameVi`, `nameEn` | Tên nước theo ngôn ngữ |
+| `groundAvailable` | `true`: nhận chở **đến** nước này bằng đường bộ |
+| `airAvailable` | `true`: nhận chở **đến** nước này bằng đường bay |
+| `airports[]` | Sân bay đang mở. Đặt đường bay **từ** một nước thì nước đó phải có ít nhất 1 sân bay |
+
+Cách dùng trên form đặt chuyến:
+
+- Dropdown **nước đi**: mọi nước trong danh sách.
+- Dropdown **nước đến**: nước có `groundAvailable` hoặc `airAvailable`. Nước chỉ có một phương thức thì ghi chú, ví dụ "Hiện chỉ nhận vận chuyển đường bay".
+- Nút chọn **phương thức**: tắt "Đường bộ" khi nước đến có `groundAvailable = false`; tắt "Đường bay" khi nước đến có `airAvailable = false` hoặc nước đi không có sân bay.
+- Dropdown **sân bay**: lấy từ `airports` của từng nước.
+
+### GET /api/countries — Danh sách nước cho trang cấu hình
+
+- **Ai gọi được:** LogisticsManager, Admin
+- Trả **mọi** nước, kể cả đang tắt, kèm cước, số sân bay, số giấy tờ và cảnh báo.
+
+Response `200` — mỗi phần tử của `data`:
+
+```json
+{
+  "countryCode": "SG",
+  "nameVi": "Singapore",
+  "nameEn": "Singapore",
+  "isActive": true,
+  "sortOrder": 7,
+  "groundFreight": { "priceItemId": 40, "value": 1.0, "calcType": "PerKmPerHorse", "isActive": true },
+  "airFreight": { "priceItemId": 2, "value": 3000.0, "calcType": "PerHorse", "isActive": true },
+  "groundAvailable": true,
+  "airAvailable": true,
+  "airportCount": 1,
+  "activeAirportCount": 1,
+  "exportDocumentCount": 2,
+  "importDocumentCount": 6,
+  "transitDocumentCount": 0,
+  "warnings": []
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `isActive` | Nước có đang nằm trong phạm vi dịch vụ không |
+| `sortOrder` | Thứ tự hiển thị (nhỏ lên trước) |
+| `groundFreight` | Dòng cước đường bộ (USD / km / con); `null` là chưa khai báo |
+| `airFreight` | Dòng cước đường bay (USD / con); `null` là chưa khai báo |
+| `groundFreight.isActive`, `airFreight.isActive` | Công tắc của phương thức |
+| `groundAvailable`, `airAvailable` | Kết quả cuối cùng: khách có chọn được không (đã tính cả nước bật / tắt và sân bay) |
+| `airportCount`, `activeAirportCount` | Số sân bay / số sân bay đang mở |
+| `exportDocumentCount`, `importDocumentCount`, `transitDocumentCount` | Số quy định giấy tờ theo chiều xuất / nhập / quá cảnh (mục 16) |
+| `warnings[]` | Còn thiếu gì: `MissingImportDocuments` (nhận làm nước đến mà chưa khai giấy nhập), `MissingExportDocuments` (chưa khai giấy xuất), `AirFreightWithoutAirport` (bật cước bay nhưng không còn sân bay mở) |
+
+### GET /api/countries/{countryCode} — Chi tiết một nước
+
+- **Ai gọi được:** LogisticsManager, Admin
+- `countryCode`: mã 2 chữ, ví dụ `JP`.
+
+Response `200`: mọi trường như danh sách ở trên, thêm:
+
+| Trường | Ý nghĩa |
+|---|---|
+| `airports[]` | Mọi sân bay của nước, kể cả đang đóng (`isActive: false`) |
+| `requirements[]` | Quy định giấy tờ của nước, cùng dạng mục 16 (`direction` là `Export`, `Import` hoặc `Transit`) |
+| `countryFees[]` | Dòng giá **riêng của nước** (trừ cước), cùng dạng mục 17. Ví dụ Nhật: `FEE_QUARANTINE` $2.500 |
+
+Muốn thêm / sửa / xóa giấy tờ thì dùng API mục 16 (`/api/country-doc-requirements`); muốn sửa phí riêng thì dùng API mục 17 (`/api/price-items`). Sau đó gọi lại API này để làm mới.
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 404 | `Country 'NZ' was not found.` | Chưa có nước này |
+
+### POST /api/countries — Thêm một nước
+
+- **Ai gọi được:** LogisticsManager, Admin
+- Nước mới **đang bật** nhưng chưa có cước, nên khách chỉ chọn được làm **nước đi** cho tới khi Manager nhập cước.
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `countryCode` | chuỗi | Có | Mã ISO 2 chữ, tự đổi sang chữ in hoa |
+| `nameVi` | chuỗi | Có | Tên tiếng Việt, tối đa 100 ký tự |
+| `nameEn` | chuỗi | Có | Tên tiếng Anh, tối đa 100 ký tự |
+| `sortOrder` | số | Không | Thứ tự hiển thị, 0–9999 (mặc định 0) |
+
+```json
+{ "countryCode": "NZ", "nameVi": "New Zealand", "nameEn": "New Zealand", "sortOrder": 30 }
+```
+
+Response `201`: chi tiết nước vừa tạo.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Country 'NZ' already exists.` | Trùng mã |
+| 400 | `Validation failed` | Mã không phải 2 chữ cái, thiếu tên |
+
+### PUT /api/countries/{countryCode} — Sửa tên, thứ tự
+
+- **Ai gọi được:** LogisticsManager, Admin
+- Body gồm `nameVi`, `nameEn`, `sortOrder` (như khi thêm, không có `countryCode`).
+
+Response `200`: chi tiết nước.
+
+### PATCH /api/countries/{countryCode}/active — Bật / tắt cả nước
+
+- **Ai gọi được:** LogisticsManager, Admin
+- Tắt thì khách không chọn được nước này nữa (cả làm nước đi lẫn nước đến). Đơn đã gửi không bị ảnh hưởng.
+
+```js
+await api.patch(`/api/countries/${code}/active`, { isActive: false });
+```
+
+Response `200`: chi tiết nước.
+
+### PUT /api/countries/{countryCode}/freight/{transportMode} — Đặt cước và bật / tắt một phương thức
+
+- **Ai gọi được:** LogisticsManager, Admin
+- `transportMode`: `Ground` hoặc `Air`.
+- Nước chưa có dòng cước cho phương thức này thì server **tạo mới** (đường bộ tính `PerKmPerHorse`, đường bay tính `PerHorse`); đã có thì sửa giá và trạng thái.
+- **Tắt thì giá vẫn được giữ**, chỉ là khách không chọn được phương thức đó.
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `value` | số | Có | Lớn hơn 0. Đường bộ: USD / km / con. Đường bay: USD / con |
+| `isActive` | true / false | Có | Bật / tắt phương thức |
+
+```js
+// Mở đường bộ đi Singapore, 1 USD / km / con
+await api.put("/api/countries/SG/freight/Ground", { value: 1, isActive: true });
+// Tạm ngừng nhận đường bay đi Nga (giữ giá)
+await api.put("/api/countries/RU/freight/Air", { value: 8000, isActive: false });
+```
+
+Response `200`: chi tiết nước (đã cập nhật `groundAvailable` / `airAvailable`).
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Add at least one active airport in Laos before turning on air transport.` | Bật đường bay cho nước không có sân bay mở |
+| 400 | `The freight rate must be greater than zero.` | `value` ≤ 0 |
+| 400 | `TransportMode 'Sea' is invalid. Allowed values: Ground, Air.` | Sai phương thức |
+| 404 | `Country 'XX' was not found.` | Chưa có nước này |
+
+### POST /api/countries/{countryCode}/airports — Thêm sân bay
+
+- **Ai gọi được:** LogisticsManager, Admin
+- Sân bay mới **đang mở**.
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `iataCode` | chuỗi | Có | Mã IATA 3 chữ, tự đổi sang in hoa, không trùng |
+| `name` | chuỗi | Có | Tên sân bay, tối đa 150 ký tự |
+| `city` | chuỗi | Không | Thành phố, tối đa 100 ký tự |
+
+```json
+{ "iataCode": "AKL", "name": "Sân bay Quốc tế Auckland", "city": "Auckland" }
+```
+
+Response `200`: chi tiết nước (có sân bay mới trong `airports`).
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Airport code 'AKL' already exists.` | Trùng mã IATA |
+| 400 | `Validation failed` | Mã không phải 3 chữ cái, thiếu tên |
+
+### PUT /api/countries/airports/{airportId} — Sửa sân bay
+
+- **Ai gọi được:** LogisticsManager, Admin
+- Body như khi thêm. Response `200`: chi tiết nước chứa sân bay đó.
+
+### PATCH /api/countries/airports/{airportId}/active — Mở / đóng sân bay
+
+- **Ai gọi được:** LogisticsManager, Admin
+- Body: `{ "isActive": false }`. Nước không còn sân bay mở thì không đặt được đường bay (đi hay đến), và trang cấu hình hiện cảnh báo `AirFreightWithoutAirport` nếu cước bay vẫn bật.
+
+Response `200`: chi tiết nước.
+
 ---
 
 ## 18. Danh mục giá trị cho dropdown
@@ -7256,7 +7523,8 @@ Các danh sách trong `data`:
 | `stallClasses` | Hạng chuồng |
 | `dossierStatuses` | Trạng thái hồ sơ kiểm dịch |
 | `documentStatuses` | Trạng thái giấy tờ đã nộp |
-| `requirementDirections` | Chiều quy định (xuất / nhập khẩu) |
+| `requirementDirections` | Chiều quy định (xuất / nhập khẩu / quá cảnh) |
+| `documentProviders` | Ai lo một loại giấy: `Customer`, `Company` (R-19) |
 | `assetTypes` | Loại phương tiện |
 | `assetStatuses` | Trạng thái phương tiện |
 | `tripStatuses` | Trạng thái chuyến |
@@ -7343,7 +7611,12 @@ Response `200`:
     ],
     "requirementDirections": [
       "Export",
-      "Import"
+      "Import",
+      "Transit"
+    ],
+    "documentProviders": [
+      "Customer",
+      "Company"
     ],
     "assetTypes": [
       "HorseTruck_AirSuspension",
@@ -8579,7 +8852,7 @@ Tiến độ từng phần xem ở [TASKS.md](TASKS.md).
 
 ## 22. Bảng tra nhanh mọi endpoint
 
-Tổng cộng 129 endpoint. Chi tiết từng cái xem ở mục tương ứng.
+Tổng cộng 139 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 
 **4. Đăng nhập và tài khoản của tôi**
 
@@ -8804,6 +9077,21 @@ Tổng cộng 129 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/price-items` | Thêm dòng giá | LogisticsManager, Admin |
 | PUT | `/api/price-items/{id}` | Sửa dòng giá | LogisticsManager, Admin |
 | PATCH | `/api/price-items/{id}/active` | Bật hoặc tắt dòng giá | LogisticsManager, Admin |
+
+**17b. Quốc gia, phương thức và sân bay**
+
+| Method | Đường dẫn | Việc | Ai gọi được |
+|---|---|---|---|
+| GET | `/api/countries/catalog` | Danh sách nước cho form đặt chuyến | Ai cũng gọi được, không cần đăng nhập |
+| GET | `/api/countries` | Danh sách nước cho trang cấu hình | LogisticsManager, Admin |
+| GET | `/api/countries/{countryCode}` | Chi tiết một nước | LogisticsManager, Admin |
+| POST | `/api/countries` | Thêm một nước | LogisticsManager, Admin |
+| PUT | `/api/countries/{countryCode}` | Sửa tên, thứ tự | LogisticsManager, Admin |
+| PATCH | `/api/countries/{countryCode}/active` | Bật / tắt cả nước | LogisticsManager, Admin |
+| PUT | `/api/countries/{countryCode}/freight/{transportMode}` | Đặt cước và bật / tắt một phương thức | LogisticsManager, Admin |
+| POST | `/api/countries/{countryCode}/airports` | Thêm sân bay | LogisticsManager, Admin |
+| PUT | `/api/countries/airports/{airportId}` | Sửa sân bay | LogisticsManager, Admin |
+| PATCH | `/api/countries/airports/{airportId}/active` | Mở / đóng sân bay | LogisticsManager, Admin |
 
 **18. Danh mục giá trị cho dropdown**
 

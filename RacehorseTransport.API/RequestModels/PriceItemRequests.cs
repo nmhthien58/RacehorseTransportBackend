@@ -13,6 +13,15 @@ namespace RacehorseTransport.API.RequestModels
 
         [FromQuery(Name = "isActive")]
         public bool? IsActive { get; set; }
+
+        /// <summary>Chỉ lấy dòng giá riêng của nước đến này (mã 2 chữ, ví dụ JP).</summary>
+        [FromQuery(Name = "destCountryCode")]
+        [RegularExpression("^[A-Za-z]{2}$", ErrorMessage = "DestCountryCode must contain exactly two letters.")]
+        public string? DestCountryCode { get; set; }
+
+        /// <summary>true: chỉ lấy dòng giá chung, áp cho mọi nước đến.</summary>
+        [FromQuery(Name = "globalOnly")]
+        public bool? GlobalOnly { get; set; }
     }
 
     public class CreatePriceItemRequest

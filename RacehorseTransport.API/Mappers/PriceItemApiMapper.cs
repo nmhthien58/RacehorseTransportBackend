@@ -16,7 +16,9 @@ namespace RacehorseTransport.API.Mappers
                 Size = request.Size,
                 Category = NormalizeOptional(request.Category),
                 TransportMode = NormalizeOptional(request.TransportMode),
-                IsActive = request.IsActive
+                IsActive = request.IsActive,
+                DestCountryCode = NormalizeOptional(request.DestCountryCode)?.ToUpperInvariant(),
+                GlobalOnly = request.GlobalOnly
             };
         }
 

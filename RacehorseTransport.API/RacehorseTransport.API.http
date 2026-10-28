@@ -1244,3 +1244,55 @@ Authorization: Bearer {{managerToken}}
 Content-Type: application/json
 
 { "manualReference": "VCB-123456" }
+
+# ===================== R-18: quốc gia, phương thức, sân bay =====================
+
+### Danh sách nước cho form đặt chuyến (không cần đăng nhập)
+GET {{baseUrl}}/api/countries/catalog
+
+### Danh sách nước cho trang cấu hình (Manager)
+GET {{baseUrl}}/api/countries
+Authorization: Bearer {{managerToken}}
+
+### Chi tiết một nước: cước, sân bay, giấy tờ, phí riêng
+GET {{baseUrl}}/api/countries/SG
+Authorization: Bearer {{managerToken}}
+
+### Mở đường bộ đi Singapore (USD / km / con)
+PUT {{baseUrl}}/api/countries/SG/freight/Ground
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{ "value": 1, "isActive": true }
+
+### Bật đường bay cho nước chưa có sân bay -> 400
+PUT {{baseUrl}}/api/countries/LA/freight/Air
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{ "value": 3000, "isActive": true }
+
+### Thêm nước mới
+POST {{baseUrl}}/api/countries
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{ "countryCode": "NZ", "nameVi": "New Zealand", "nameEn": "New Zealand", "sortOrder": 30 }
+
+### Thêm sân bay
+POST {{baseUrl}}/api/countries/NZ/airports
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{ "iataCode": "AKL", "name": "Sân bay Quốc tế Auckland", "city": "Auckland" }
+
+### Đóng một sân bay
+PATCH {{baseUrl}}/api/countries/airports/1/active
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{ "isActive": false }
+
+### Bảng giá chung (không gắn nước đến)
+GET {{baseUrl}}/api/price-items?globalOnly=true&size=100
+Authorization: Bearer {{managerToken}}

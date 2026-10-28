@@ -19,5 +19,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? Category { get; set; }
         public string? TransportMode { get; set; }
         public bool? IsActive { get; set; }
+        public string? DestCountryCode { get; set; } // R-18: dòng giá riêng của một nước
+        public bool? GlobalOnly { get; set; }        // R-18: chỉ dòng giá chung (không gắn nước đến)
     }
 }
