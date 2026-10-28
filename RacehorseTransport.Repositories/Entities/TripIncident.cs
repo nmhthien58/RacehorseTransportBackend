@@ -15,6 +15,7 @@ namespace RacehorseTransport.Repositories.Entities
         public string? ProposedAction { get; set; }
         public string? ResponseAction { get; set; } // IncidentResponseActions
         public string? RouteChange { get; set; }    // JSON thay đổi tuyến đề xuất kèm phương án (IncidentRouteChangeModel)
+        public string? ActionPayload { get; set; }  // JSON chi tiết hành động đổi xe / đổi người (IncidentActionPayloadModel)
         public string? RevisedRouteNotes { get; set; }
         public decimal AdditionalCost { get; set; }
         public string? RejectionReason { get; set; } // lý do của lần từ chối phương án gần nhất

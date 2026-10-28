@@ -44,9 +44,23 @@ namespace RacehorseTransport.API.RequestModels
         [MaxLength(255, ErrorMessage = "ProposedAction cannot exceed 255 characters.")]
         public string ProposedAction { get; set; } = string.Empty;
 
-        // WaitAndContinue | RepairAndContinue | Reroute | VeterinaryCare | OffloadHorse | Other
+        // WaitAndContinue | RepairAndContinue | Reroute | VeterinaryCare | OffloadHorse | ReplaceVehicle | ReplaceCrew | Other
         [Required(ErrorMessage = "ResponseAction is required.")]
         public string ResponseAction { get; set; } = string.Empty;
+
+        // ReplaceVehicle
+        [Range(1, int.MaxValue, ErrorMessage = "ReplacementVehicleId must be a valid asset ID.")]
+        public int? ReplacementVehicleId { get; set; }
+
+        // ReplaceCrew
+        [Range(1, int.MaxValue, ErrorMessage = "RemoveUserId must be a valid user ID.")]
+        public int? RemoveUserId { get; set; }
+
+        [Range(1, int.MaxValue, ErrorMessage = "AddUserId must be a valid user ID.")]
+        public int? AddUserId { get; set; }
+
+        // Driver | Escort
+        public string? CrewRole { get; set; }
 
         // Thay đổi tuyến đi kèm (bắt buộc với Reroute). Được kiểm tra ngay và áp vào lộ trình khi Manager duyệt.
         public ApplyRerouteRequest? RouteChange { get; set; }

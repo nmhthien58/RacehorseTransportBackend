@@ -5140,6 +5140,7 @@ Một sự cố (`incident`) có dạng:
 | `affectedTripHorseId`, `affectedHorseName` | Con ngựa bị ảnh hưởng; `null` nếu sự cố không gắn với con nào |
 | `reportedByName`, `reportedAt` | Ai báo và lúc nào |
 | `proposedAction`, `revisedRouteNotes`, `additionalCost` | Phương án của điều phối viên: việc sẽ làm, ghi chú tuyến mới, chi phí phát sinh |
+| `actionPayload` | Chi tiết phương án đổi xe / đổi người; `null` với hành động khác. Đổi xe trả `{ replacementVehicleId }`; đổi người trả `{ removeUserId, addUserId, crewRole }` |
 | `rejectionReason` | Lý do quản lý từ chối phương án gần nhất. Được giữ lại khi điều phối đề xuất lại, và xóa (`null`) khi phương án được duyệt |
 | `approvedByName`, `approvedAt` | Quản lý duyệt phương án |
 | `resolvedAt` | Thời điểm đóng sự cố |
@@ -5286,8 +5287,12 @@ Các trường gửi lên:
 
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
-| `responseAction` | chuỗi | Có | Loại hành động: `WaitAndContinue` (chờ rồi đi tiếp), `RepairAndContinue` (sửa xe / thiết bị rồi đi tiếp), `Reroute` (đổi tuyến), `VeterinaryCare` (dừng chăm sóc thú y), `OffloadHorse` (cho ngựa rời chuyến), `ReturnToOrigin` (cả đoàn quay về nơi đi; **không gửi** `routeChange`, hệ thống tự dựng tuyến về), `HoldAtStable` (gửi ngựa chuồng tạm, tính phí chuồng khi đóng), `Other` |
+| `responseAction` | chuỗi | Có | Loại hành động: `WaitAndContinue`, `RepairAndContinue`, `Reroute`, `VeterinaryCare`, `OffloadHorse`, `ReplaceVehicle` (đổi xe), `ReplaceCrew` (đổi tài xế / áp tải), `ReturnToOrigin`, `HoldAtStable`, `Other` |
 | `proposedAction` | chuỗi | Có | Chỉ đạo cho đoàn xe, tối đa 255 ký tự |
+| `replacementVehicleId` | số | Có khi `responseAction` là `ReplaceVehicle` | Xe thay thế. Phải khác xe hiện tại, cùng loại tài sản, đang `Available`, không trùng lịch, đủ chuồng cho số ngựa còn phải chở và có điều hòa nếu một đơn trên xe yêu cầu |
+| `removeUserId` | số | Có khi `responseAction` là `ReplaceCrew` | Thành viên hiện tại cần thay; phải đang giữ đúng `crewRole` trên chuyến |
+| `addUserId` | số | Có khi `responseAction` là `ReplaceCrew` | Người thay thế; phải là tài khoản `DriverEscort` đang hoạt động và không bận chuyến khác trùng thời gian |
+| `crewRole` | chuỗi | Có khi `responseAction` là `ReplaceCrew` | Vai trò cần thay: `Driver` hoặc `Escort` |
 | `routeChange` | object | Không (bắt buộc khi `responseAction` là `Reroute`) | Thay đổi tuyến, cùng dạng body của `apply-reroute` bên dưới: `deactivateCheckpointIds`, `newCheckpoints`, `insertAfterCheckpointId`. Phải có ít nhất một mốc bỏ hoặc thêm. Mỗi mốc mới bắt buộc có `address` |
 | `revisedRouteNotes` | chuỗi | Không | Ghi chú thêm về tuyến đường, tối đa 2000 ký tự |
 | `additionalCost` | số | Không | Chi phí phát sinh, không âm (mặc định 0) |
@@ -5349,6 +5354,29 @@ Các hướng xử lý khác không cần biên bản, ví dụ:
 }
 ```
 
+Ví dụ đổi xe dự phòng:
+
+```json
+{
+  "responseAction": "ReplaceVehicle",
+  "proposedAction": "Điều xe TRK-009 tới sang ngựa và tiếp tục hành trình",
+  "replacementVehicleId": 9,
+  "additionalCost": 450
+}
+```
+
+Ví dụ đổi áp tải:
+
+```json
+{
+  "responseAction": "ReplaceCrew",
+  "proposedAction": "Thay áp tải bị ốm tại trạm dừng",
+  "removeUserId": 14,
+  "addUserId": 21,
+  "crewRole": "Escort"
+}
+```
+
 Response `200`: sự cố với `status` là `PlanProposed`, kèm `responseAction` và `routeChange` (dạng bên dưới, `appliedAt` là `null` vì chưa áp). Phương án `OffloadHorse` có thêm `offloadOutcome`, `affectedTripHorseId` và `vetReportUrl` (nếu có biên bản). Con ngựa **chưa** đổi trạng thái cho tới khi quản lý duyệt.
 
 **Trường `routeChange` trong mọi response sự cố** (`null` nếu phương án không đổi tuyến):
@@ -5377,6 +5405,9 @@ Lỗi thường gặp:
 | 400 | `VetReportPath is not a valid file path. ...` | `vetReportPath` không phải đường dẫn do `POST /api/files` (category `documents`) trả về |
 | 400 | `A horse was offloaded in an emergency on this incident, so the plan must be OffloadHorse with the next step for that horse.` | Sự cố dỡ khẩn cấp mà đề xuất loại hành động khác |
 | 400 | `This incident is about the horse offloaded in an emergency; the plan must be for that horse.` | Sự cố dỡ khẩn cấp mà chọn con ngựa khác |
+| 400 | `Replacement vehicle TRK-009 has only 2 stall(s), but 3 horse(s) still need transport.` | Xe thay thế không đủ chỗ |
+| 400 | `Replacement vehicle TRK-009 must have climate control because an onboard booking requires it.` | Đơn trên xe yêu cầu điều hòa nhưng xe thay không có |
+| 400 | `Replacement crew member ... is already assigned to trip ... during this period.` | Người thay thế đang bận chuyến khác trùng thời gian |
 
 ### POST /api/incidents/{id}/approve — Duyệt phương án
 
@@ -5394,6 +5425,10 @@ Tham số trên đường dẫn:
 Phương án `ReturnToOrigin`: tuyến về được dựng và áp ngay (xem đầu mục 11), chuyến `EmergencyRerouting`. Phương án `Reroute` có `extraCostForCustomer > 0`: sự cố chuyển `AwaitingConsent`, tuyến chưa đổi; khách có ngựa trên xe nhận thông báo + email xin đồng ý.
 
 Phương án `OffloadHorse`: con ngựa `affectedTripHorseId` đổi trạng thái theo `offloadOutcome` (bảng ở đầu mục 11): `Deceased` → ngựa `Deceased` cả trên chuyến và trong đơn; các hướng khác → `Offloaded` kèm `offloadOutcome`. Khách của con ngựa nhận thông báo + email; với `WaitRecover`, người lập chuyến được báo để xếp chuyến khác.
+
+Phương án `ReplaceVehicle`: server kiểm tra lại điều kiện tại thời điểm duyệt, chuyển `trip.vehicleId` sang xe mới, đặt xe mới `InTransit` và xe cũ `Maintenance`. Số chuồng được giữ nguyên nếu còn nằm trong sức chứa xe mới; nếu không, các ngựa còn phải chở được đánh lại số theo thứ tự hiện tại.
+
+Phương án `ReplaceCrew`: server kiểm tra lại người thay thế chưa bận chuyến khác, thay dòng `trip_crew` và giữ nguyên cờ trưởng đoàn / nhiệm vụ. Nếu thay `Escort`, mọi ngựa người cũ phụ trách được chuyển sang người mới. Cả người cũ và người mới đều nhận thông báo.
 
 Response `200`: sự cố với `status` là `Approved`, có `approvedByName`, `approvedAt`; `rejectionReason` thành `null`.
 

@@ -25,6 +25,10 @@ namespace RacehorseTransport.Services.BusinessModels
     {
         public string ProposedAction { get; set; } = string.Empty;
         public string ResponseAction { get; set; } = string.Empty;
+        public int? ReplacementVehicleId { get; set; }
+        public int? RemoveUserId { get; set; }
+        public int? AddUserId { get; set; }
+        public string? CrewRole { get; set; }
 
         // Thay đổi tuyến đi kèm phương án (bỏ trống = giữ nguyên lộ trình). Áp vào lộ trình khi Manager duyệt.
         public ApplyRerouteModel? RouteChange { get; set; }
@@ -70,6 +74,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset ReportedAt { get; set; }
         public string? ProposedAction { get; set; }
         public string? ResponseAction { get; set; }
+        public IncidentActionPayloadModel? ActionPayload { get; set; }
         public IncidentRouteChangeModel? RouteChange { get; set; }
         public string? RevisedRouteNotes { get; set; }
         public decimal AdditionalCost { get; set; }
@@ -88,6 +93,14 @@ namespace RacehorseTransport.Services.BusinessModels
         // R-14 (BE-14b)
         public decimal ExtraCostForCustomer { get; set; }
         public List<IncidentConsentModel> Consents { get; set; } = new();
+    }
+
+    public class IncidentActionPayloadModel
+    {
+        public int? ReplacementVehicleId { get; set; }
+        public int? RemoveUserId { get; set; }
+        public int? AddUserId { get; set; }
+        public string? CrewRole { get; set; }
     }
 
     public class IncidentConsentModel

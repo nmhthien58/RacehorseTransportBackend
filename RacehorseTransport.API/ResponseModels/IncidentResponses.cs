@@ -19,6 +19,7 @@ namespace RacehorseTransport.API.ResponseModels
         public DateTimeOffset ReportedAt { get; set; }
         public string? ProposedAction { get; set; }
         public string? ResponseAction { get; set; }
+        public RacehorseTransport.Services.BusinessModels.IncidentActionPayloadModel? ActionPayload { get; set; }
         public IncidentRouteChangeResponse? RouteChange { get; set; } // null = phương án không đổi tuyến
         public string? RevisedRouteNotes { get; set; }
         public decimal AdditionalCost { get; set; }
