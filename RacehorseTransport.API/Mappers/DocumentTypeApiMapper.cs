@@ -14,7 +14,8 @@ namespace RacehorseTransport.API.Mappers
                 Code = request.Code.Trim().ToUpperInvariant(),
                 Name = request.Name.Trim(),
                 Description = request.Description?.Trim(),
-                IsMandatory = request.IsMandatory
+                IsMandatory = request.IsMandatory,
+                ProvidedBy = request.ProvidedBy
             };
         }
 
@@ -26,7 +27,8 @@ namespace RacehorseTransport.API.Mappers
                 Code = request.Code.Trim().ToUpperInvariant(),
                 Name = request.Name.Trim(),
                 Description = request.Description?.Trim(),
-                IsMandatory = request.IsMandatory
+                IsMandatory = request.IsMandatory,
+                ProvidedBy = request.ProvidedBy
             };
         }
 
@@ -38,7 +40,8 @@ namespace RacehorseTransport.API.Mappers
                 Code = model.Code,
                 Name = model.Name,
                 Description = model.Description,
-                IsMandatory = model.IsMandatory
+                IsMandatory = model.IsMandatory,
+                ProvidedBy = model.ProvidedBy
             };
         }
     }

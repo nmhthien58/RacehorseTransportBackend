@@ -52,6 +52,16 @@ namespace RacehorseTransport.Services.Implementations
                 query = query.Where(p => p.IsActive == options.IsActive.Value);
             }
 
+            if (!string.IsNullOrWhiteSpace(options.DestCountryCode))
+            {
+                query = query.Where(p => p.DestCountryCode == options.DestCountryCode);
+            }
+
+            if (options.GlobalOnly == true)
+            {
+                query = query.Where(p => p.DestCountryCode == null);
+            }
+
             query = query.ApplySort(options.Sort, nameof(PriceItem.PriceItemId));
             return await query.ToPagedResultAsync(options, p => p.ToBusinessModel());
         }

@@ -103,6 +103,7 @@ namespace RacehorseTransport.Services.Implementations
             existing.Name = model.Name;
             existing.Description = model.Description;
             existing.IsMandatory = model.IsMandatory;
+            existing.ProvidedBy = model.ProvidedBy;
 
             await _docTypeRepo.UpdateAsync(existing);
             await _cache.RemoveAsync(CacheKeys.DocumentTypesAll);

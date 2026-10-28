@@ -53,6 +53,7 @@ namespace RacehorseTransport.API.Mappers
                     DocTypeCode = c.DocTypeCode,
                     DocTypeName = c.DocTypeName,
                     IsMandatory = c.IsMandatory,
+                    ProvidedBy = c.ProvidedBy,
                     ValidityDays = c.ValidityDays,
                     RegulationNote = c.RegulationNote,
                     RequiredBy = c.RequiredBy,

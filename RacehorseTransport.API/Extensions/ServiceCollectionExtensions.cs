@@ -152,6 +152,7 @@ namespace RacehorseTransport.API.Extensions
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IPricingService, PricingService>();
             services.AddScoped<IPriceItemService, PriceItemService>();
+            services.AddScoped<ICountryService, CountryService>();
             services.AddScoped<IBookingService, BookingService>();
             services.AddScoped<ITripService, TripService>();
             services.AddScoped<ITripPlanningService, TripPlanningService>();

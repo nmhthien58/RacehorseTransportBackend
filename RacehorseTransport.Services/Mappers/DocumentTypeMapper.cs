@@ -14,7 +14,8 @@ namespace RacehorseTransport.Services.Mappers
                 Code = entity.Code,
                 Name = entity.Name,
                 Description = entity.Description,
-                IsMandatory = entity.IsMandatory
+                IsMandatory = entity.IsMandatory,
+                ProvidedBy = entity.ProvidedBy
             };
         }
 
@@ -26,7 +27,8 @@ namespace RacehorseTransport.Services.Mappers
                 Code = model.Code,
                 Name = model.Name,
                 Description = model.Description,
-                IsMandatory = model.IsMandatory
+                IsMandatory = model.IsMandatory,
+                ProvidedBy = model.ProvidedBy
             };
         }
     }
