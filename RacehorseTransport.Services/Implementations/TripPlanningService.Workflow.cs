@@ -20,6 +20,10 @@ namespace RacehorseTransport.Services.Implementations
         public async Task<TripDetailModel> CreateTripAsync(TripPlanModel plan, CurrentUser currentUser)
         {
             await ValidatePlanAsync(plan, excludeTripId: null);
+            if (plan.Checkpoints == null || plan.Checkpoints.Count == 0)
+            {
+                plan.Checkpoints = await CopyApprovedRouteWhenSingleBookingAsync(plan);
+            }
             if (plan.Checkpoints != null)
             {
                 ValidateCheckpointInputs(plan.Checkpoints);
@@ -54,6 +58,10 @@ namespace RacehorseTransport.Services.Implementations
             var trip = await GetDraftForEditAsync(tripId, currentUser);
 
             await ValidatePlanAsync(plan, excludeTripId: tripId);
+            if (trip.Checkpoints.Count == 0 && (plan.Checkpoints == null || plan.Checkpoints.Count == 0))
+            {
+                plan.Checkpoints = await CopyApprovedRouteWhenSingleBookingAsync(plan);
+            }
             if (plan.Checkpoints != null)
             {
                 ValidateCheckpointInputs(plan.Checkpoints);
@@ -133,6 +141,9 @@ namespace RacehorseTransport.Services.Implementations
             checkpoint.CheckpointName = input.CheckpointName;
             checkpoint.CheckpointType = input.CheckpointType;
             checkpoint.Address = input.Address;
+            checkpoint.Latitude = input.Latitude;
+            checkpoint.Longitude = input.Longitude;
+            checkpoint.DistanceKmFromPrevious = input.DistanceKmFromPrevious;
             checkpoint.PlannedTime = input.PlannedTime;
             checkpoint.MandatoryRestMinutes = input.MandatoryRestMinutes;
             checkpoint.BookingId = input.BookingId;
@@ -184,6 +195,7 @@ namespace RacehorseTransport.Services.Implementations
             var plan = ToPlan(trip);
             var bookings = await ValidatePlanAsync(plan, excludeTripId: tripId);
             ValidateRoute(trip, bookings);
+            await ValidateApprovedRouteAndDriversAsync(trip, bookings);
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
@@ -209,6 +221,7 @@ namespace RacehorseTransport.Services.Implementations
             var plan = ToPlan(trip);
             var bookings = await ValidatePlanAsync(plan, excludeTripId: tripId);
             ValidateRoute(trip, bookings);
+            await ValidateApprovedRouteAndDriversAsync(trip, bookings);
 
             var customerIds = await _tripHorseRepo.GetQueryable()
                 .Where(th => th.TripId == tripId)
@@ -584,8 +597,144 @@ namespace RacehorseTransport.Services.Implementations
                 BookingCode = b.BookingCode,
                 PickupWindowStart = b.PickupWindowStart,
                 PickupWindowEnd = b.PickupWindowEnd,
-                DeliveryDeadline = b.DeliveryDeadline
+                DeliveryDeadline = b.DeliveryDeadline,
+                TransportMode = b.TransportMode
             }).ToList();
+        }
+
+        // Một đơn trên chuyến chưa có mốc: chép nguyên tuyến Approved để Coordinator không phải nhập lại.
+        // Chuyến ghép nhiều đơn tiếp tục dùng suggest-route vì còn phải sắp thứ tự đón / trả.
+        private async Task<List<CheckpointInputModel>?> CopyApprovedRouteWhenSingleBookingAsync(TripPlanModel tripPlan)
+        {
+            var horseIds = tripPlan.Horses.Select(h => h.BookingHorseId).Distinct().ToList();
+            var bookingIds = await _bookingHorseRepo.GetQueryable()
+                .AsNoTracking()
+                .Where(bh => horseIds.Contains(bh.BookingHorseId))
+                .Select(bh => bh.BookingId)
+                .Distinct()
+                .ToListAsync();
+
+            if (bookingIds.Count != 1)
+            {
+                return null;
+            }
+
+            int bookingId = bookingIds[0];
+            var approved = await _routePlanRepo.GetQueryable()
+                .AsNoTracking()
+                .Include(p => p.Booking)
+                .Include(p => p.Stops)
+                .FirstOrDefaultAsync(p => p.BookingId == bookingId && p.Status == RoutePlanStatuses.Approved)
+                ?? throw new BusinessException($"Booking ID {bookingId} has no approved route plan. Approve its route before assigning horses to a trip.");
+
+            var ordered = approved.Stops.OrderBy(s => s.SequenceOrder).ToList();
+            if (ordered.Count < 2)
+            {
+                throw new BusinessException($"The approved route for booking {approved.Booking!.BookingCode} has fewer than two stops.");
+            }
+
+            var current = tripPlan.PlannedStartDate > approved.Booking!.PickupWindowStart
+                ? tripPlan.PlannedStartDate
+                : approved.Booking.PickupWindowStart;
+            var checkpoints = new List<CheckpointInputModel>();
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                var stop = ordered[i];
+                if (i > 0)
+                {
+                    current = current.AddMinutes(ordered[i - 1].RestMinutes)
+                        .AddHours((double)(stop.DurationHoursFromPrevious ?? 0.01m));
+                }
+                checkpoints.Add(new CheckpointInputModel
+                {
+                    CheckpointName = stop.StopName,
+                    CheckpointType = stop.StopType,
+                    Address = stop.Address,
+                    Latitude = stop.Latitude,
+                    Longitude = stop.Longitude,
+                    DistanceKmFromPrevious = stop.DistanceKmFromPrevious,
+                    PlannedTime = current,
+                    MandatoryRestMinutes = stop.RestMinutes
+                });
+            }
+            return checkpoints;
+        }
+
+        private async Task ValidateApprovedRouteAndDriversAsync(Trip trip, List<RouteBookingRule> bookings)
+        {
+            var route = trip.Checkpoints.Where(c => c.IsActive).OrderBy(c => c.SequenceOrder).ToList();
+            var bookingIds = bookings.Select(b => b.BookingId).ToList();
+            var plans = await _routePlanRepo.GetQueryable()
+                .AsNoTracking()
+                .Include(p => p.Stops)
+                .Where(p => bookingIds.Contains(p.BookingId) && p.Status == RoutePlanStatuses.Approved)
+                .ToListAsync();
+
+            var missing = bookings.Where(b => plans.All(p => p.BookingId != b.BookingId)).Select(b => b.BookingCode).ToList();
+            if (missing.Count > 0)
+            {
+                throw new BusinessException($"Approved route plan is missing for booking(s): {string.Join(", ", missing)}.");
+            }
+
+            var points = RoutePoints(route);
+            decimal distance;
+            if (route.Skip(1).All(c => c.DistanceKmFromPrevious.HasValue))
+            {
+                distance = route.Skip(1).Sum(c => c.DistanceKmFromPrevious!.Value);
+            }
+            else
+            {
+                distance = (await _geoService.RouteAsync(points, includeCountries: false)).TotalDistanceKm;
+            }
+            int driverCount = trip.Crew.Count(c => c.CrewRole == CrewRoles.Driver);
+            string mode = bookings.Select(b => b.TransportMode).Distinct().Single();
+            var estimate = _transitEstimator.Estimate(new TransitEstimateInputModel
+            {
+                TransportMode = mode,
+                DistanceKm = distance > 0 ? (int)Math.Ceiling(distance) : null,
+                DriverCount = driverCount,
+                Stops = route.Count(c => c.CheckpointType == CheckpointTypes.PickUp || c.CheckpointType == CheckpointTypes.DropOff) + 2
+            });
+            TripAssignmentRules.EnsureDriverCount(estimate.DrivingHours, driverCount, _transitOptions.MaxDrivingHoursPerDaySingleDriver);
+
+            // Nước bay ngang qua không phải nước quá cảnh thủ tục; quy tắc này chỉ áp cho tuyến đường bộ.
+            if (mode != TransportModes.Ground)
+            {
+                return;
+            }
+
+            foreach (var booking in bookings)
+            {
+                var segment = SegmentForBooking(route, booking.BookingId);
+                var actual = await _geoService.RouteAsync(RoutePoints(segment), includeCountries: true);
+                if (actual.CountryCodes == null || actual.CountryCodes.Count == 0)
+                {
+                    throw new BusinessException($"The countries along the trip route for booking {booking.BookingCode} could not be determined. Check all checkpoint coordinates and try again.");
+                }
+                var approved = plans.Single(p => p.BookingId == booking.BookingId).Stops
+                    .Where(s => !string.IsNullOrWhiteSpace(s.CountryCode))
+                    .Select(s => s.CountryCode!);
+                TripAssignmentRules.EnsureCountriesAreApproved(booking.BookingCode, actual.CountryCodes, approved);
+            }
+        }
+
+        private static List<RouteCheckpoint> SegmentForBooking(List<RouteCheckpoint> route, int bookingId)
+        {
+            var pickup = TripRouteRules.PickupCheckpoint(route, bookingId)!;
+            var dropoff = TripRouteRules.DropoffCheckpoint(route, bookingId)!;
+            int start = route.IndexOf(pickup);
+            int count = route.IndexOf(dropoff) - start + 1;
+            return route.GetRange(start, count);
+        }
+
+        private static List<GeoPointModel> RoutePoints(IEnumerable<RouteCheckpoint> route)
+        {
+            var checkpoints = route.ToList();
+            if (checkpoints.Any(c => !c.Latitude.HasValue || !c.Longitude.HasValue))
+            {
+                throw new BusinessException("Every checkpoint needs latitude and longitude before the trip can be submitted.");
+            }
+            return checkpoints.Select(c => new GeoPointModel((double)c.Latitude!.Value, (double)c.Longitude!.Value)).ToList();
         }
 
         private static void ValidateCheckpointInputs(IEnumerable<CheckpointInputModel> checkpoints)
@@ -599,6 +748,10 @@ namespace RacehorseTransport.Services.Implementations
                 if (checkpoint.MandatoryRestMinutes < 0)
                 {
                     throw new BusinessException("MandatoryRestMinutes cannot be negative.");
+                }
+                if (checkpoint.Latitude.HasValue != checkpoint.Longitude.HasValue)
+                {
+                    throw new BusinessException($"Checkpoint '{checkpoint.CheckpointName}' must provide both latitude and longitude.");
                 }
 
                 bool isBookingStop = CheckpointTypes.BookingStops.Contains(checkpoint.CheckpointType);
@@ -757,6 +910,9 @@ namespace RacehorseTransport.Services.Implementations
                 CheckpointName = input.CheckpointName,
                 CheckpointType = input.CheckpointType,
                 Address = input.Address,
+                Latitude = input.Latitude,
+                Longitude = input.Longitude,
+                DistanceKmFromPrevious = input.DistanceKmFromPrevious,
                 PlannedTime = input.PlannedTime,
                 MandatoryRestMinutes = input.MandatoryRestMinutes,
                 BookingId = input.BookingId,

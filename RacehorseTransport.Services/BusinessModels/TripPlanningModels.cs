@@ -62,6 +62,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public string CheckpointName { get; set; } = string.Empty;
         public string CheckpointType { get; set; } = string.Empty;
         public string Address { get; set; } = string.Empty;
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
+        public decimal? DistanceKmFromPrevious { get; set; }
         public DateTimeOffset PlannedTime { get; set; }
         public int MandatoryRestMinutes { get; set; }
 

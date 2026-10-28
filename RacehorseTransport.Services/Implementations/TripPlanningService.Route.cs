@@ -59,6 +59,7 @@ namespace RacehorseTransport.Services.Implementations
 
             var builder = new RouteSuggestionBuilder(_transitOptions, _transitEstimator, DistanceKmAsync);
             var result = await builder.BuildAsync(inputs, modes[0], request.PlannedStartDate.ToUniversalTime(), request.DriverCount);
+            await FillApprovedRouteCoordinatesAsync(result, inputs);
 
             // Hồ sơ chưa thông quan: vẫn lập được kế hoạch, nhưng chuyến sẽ không xuất phát được cho tới khi xong
             foreach (var bh in bookingHorses.Where(bh => bh.Dossier?.Status != DossierStatuses.Cleared).OrderBy(bh => bh.BookingId))
@@ -80,6 +81,37 @@ namespace RacehorseTransport.Services.Implementations
 
             return result;
         }
+
+        // Tuyến ghép vẫn do RouteSuggestionBuilder sắp thứ tự; tọa độ điểm đón / trả lấy từ tuyến đã duyệt của từng đơn.
+        private async Task FillApprovedRouteCoordinatesAsync(RouteSuggestionModel result, List<RouteBookingInput> bookings)
+        {
+            var bookingIds = bookings.Select(b => b.BookingId).ToList();
+            var plans = await _routePlanRepo.GetQueryable()
+                .AsNoTracking()
+                .Include(p => p.Stops)
+                .Where(p => bookingIds.Contains(p.BookingId) && p.Status == RoutePlanStatuses.Approved)
+                .ToListAsync();
+
+            var coordinatesByAddress = new Dictionary<string, (decimal Lat, decimal Lng)>();
+            foreach (var plan in plans)
+            {
+                foreach (var stop in plan.Stops.Where(s => s.StopType == RouteStopTypes.Origin || s.StopType == RouteStopTypes.Destination))
+                {
+                    coordinatesByAddress[NormalizeAddress(stop.Address)] = (stop.Latitude, stop.Longitude);
+                }
+            }
+
+            foreach (var checkpoint in result.Checkpoints)
+            {
+                if (coordinatesByAddress.TryGetValue(NormalizeAddress(checkpoint.Address), out var coordinates))
+                {
+                    checkpoint.Latitude = coordinates.Lat;
+                    checkpoint.Longitude = coordinates.Lng;
+                }
+            }
+        }
+
+        private static string NormalizeAddress(string address) => address.Trim().ToUpperInvariant();
 
         // Quãng đường đường bộ giữa hai địa điểm (Goong / OSRM, dự phòng bảng cự ly của DistanceService)
         private async Task<int> DistanceKmAsync(RoutePlace from, RoutePlace to)

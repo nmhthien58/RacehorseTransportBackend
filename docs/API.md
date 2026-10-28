@@ -3639,7 +3639,7 @@ Response `200` — phần `data`:
 
 ### POST /api/trips/suggest-route — Gợi ý lộ trình
 
-Hệ thống đề xuất lộ trình cho các con ngựa đã chọn (một hoặc nhiều đơn). Kết quả **chỉ là gợi ý**, không lưu gì: frontend hiển thị cho điều phối viên xem, rồi chép `checkpoints` vào body của `POST /api/trips` / `PUT /api/trips/{id}` (có thể sửa trước khi lưu).
+Hệ thống đề xuất lộ trình cho các con ngựa đã chọn (một hoặc nhiều đơn). Kết quả **chỉ là gợi ý**, không lưu gì: frontend hiển thị cho điều phối viên xem, rồi chép `checkpoints` vào body của `POST /api/trips` / `PUT /api/trips/{id}` (có thể sửa trước khi lưu). Tọa độ điểm đón / trả lấy từ tuyến `Approved` của từng đơn; khi chép, đổi `legDistanceKm` thành `distanceKmFromPrevious`.
 
 Cách hệ thống xếp:
 
@@ -3685,6 +3685,8 @@ Response `200` (2 đơn cùng đón ở Hà Nội: BKG-2026-0201 trả ở Lạn
         "checkpointName": "Hà Nội",
         "checkpointType": "Origin",
         "address": "Hà Nội",
+        "latitude": 21.0285,
+        "longitude": 105.8542,
         "plannedTime": "2026-11-09T23:00:00+00:00",
         "mandatoryRestMinutes": 60,
         "bookingId": null,
@@ -3835,7 +3837,7 @@ Các trường gửi lên:
 | `plannedCost` | số | Không | Chi phí vận hành dự kiến, không âm |
 | `crew` | mảng | Có | Đoàn xe, ít nhất 1 người. Xem bảng dưới |
 | `horses` | mảng | Có | Ngựa trên chuyến, ít nhất 1 con. Xem bảng dưới |
-| `checkpoints` | mảng | Không | Các mốc lộ trình theo đúng thứ tự đi. Có thể thêm sau |
+| `checkpoints` | mảng | Không | Các mốc lộ trình theo đúng thứ tự đi. Một đơn và bỏ trống: server tự chép tuyến `Approved`; nhiều đơn: dùng `suggest-route` rồi gửi lại các mốc |
 
 Mỗi phần tử của `crew`:
 
@@ -3864,6 +3866,8 @@ Mỗi phần tử của `checkpoints`:
 | `checkpointName` | chuỗi | Có | Tên mốc, tối đa 100 ký tự |
 | `checkpointType` | chuỗi | Có | `Origin` (mốc đầu), `PickUp`, `RestStop`, `BorderGate`, `DropOff`, `Destination` (mốc cuối) |
 | `address` | chuỗi | Có | Địa chỉ, tối đa 255 ký tự |
+| `latitude`, `longitude` | số | Có trước khi trình | Tọa độ mốc; tuyến chép từ bản `Approved` có sẵn hai giá trị này |
+| `distanceKmFromPrevious` | số | Không với mốc đầu, có với mốc sau | Quãng đường từ mốc trước; lấy từ `legDistanceKm` của gợi ý hoặc tuyến đã duyệt |
 | `plannedTime` | ngày giờ | Có | Giờ dự kiến tới mốc |
 | `mandatoryRestMinutes` | số | Không | Số phút bắt buộc nghỉ tại mốc (0–2880). Đoàn xe chưa nghỉ đủ thì chưa rời mốc được |
 | `bookingId` | số | Với `PickUp` / `DropOff` | Đơn được đón / trả ở mốc này (phải có ngựa trên chuyến). Để trống với các loại mốc khác |
@@ -3905,6 +3909,9 @@ Ví dụ request:
       "checkpointName": "Trại Ba Vì",
       "checkpointType": "Origin",
       "address": "Ba Vì, Hà Nội",
+      "latitude": 21.1988,
+      "longitude": 105.4230,
+      "distanceKmFromPrevious": null,
       "plannedTime": "2026-11-07T06:00:00+07:00",
       "mandatoryRestMinutes": 0
     },
@@ -3912,6 +3919,9 @@ Ví dụ request:
       "checkpointName": "Cửa khẩu Hữu Nghị",
       "checkpointType": "BorderGate",
       "address": "Lạng Sơn",
+      "latitude": 21.8537,
+      "longitude": 106.7615,
+      "distanceKmFromPrevious": 180,
       "plannedTime": "2026-11-07T12:00:00+07:00",
       "mandatoryRestMinutes": 0
     },
@@ -3919,6 +3929,9 @@ Ví dụ request:
       "checkpointName": "Trường đua Tùng Hóa",
       "checkpointType": "Destination",
       "address": "Quảng Châu",
+      "latitude": 23.1291,
+      "longitude": 113.2644,
+      "distanceKmFromPrevious": 980,
       "plannedTime": "2026-11-09T18:00:00+07:00",
       "mandatoryRestMinutes": 0
     }
@@ -4114,7 +4127,7 @@ Lỗi thường gặp:
 
 ### POST /api/trips/{id}/submit — Trình duyệt kế hoạch
 
-Chuyển chuyến từ `Draft` sang `PendingApproval` và báo cho quản lý. Hệ thống kiểm tra lộ trình trước khi cho trình.
+Chuyển chuyến từ `Draft` sang `PendingApproval` và báo cho quản lý. Hệ thống kiểm tra lộ trình trước khi cho trình: mọi mốc có tọa độ, từng đơn chỉ đi qua các nước trong tuyến `Approved`, và chuyến có thời gian lái trên `Transit:MaxDrivingHoursPerDaySingleDriver` (mặc định 9 giờ) phải có ít nhất 2 tài xế.
 
 - **Ai gọi được:** Người lập chuyến, Admin
 - **Dữ liệu gửi lên:** không có (không cần body)
@@ -4141,6 +4154,9 @@ Lỗi thường gặp:
 | 400 | `Booking BKG-2026-0201 must be picked up before it is dropped off.` | Mốc trả đứng trước mốc đón |
 | 400 | `Booking BKG-2026-0201 can only be picked up between 2026-11-09 and 2026-11-12; it is planned at 'X' on ...` | Giờ đón của đơn (mốc `PickUp` hoặc `Origin`) nằm ngoài khoảng pickup |
 | 400 | `Booking BKG-2026-0201 must be delivered by ...; it reaches 'X' at ...` | Giờ tới điểm trả của đơn (mốc `DropOff` hoặc `Destination`) trễ hạn giao |
+| 400 | `Every checkpoint needs latitude and longitude before the trip can be submitted.` | Có mốc chưa có tọa độ |
+| 400 | `A trip with 10 estimated driving hours needs at least 2 drivers; this trip has 1.` | Tuyến lái trên 9 giờ nhưng đoàn chỉ có một tài xế |
+| 400 | `Trip route for booking BKG-... passes through country ..., which is outside its approved route.` | Chuyến đi qua nước chưa nằm trong tuyến đã duyệt của đơn |
 
 `POST /api/trips/{id}/approve` kiểm tra lại đúng các quy tắc này trước khi duyệt.
 

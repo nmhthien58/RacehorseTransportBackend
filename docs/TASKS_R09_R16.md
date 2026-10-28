@@ -100,8 +100,10 @@ Lưu ý: email gửi **người nhận** không đi qua `EmailCustomerAsync` (ng
 
 Xong khi: mỗi mẫu render không còn `{{...}}` khi đủ biến (viết một test lặp qua các mẫu).
 
-### [ ] BE-07 · Xếp chuyến từ tuyến đã duyệt + quy tắc ≥ 2 tài xế (R-10, R-14)
+### [x] BE-07 · Xếp chuyến từ tuyến đã duyệt + quy tắc ≥ 2 tài xế (R-10, R-14)
 Phụ thuộc BE-04 (bảng `booking.route_plans`).
+
+Đã làm: chuyến một đơn chưa có mốc tự chép các điểm, tọa độ và quãng đường từ tuyến `Approved`; gợi ý tuyến ghép trả tọa độ điểm đón / trả từ tuyến đã duyệt. `submit` và `approve` cùng kiểm tra các nước thực đi của từng đơn bằng `IGeoService`, chặn nước ngoài tuyến, và dùng `ITransitTimeEstimator` để bắt ít nhất 2 tài xế khi thời gian lái trên `Transit:MaxDrivingHoursPerDaySingleDriver`.
 
 Làm:
 - Khi Coordinator thêm ngựa của một đơn vào bản nháp chuyến mà chuyến chưa có mốc: gợi ý / chép các mốc của **tuyến đã duyệt** của đơn (kèm tọa độ, quãng đường từng chặng) sang `route_checkpoints` của chuyến. Ghép nhiều đơn (R-04) thì giữ logic hiện có, chỉ thêm tọa độ cho mốc PickUp / DropOff.

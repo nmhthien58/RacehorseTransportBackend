@@ -89,6 +89,15 @@ namespace RacehorseTransport.API.RequestModels
         [MaxLength(255, ErrorMessage = "Address cannot exceed 255 characters.")]
         public string Address { get; set; } = string.Empty;
 
+        [Range(-90, 90, ErrorMessage = "Latitude must be between -90 and 90.")]
+        public decimal? Latitude { get; set; }
+
+        [Range(-180, 180, ErrorMessage = "Longitude must be between -180 and 180.")]
+        public decimal? Longitude { get; set; }
+
+        [Range(0, 100000, ErrorMessage = "DistanceKmFromPrevious must be between 0 and 100,000.")]
+        public decimal? DistanceKmFromPrevious { get; set; }
+
         [Required(ErrorMessage = "PlannedTime is required.")]
         public DateTimeOffset? PlannedTime { get; set; }
 
