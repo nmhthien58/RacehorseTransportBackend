@@ -17,6 +17,10 @@ namespace RacehorseTransport.API.RequestModels
         public string? Description { get; set; }
 
         public bool IsMandatory { get; set; } = true;
+
+        /// <summary>Ai lo giấy này: Customer (khách nộp) hoặc Company (chuyên viên công ty xin).</summary>
+        [RegularExpression("^(Customer|Company)$", ErrorMessage = "ProvidedBy must be Customer or Company.")]
+        public string ProvidedBy { get; set; } = "Customer";
     }
 
     public class UpdateDocumentTypeRequest
@@ -34,5 +38,9 @@ namespace RacehorseTransport.API.RequestModels
         public string? Description { get; set; }
 
         public bool IsMandatory { get; set; } = true;
+
+        /// <summary>Ai lo giấy này: Customer (khách nộp) hoặc Company (chuyên viên công ty xin).</summary>
+        [RegularExpression("^(Customer|Company)$", ErrorMessage = "ProvidedBy must be Customer or Company.")]
+        public string ProvidedBy { get; set; } = "Customer";
     }
 }

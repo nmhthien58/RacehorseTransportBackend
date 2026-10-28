@@ -7,5 +7,6 @@ namespace RacehorseTransport.API.ResponseModels
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
         public bool IsMandatory { get; set; }
+        public string ProvidedBy { get; set; } = string.Empty;
     }
 }

@@ -162,6 +162,7 @@ namespace RacehorseTransport.Services.Implementations
                         DocTypeCode = g.First().DocumentType!.Code,
                         DocTypeName = g.First().DocumentType!.Name,
                         IsMandatory = g.Any(r => r.IsMandatory),
+                        ProvidedBy = g.First().DocumentType!.ProvidedBy,
                         ValidityDays = g.Min(r => r.ValidityDays),
                         RegulationNote = string.Join("; ", g.Where(r => !string.IsNullOrWhiteSpace(r.RegulationNote)).Select(r => r.RegulationNote)),
                         // Theo thứ tự đường đi: nước đi (Export) -> nước quá cảnh (Transit) -> nước đến (Import)
@@ -179,7 +180,8 @@ namespace RacehorseTransport.Services.Implementations
                         DocTypeId = t.DocTypeId,
                         DocTypeCode = t.Code,
                         DocTypeName = t.Name,
-                        IsMandatory = true
+                        IsMandatory = true,
+                        ProvidedBy = t.ProvidedBy
                     })
                     .ToList();
             }

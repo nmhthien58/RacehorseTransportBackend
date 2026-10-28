@@ -29,6 +29,7 @@ namespace RacehorseTransport.API.Controllers
                 DossierStatuses = DossierStatuses.All.ToArray(),
                 DocumentStatuses = DocumentStatuses.All.ToArray(),
                 RequirementDirections = RequirementDirections.All.ToArray(),
+                DocumentProviders = DocumentProviders.All.ToArray(),
                 AssetTypes = AssetTypes.All.ToArray(),
                 AssetStatuses = AssetStatuses.All.ToArray(),
                 TripStatuses = TripStatuses.All.ToArray(),

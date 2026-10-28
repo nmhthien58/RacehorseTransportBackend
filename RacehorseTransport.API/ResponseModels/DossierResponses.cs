@@ -41,6 +41,7 @@ namespace RacehorseTransport.API.ResponseModels
         public string DocTypeCode { get; set; } = string.Empty;
         public string DocTypeName { get; set; } = string.Empty;
         public bool IsMandatory { get; set; }
+        public string ProvidedBy { get; set; } = string.Empty;
         public int? ValidityDays { get; set; }
         public string? RegulationNote { get; set; }
         public List<string> RequiredBy { get; set; } = new();

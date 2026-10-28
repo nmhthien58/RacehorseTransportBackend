@@ -33,8 +33,10 @@ namespace RacehorseTransport.Services.Implementations
             var booking = dossier.BookingHorse!.Booking!;
             var checklist = await BuildChecklistAsync(booking, ToDocumentModels(dossier));
 
+            // Chỉ nhắc khách những giấy khách phải nộp; giấy công ty xin do chuyên viên tự lo (R-19)
             var outstanding = checklist
-                .Where(c => c.IsMandatory && c.State != DocumentStatuses.Approved && c.State != DocumentStatuses.Pending)
+                .Where(c => c.IsMandatory && c.ProvidedBy == DocumentProviders.Customer
+                    && c.State != DocumentStatuses.Approved && c.State != DocumentStatuses.Pending)
                 .Select(c => c.DocTypeName)
                 .ToList();
 
@@ -105,6 +107,21 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Document type with ID {model.DocTypeId} does not exist.");
             }
 
+            // R-19: giấy phép của cơ quan nhà nước (kiểm dịch xuất khẩu, nhập khẩu, quá cảnh) do chuyên viên xin, khách không nộp
+            bool companyDocument = docType.ProvidedBy == DocumentProviders.Company;
+            if (companyDocument && isOwner)
+            {
+                throw new BusinessException($"'{docType.Name}' is obtained by our specialist from the authorities. You do not need to upload it.");
+            }
+
+            // Giấy công ty tự xin được coi là đã duyệt ngay khi chuyên viên tải lên, nên phải còn hiệu lực tới cuối khoảng pickup
+            var latestPickupDay = DateOnly.FromDateTime(booking.PickupWindowEnd.UtcDateTime);
+            if (companyDocument && model.ExpiryDate.HasValue && model.ExpiryDate.Value < latestPickupDay)
+            {
+                throw new BusinessException(
+                    $"'{docType.Name}' expires on {model.ExpiryDate:yyyy-MM-dd}, before the end of the pickup window {latestPickupDay:yyyy-MM-dd}.");
+            }
+
             if (model.ExpiryDate.HasValue && model.ExpiryDate.Value < DateOnly.FromDateTime(DateTime.UtcNow))
             {
                 throw new BusinessException("The document has already expired.");
@@ -128,6 +145,10 @@ namespace RacehorseTransport.Services.Implementations
             var stored = await _fileStorage.UploadAsync(
                 model.File.Content, model.File.FileName, model.File.SizeBytes, FileCategories.Documents);
 
+            string newStatus = companyDocument ? DocumentStatuses.Approved : DocumentStatuses.Pending;
+            int? reviewerId = companyDocument ? currentUser.UserId : null;
+            DateTimeOffset? reviewedAt = companyDocument ? DateTimeOffset.UtcNow : null;
+
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 if (existing == null)
@@ -140,7 +161,9 @@ namespace RacehorseTransport.Services.Implementations
                         FileUrl = stored.Path,
                         ExpiryDate = model.ExpiryDate,
                         UploadedByUserId = currentUser.UserId,
-                        Status = DocumentStatuses.Pending
+                        Status = newStatus,
+                        ReviewedByUserId = reviewerId,
+                        ReviewedAt = reviewedAt
                     });
                 }
                 else
@@ -150,16 +173,29 @@ namespace RacehorseTransport.Services.Implementations
                     existing.ExpiryDate = model.ExpiryDate;
                     existing.UploadedByUserId = currentUser.UserId;
                     existing.UploadedAt = DateTimeOffset.UtcNow;
-                    existing.Status = DocumentStatuses.Pending;
+                    existing.Status = newStatus;
                     existing.CorrectionNote = null;
-                    existing.ReviewedByUserId = null;
-                    existing.ReviewedAt = null;
+                    existing.ReviewedByUserId = reviewerId;
+                    existing.ReviewedAt = reviewedAt;
 
                     // Specialist nộp hộ thì tính lại lượt từ đầu
                     if (!isOwner)
                     {
                         existing.RejectionCount = 0;
                     }
+                }
+
+                if (companyDocument)
+                {
+                    // Không cần thẩm định thêm; báo khách để theo dõi tiến độ giấy công ty đang xin
+                    await _dossierRepo.UpdateAsync(dossier);
+                    await _notificationService.SendAsync(
+                        booking.CustomerUserId,
+                        $"{docType.Name} obtained for {dossier.BookingHorse.Horse!.Name}",
+                        $"Our specialist has obtained '{docType.Name}' from the authorities for booking {booking.BookingCode}.",
+                        NotificationReferenceTypes.Dossier,
+                        dossier.DossierId);
+                    return;
                 }
 
                 dossier.Status = DossierStatuses.Reviewing;

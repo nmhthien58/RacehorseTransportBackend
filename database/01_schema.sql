@@ -272,7 +272,10 @@ CREATE TABLE clearance.document_types (
     code          varchar(30)  NOT NULL CONSTRAINT uq_document_types_code UNIQUE,
     name          varchar(100) NOT NULL,
     description   varchar(255),
-    is_mandatory  boolean      NOT NULL DEFAULT true
+    is_mandatory  boolean      NOT NULL DEFAULT true,
+    -- Ai lo giấy này: Customer = khách nộp (giấy của con ngựa), Company = chuyên viên công ty xin với cơ quan nhà nước
+    provided_by   varchar(10)  NOT NULL DEFAULT 'Customer'
+        CONSTRAINT ck_document_types_provided_by CHECK (provided_by IN ('Customer', 'Company'))
 );
 
 -- Hồ sơ thú y lưu theo từng con ngựa (hộ chiếu, xét nghiệm, tiêm phòng...), chủ ngựa bổ sung bất cứ lúc nào.

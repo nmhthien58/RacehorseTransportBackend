@@ -12,16 +12,16 @@
 -- Danh mục theo mẫu giấy chứng nhận vận chuyển ngựa quốc tế của WOAH và yêu cầu nhập khẩu công bố của
 -- một số nước (Singapore AVS, Hong Kong AFCD...). Dữ liệu minh họa cho đồ án, không thay thế quy định hiện hành.
 -- is_mandatory: loại giấy mặc định bắt buộc khi tuyến đi chưa có quy định riêng trong country_doc_requirements.
-INSERT INTO clearance.document_types (doc_type_id, code, name, description, is_mandatory) VALUES
-(1, 'HORSE_PASSPORT',     'Hộ chiếu ngựa',                                   'Hộ chiếu định danh cá thể (FEI hoặc hộ chiếu quốc gia có số UELN), có sơ đồ nhận dạng và lịch tiêm phòng', true),
-(2, 'COGGINS_EIA',        'Xét nghiệm thiếu máu truyền nhiễm (EIA/Coggins)', 'Kết quả âm tính bằng AGID hoặc ELISA, lấy mẫu trong vòng 30 ngày trước ngày đi', true),
-(3, 'HEALTH_CERT',        'Giấy chứng nhận kiểm dịch xuất khẩu',             'Cơ quan thú y nước xuất khẩu cấp theo mẫu của nước nhập khẩu (ở Việt Nam: Cục Chăn nuôi và Thú y)', true),
-(4, 'VACCINE',            'Chứng nhận tiêm phòng cúm ngựa',                  'Mũi nhắc gần nhất trong vòng 6 tháng và không tiêm trong 7 ngày trước ngày đi', true),
-(5, 'IMPORT_PERMIT',      'Giấy phép nhập khẩu',                             'Cơ quan thú y nước nhập khẩu cấp trước khi xuất phát (ví dụ: AVS Singapore, AFCD Hong Kong)', false),
-(6, 'GLANDERS_TEST',      'Xét nghiệm bệnh tỵ (Glanders)',                   'Kết quả âm tính bằng phản ứng kết hợp bổ thể (CFT)', false),
-(7, 'PIROPLASMOSIS_TEST', 'Xét nghiệm lê dạng trùng (Piroplasmosis)',        'Âm tính với Theileria equi và Babesia caballi (cELISA hoặc IFAT)', false),
-(8, 'EVA_TEST',           'Xét nghiệm viêm động mạch do virus (EVA)',        'Áp dụng cho ngựa đực chưa thiến ở các nước yêu cầu', false),
-(9, 'TRANSIT_PERMIT',     'Giấy phép quá cảnh động vật',                     'Cơ quan thú y của nước ngựa đi qua cấp trước khi xuất phát, ghi rõ cửa khẩu vào / ra', false);
+INSERT INTO clearance.document_types (doc_type_id, code, name, description, is_mandatory, provided_by) VALUES
+(1, 'HORSE_PASSPORT',     'Hộ chiếu ngựa',                                   'Hộ chiếu định danh cá thể (FEI hoặc hộ chiếu quốc gia có số UELN), có sơ đồ nhận dạng và lịch tiêm phòng', true, 'Customer'),
+(2, 'COGGINS_EIA',        'Xét nghiệm thiếu máu truyền nhiễm (EIA/Coggins)', 'Kết quả âm tính bằng AGID hoặc ELISA, lấy mẫu trong vòng 30 ngày trước ngày đi', true, 'Customer'),
+(3, 'HEALTH_CERT',        'Giấy chứng nhận kiểm dịch xuất khẩu',             'Cơ quan thú y nước xuất khẩu cấp theo mẫu của nước nhập khẩu (ở Việt Nam: Cục Chăn nuôi và Thú y)', true, 'Company'),
+(4, 'VACCINE',            'Chứng nhận tiêm phòng cúm ngựa',                  'Mũi nhắc gần nhất trong vòng 6 tháng và không tiêm trong 7 ngày trước ngày đi', true, 'Customer'),
+(5, 'IMPORT_PERMIT',      'Giấy phép nhập khẩu',                             'Cơ quan thú y nước nhập khẩu cấp trước khi xuất phát (ví dụ: AVS Singapore, AFCD Hong Kong)', false, 'Company'),
+(6, 'GLANDERS_TEST',      'Xét nghiệm bệnh tỵ (Glanders)',                   'Kết quả âm tính bằng phản ứng kết hợp bổ thể (CFT)', false, 'Customer'),
+(7, 'PIROPLASMOSIS_TEST', 'Xét nghiệm lê dạng trùng (Piroplasmosis)',        'Âm tính với Theileria equi và Babesia caballi (cELISA hoặc IFAT)', false, 'Customer'),
+(8, 'EVA_TEST',           'Xét nghiệm viêm động mạch do virus (EVA)',        'Áp dụng cho ngựa đực chưa thiến ở các nước yêu cầu', false, 'Customer'),
+(9, 'TRANSIT_PERMIT',     'Giấy phép quá cảnh động vật',                     'Cơ quan thú y của nước ngựa đi qua cấp trước khi xuất phát, ghi rõ cửa khẩu vào / ra', false, 'Company');
 
 -- ---------- A.2 Quy định giấy tờ theo quốc gia ----------
 -- validity_days: giấy phải được cấp / lấy mẫu trong vòng N ngày trước ngày đi (NULL = còn hiệu lực là được)

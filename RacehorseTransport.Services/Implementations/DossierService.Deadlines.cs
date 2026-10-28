@@ -25,9 +25,10 @@ namespace RacehorseTransport.Services.Implementations
             foreach (var dossier in dossiers)
             {
                 var checklist = await BuildChecklistAsync(dossier.BookingHorse!.Booking!, ToDocumentModels(dossier));
-                // Khách còn phải nộp: giấy bắt buộc chưa có bản nào, hoặc bản mới nhất bị từ chối (đang chờ duyệt thì coi như đã nộp)
+                // Khách còn phải nộp: giấy bắt buộc chưa có bản nào, hoặc bản mới nhất bị từ chối (đang chờ duyệt thì coi như đã nộp).
+                // Giấy công ty xin (R-19) không tính: khách không bị nhắc hay bị hủy đơn vì giấy đó.
                 var missing = checklist
-                    .Where(c => c.IsMandatory && (c.State == ChecklistStates.Missing || c.State == DocumentStatuses.Rejected))
+                    .Where(c => c.IsMandatory && c.ProvidedBy == DocumentProviders.Customer && (c.State == ChecklistStates.Missing || c.State == DocumentStatuses.Rejected))
                     .Select(c => c.DocTypeName)
                     .ToList();
                 if (missing.Count > 0)

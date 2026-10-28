@@ -11,6 +11,7 @@ namespace RacehorseTransport.API.ResponseModels
         public string[] DossierStatuses { get; set; } = Array.Empty<string>();
         public string[] DocumentStatuses { get; set; } = Array.Empty<string>();
         public string[] RequirementDirections { get; set; } = Array.Empty<string>();
+        public string[] DocumentProviders { get; set; } = Array.Empty<string>();
         public string[] AssetTypes { get; set; } = Array.Empty<string>();
         public string[] AssetStatuses { get; set; } = Array.Empty<string>();
         public string[] TripStatuses { get; set; } = Array.Empty<string>();

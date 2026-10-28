@@ -190,6 +190,15 @@ namespace RacehorseTransport.Repositories.Constants
         public static readonly string[] All = { Export, Import, Transit };
     }
 
+    // Ai lo một loại giấy (R-19): khách nộp giấy của con ngựa, công ty xin giấy phép của cơ quan nhà nước các nước
+    public static class DocumentProviders
+    {
+        public const string Customer = "Customer";
+        public const string Company = "Company";
+
+        public static readonly string[] All = { Customer, Company };
+    }
+
     public static class AssetTypes
     {
         public const string HorseTruckAirSuspension = "HorseTruck_AirSuspension";
