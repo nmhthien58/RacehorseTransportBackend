@@ -1276,6 +1276,43 @@ Content-Type: application/json
 
 # ===================== R-18: quốc gia, phương thức, sân bay =====================
 
+### ===================== BE-07: chuyến theo tuyến đã duyệt =====================
+
+### [ĐÚNG] Gợi ý tuyến ghép; response có latitude / longitude ở điểm đón và trả
+POST {{baseUrl}}/api/trips/suggest-route
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "bookingHorseIds": [1],
+  "plannedStartDate": "2026-12-01T06:00:00+07:00",
+  "driverCount": 2
+}
+
+### [ĐÚNG] Tạo chuyến một đơn không gửi checkpoints: server chép tuyến Approved
+POST {{baseUrl}}/api/trips
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "vehicleId": 1,
+  "plannedStartDate": "2026-12-01T06:00:00+07:00",
+  "plannedEndDate": "2026-12-05T18:00:00+07:00",
+  "plannedCost": 4200,
+  "crew": [
+    { "userId": 4, "crewRole": "Driver", "isLead": true },
+    { "userId": 9, "crewRole": "Driver" },
+    { "userId": 10, "crewRole": "Escort", "isLead": true }
+  ],
+  "horses": [
+    { "bookingHorseId": 1, "stallSlotNumber": 1, "escortUserId": 10 }
+  ]
+}
+
+### [SAI - 400] Sau khi tạo, bỏ một tài xế rồi submit chuyến lái trên 9 giờ
+POST {{baseUrl}}/api/trips/1/submit
+Authorization: Bearer {{coordinatorToken}}
+
 ### Danh sách nước cho form đặt chuyến (không cần đăng nhập)
 GET {{baseUrl}}/api/countries/catalog
 

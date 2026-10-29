@@ -24,6 +24,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IRepository<TripCrew> _crewRepo;
         private readonly IRepository<TripHorse> _tripHorseRepo;
         private readonly IRepository<RouteCheckpoint> _checkpointRepo;
+        private readonly IRepository<RoutePlan> _routePlanRepo;
         private readonly ITripService _tripService;
         private readonly ICodeGenerator _codeGenerator;
         private readonly INotificationService _notificationService;
@@ -31,6 +32,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ISystemSettingService _settingService;
         private readonly IDistanceService _distanceService;
         private readonly ITransitTimeEstimator _transitEstimator;
+        private readonly IGeoService _geoService;
         private readonly TransitOptions _transitOptions;
         private readonly IUnitOfWork _unitOfWork;
 
@@ -42,6 +44,7 @@ namespace RacehorseTransport.Services.Implementations
             IRepository<TripCrew> crewRepo,
             IRepository<TripHorse> tripHorseRepo,
             IRepository<RouteCheckpoint> checkpointRepo,
+            IRepository<RoutePlan> routePlanRepo,
             ITripService tripService,
             ICodeGenerator codeGenerator,
             INotificationService notificationService,
@@ -49,6 +52,7 @@ namespace RacehorseTransport.Services.Implementations
             ISystemSettingService settingService,
             IDistanceService distanceService,
             ITransitTimeEstimator transitEstimator,
+            IGeoService geoService,
             IOptions<TransitOptions> transitOptions,
             IUnitOfWork unitOfWork)
         {
@@ -59,6 +63,7 @@ namespace RacehorseTransport.Services.Implementations
             _crewRepo = crewRepo;
             _tripHorseRepo = tripHorseRepo;
             _checkpointRepo = checkpointRepo;
+            _routePlanRepo = routePlanRepo;
             _tripService = tripService;
             _codeGenerator = codeGenerator;
             _notificationService = notificationService;
@@ -66,6 +71,7 @@ namespace RacehorseTransport.Services.Implementations
             _settingService = settingService;
             _distanceService = distanceService;
             _transitEstimator = transitEstimator;
+            _geoService = geoService;
             _transitOptions = transitOptions.Value;
             _unitOfWork = unitOfWork;
         }
