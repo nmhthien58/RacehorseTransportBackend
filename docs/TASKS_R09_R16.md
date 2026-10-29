@@ -112,8 +112,10 @@ Làm:
 
 Xong khi: unit test cho quy tắc tài xế (8 giờ: 1 tài xế OK; 10 giờ: 1 tài xế lỗi, 2 tài xế OK) và quy tắc nước ngoài tuyến.
 
-### [ ] BE-14a · Đổi xe / đổi người trong sự cố (R-14)
+### [x] BE-14a · Đổi xe / đổi người trong sự cố (R-14)
 Phụ thuộc BE-13 (đã có `fault_party`).
+
+Đã làm: thêm `ReplaceVehicle` / `ReplaceCrew` và `action_payload`; kiểm tra xe thay thế (trạng thái, loại, lịch, sức chứa, điều hòa), kiểm tra người thay thế (vai trò, hoạt động, trùng lịch), tái kiểm tra khi duyệt; duyệt sẽ đổi trạng thái xe, sắp lại chuồng khi cần, thay `trip_crew`, chuyển ngựa của áp tải cũ và thông báo hai người.
 
 Làm (thêm vào luồng sự cố hiện có, xem `IncidentService`):
 - Hành động mới trong `IncidentResponseActions`: `ReplaceVehicle`, `ReplaceCrew` (cập nhật CHECK constraint).

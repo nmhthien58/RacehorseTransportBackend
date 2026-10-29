@@ -39,6 +39,10 @@ namespace RacehorseTransport.API.Mappers
             {
                 ProposedAction = request.ProposedAction.Trim(),
                 ResponseAction = request.ResponseAction.Trim(),
+                ReplacementVehicleId = request.ReplacementVehicleId,
+                RemoveUserId = request.RemoveUserId,
+                AddUserId = request.AddUserId,
+                CrewRole = string.IsNullOrWhiteSpace(request.CrewRole) ? null : request.CrewRole.Trim(),
                 RouteChange = request.RouteChange?.ToBusinessModel(),
                 RevisedRouteNotes = string.IsNullOrWhiteSpace(request.RevisedRouteNotes) ? null : request.RevisedRouteNotes.Trim(),
                 AdditionalCost = request.AdditionalCost,
@@ -80,6 +84,7 @@ namespace RacehorseTransport.API.Mappers
                 ReportedAt = model.ReportedAt,
                 ProposedAction = model.ProposedAction,
                 ResponseAction = model.ResponseAction,
+                ActionPayload = model.ActionPayload,
                 RouteChange = model.RouteChange == null ? null : new IncidentRouteChangeResponse
                 {
                     InsertAfterCheckpointId = model.RouteChange.InsertAfterCheckpointId,

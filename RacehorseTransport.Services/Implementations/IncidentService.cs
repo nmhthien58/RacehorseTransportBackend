@@ -33,6 +33,9 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IRepository<Trip> _tripRepo;
         private readonly IRepository<TripHorse> _tripHorseRepo;
         private readonly IRepository<RouteCheckpoint> _checkpointRepo;
+        private readonly IRepository<TransportAsset> _assetRepo;
+        private readonly IRepository<User> _userRepo;
+        private readonly IRepository<TripCrew> _crewRepo;
         private readonly ITripService _tripService;
         private readonly ITrackingService _trackingService;
         private readonly ICodeGenerator _codeGenerator;
@@ -52,6 +55,9 @@ namespace RacehorseTransport.Services.Implementations
             IRepository<Trip> tripRepo,
             IRepository<TripHorse> tripHorseRepo,
             IRepository<RouteCheckpoint> checkpointRepo,
+            IRepository<TransportAsset> assetRepo,
+            IRepository<User> userRepo,
+            IRepository<TripCrew> crewRepo,
             ITripService tripService,
             ITrackingService trackingService,
             ICodeGenerator codeGenerator,
@@ -70,6 +76,9 @@ namespace RacehorseTransport.Services.Implementations
             _tripRepo = tripRepo;
             _tripHorseRepo = tripHorseRepo;
             _checkpointRepo = checkpointRepo;
+            _assetRepo = assetRepo;
+            _userRepo = userRepo;
+            _crewRepo = crewRepo;
             _tripService = tripService;
             _trackingService = trackingService;
             _codeGenerator = codeGenerator;
@@ -347,6 +356,8 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             var trip = incident.Trip!;
+            var actionPayload = BuildActionPayload(model);
+            await ValidateReplacementPlanAsync(trip, model.ResponseAction, actionPayload);
 
             // OffloadHorse (R-12): chọn con ngựa + hướng xử lý tiếp; con đã dỡ khẩn cấp thì phương án phải là OffloadHorse cho chính con đó
             TripHorse? offloadHorse = null;
@@ -402,6 +413,7 @@ namespace RacehorseTransport.Services.Implementations
             {
                 incident.ProposedAction = model.ProposedAction;
                 incident.ResponseAction = model.ResponseAction;
+                incident.ActionPayload = IncidentMapper.SerializeActionPayload(actionPayload);
                 incident.RouteChange = IncidentMapper.SerializeRouteChange(plan == null ? null : ToRouteChange(plan, change!.InsertAfterCheckpointId));
                 incident.RevisedRouteNotes = model.RevisedRouteNotes;
                 incident.AdditionalCost = model.AdditionalCost;
@@ -439,6 +451,10 @@ namespace RacehorseTransport.Services.Implementations
 
             var trip = incident.Trip!;
             var customerIds = await GetCustomerIdsAsync(trip.TripId);
+            var replacementPlan = await ValidateReplacementPlanAsync(
+                trip,
+                incident.ResponseAction!,
+                IncidentMapper.ParseActionPayload(incident.ActionPayload));
 
             var routeChange = IncidentMapper.ParseRouteChange(incident.RouteChange);
             RoutePlan? plan = null;
@@ -524,6 +540,10 @@ namespace RacehorseTransport.Services.Implementations
                 if (offloadHorse != null)
                 {
                     await ApplyOffloadAsync(trip, incident, offloadHorse);
+                }
+                if (replacementPlan != null)
+                {
+                    await ApplyReplacementAsync(trip, incident, replacementPlan);
                 }
                 await _incidentRepo.UpdateAsync(incident);
 
@@ -1222,6 +1242,194 @@ namespace RacehorseTransport.Services.Implementations
             return value.Length <= maxLength ? value : value[..maxLength];
         }
 
+        private static IncidentActionPayloadModel? BuildActionPayload(ProposeIncidentPlanModel model)
+        {
+            bool hasVehicle = model.ReplacementVehicleId.HasValue;
+            bool hasCrew = model.RemoveUserId.HasValue || model.AddUserId.HasValue || !string.IsNullOrWhiteSpace(model.CrewRole);
+
+            if (model.ResponseAction == IncidentResponseActions.ReplaceVehicle)
+            {
+                if (hasCrew)
+                {
+                    throw new BusinessException("ReplaceVehicle does not accept RemoveUserId, AddUserId, or CrewRole.");
+                }
+                return new IncidentActionPayloadModel { ReplacementVehicleId = model.ReplacementVehicleId };
+            }
+            if (model.ResponseAction == IncidentResponseActions.ReplaceCrew)
+            {
+                if (hasVehicle)
+                {
+                    throw new BusinessException("ReplaceCrew does not accept ReplacementVehicleId.");
+                }
+                return new IncidentActionPayloadModel
+                {
+                    RemoveUserId = model.RemoveUserId,
+                    AddUserId = model.AddUserId,
+                    CrewRole = model.CrewRole
+                };
+            }
+            if (hasVehicle || hasCrew)
+            {
+                throw new BusinessException("ReplacementVehicleId, RemoveUserId, AddUserId, and CrewRole are only used with ReplaceVehicle or ReplaceCrew.");
+            }
+            return null;
+        }
+
+        private async Task<ReplacementPlan?> ValidateReplacementPlanAsync(
+            Trip trip,
+            string responseAction,
+            IncidentActionPayloadModel? payload)
+        {
+            if (responseAction == IncidentResponseActions.ReplaceVehicle)
+            {
+                int replacementId = payload?.ReplacementVehicleId
+                    ?? throw new BusinessException("ReplacementVehicleId is required for a ReplaceVehicle plan.");
+                if (payload.RemoveUserId.HasValue || payload.AddUserId.HasValue || !string.IsNullOrWhiteSpace(payload.CrewRole))
+                {
+                    throw new BusinessException("The stored ReplaceVehicle payload contains crew replacement fields. Propose the plan again.");
+                }
+
+                var current = trip.Vehicle ?? await _assetRepo.GetByIdAsync(trip.VehicleId)
+                    ?? throw new BusinessException($"Current vehicle with ID {trip.VehicleId} was not found.");
+                var replacement = await _assetRepo.GetByIdAsync(replacementId)
+                    ?? throw new BusinessException($"Replacement vehicle with ID {replacementId} was not found.");
+                var horsesToCarry = trip.TripHorses.Where(th => TripHorseStatuses.OnBoard.Contains(th.Status)).ToList();
+                bool requiresClimate = horsesToCarry.Any(th => th.BookingHorse?.Booking?.RequiresClimateControl == true);
+                IncidentReplacementRules.ValidateVehicle(current, replacement, horsesToCarry.Count, requiresClimate);
+
+                string? conflictingTrip = await _tripRepo.GetQueryable()
+                    .Where(t => t.TripId != trip.TripId
+                        && t.VehicleId == replacementId
+                        && t.OverallStatus != TripStatuses.Completed
+                        && t.OverallStatus != TripStatuses.Cancelled
+                        && t.PlannedStartDate < trip.PlannedEndDate
+                        && t.PlannedEndDate > trip.PlannedStartDate)
+                    .Select(t => t.TripCode)
+                    .FirstOrDefaultAsync();
+                if (conflictingTrip != null)
+                {
+                    throw new BusinessException($"Replacement vehicle {replacement.AssetCode} is already assigned to trip {conflictingTrip} during this period.");
+                }
+
+                return new ReplacementPlan(payload, replacement, null, null);
+            }
+
+            if (responseAction == IncidentResponseActions.ReplaceCrew)
+            {
+                int removeUserId = payload?.RemoveUserId
+                    ?? throw new BusinessException("RemoveUserId is required for a ReplaceCrew plan.");
+                int addUserId = payload.AddUserId
+                    ?? throw new BusinessException("AddUserId is required for a ReplaceCrew plan.");
+                string crewRole = string.IsNullOrWhiteSpace(payload.CrewRole)
+                    ? throw new BusinessException("CrewRole is required for a ReplaceCrew plan.")
+                    : payload.CrewRole;
+                if (payload.ReplacementVehicleId.HasValue)
+                {
+                    throw new BusinessException("The stored ReplaceCrew payload contains ReplacementVehicleId. Propose the plan again.");
+                }
+
+                var replacement = await _userRepo.GetByIdAsync(addUserId)
+                    ?? throw new BusinessException($"Replacement crew member with user ID {addUserId} was not found.");
+                string? conflictingTrip = await _tripRepo.GetQueryable()
+                    .Where(t => t.TripId != trip.TripId
+                        && t.OverallStatus != TripStatuses.Completed
+                        && t.OverallStatus != TripStatuses.Cancelled
+                        && t.PlannedStartDate < trip.PlannedEndDate
+                        && t.PlannedEndDate > trip.PlannedStartDate
+                        && t.Crew.Any(c => c.UserId == addUserId))
+                    .Select(t => t.TripCode)
+                    .FirstOrDefaultAsync();
+                var removed = IncidentReplacementRules.ValidateCrew(trip.Crew.ToList(), removeUserId, replacement, crewRole, conflictingTrip);
+                return new ReplacementPlan(payload, null, removed, replacement);
+            }
+
+            if (payload != null)
+            {
+                throw new BusinessException("This incident action must not contain an action payload. Propose the plan again.");
+            }
+            return null;
+        }
+
+        private async Task ApplyReplacementAsync(Trip trip, TripIncident incident, ReplacementPlan plan)
+        {
+            if (plan.Vehicle != null)
+            {
+                var oldVehicle = trip.Vehicle ?? await _assetRepo.GetByIdAsync(trip.VehicleId)
+                    ?? throw new BusinessException($"Current vehicle with ID {trip.VehicleId} was not found.");
+                var horsesToCarry = trip.TripHorses
+                    .Where(th => TripHorseStatuses.OnBoard.Contains(th.Status))
+                    .OrderBy(th => th.StallSlotNumber)
+                    .ThenBy(th => th.TripHorseId)
+                    .ToList();
+
+                if (horsesToCarry.Any(th => th.StallSlotNumber > plan.Vehicle.CapacityHorses))
+                {
+                    var remaining = trip.TripHorses.Except(horsesToCarry)
+                        .OrderBy(th => th.StallSlotNumber)
+                        .ThenBy(th => th.TripHorseId)
+                        .ToList();
+                    var all = horsesToCarry.Concat(remaining).ToList();
+                    foreach (var horse in all)
+                    {
+                        horse.StallSlotNumber = 100000 + horse.TripHorseId;
+                        await _tripHorseRepo.UpdateAsync(horse);
+                    }
+                    for (int i = 0; i < all.Count; i++)
+                    {
+                        all[i].StallSlotNumber = i + 1;
+                        await _tripHorseRepo.UpdateAsync(all[i]);
+                    }
+                }
+
+                oldVehicle.Status = AssetStatuses.Maintenance;
+                plan.Vehicle.Status = AssetStatuses.InTransit;
+                trip.VehicleId = plan.Vehicle.AssetId;
+                trip.Vehicle = plan.Vehicle;
+                await _assetRepo.UpdateAsync(oldVehicle);
+                await _assetRepo.UpdateAsync(plan.Vehicle);
+                await _tripRepo.UpdateAsync(trip);
+            }
+
+            if (plan.RemovedCrew != null && plan.AddedUser != null)
+            {
+                var removed = plan.RemovedCrew;
+                var added = new TripCrew
+                {
+                    TripId = trip.TripId,
+                    UserId = plan.AddedUser.UserId,
+                    CrewRole = removed.CrewRole,
+                    IsLead = removed.IsLead,
+                    Duty = removed.Duty
+                };
+
+                if (removed.CrewRole == CrewRoles.Escort)
+                {
+                    foreach (var horse in trip.TripHorses.Where(th => th.EscortUserId == removed.UserId))
+                    {
+                        horse.EscortUserId = plan.AddedUser.UserId;
+                        await _tripHorseRepo.UpdateAsync(horse);
+                    }
+                }
+
+                // Thông báo ghi tên người cũ, không ghi mã số
+                string removedName = (await _userRepo.GetByIdAsync(removed.UserId))?.FullName ?? $"user {removed.UserId}";
+                await _crewRepo.DeleteAsync(removed);
+                await _crewRepo.AddAsync(added);
+                await _notificationService.SendToUsersAsync(
+                    new[] { removed.UserId, plan.AddedUser.UserId },
+                    $"Crew replacement on trip {trip.TripCode}",
+                    $"Incident {incident.IncidentCode}: {removed.CrewRole} assignment changed from {removedName} to {plan.AddedUser.FullName}.",
+                    NotificationReferenceTypes.Incident,
+                    incident.IncidentId);
+            }
+        }
+
+        private sealed record ReplacementPlan(
+            IncidentActionPayloadModel Payload,
+            TransportAsset? Vehicle,
+            TripCrew? RemovedCrew,
+            User? AddedUser);
+
         // ---------------------------------------------------------------------------------------------
 
         private IQueryable<TripIncident> QueryIncidents()
@@ -1252,6 +1460,7 @@ namespace RacehorseTransport.Services.Implementations
         private async Task<TripIncident> GetTrackedIncidentAsync(int incidentId)
         {
             var incident = await _incidentRepo.GetQueryable()
+                .Include(i => i.Trip!).ThenInclude(t => t.Vehicle)
                 .Include(i => i.Trip!).ThenInclude(t => t.Crew)
                 .Include(i => i.Trip!).ThenInclude(t => t.Checkpoints)
                 .Include(i => i.Trip!).ThenInclude(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Horse)

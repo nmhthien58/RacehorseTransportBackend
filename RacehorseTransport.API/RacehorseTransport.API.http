@@ -800,6 +800,35 @@ Content-Type: application/json
   "accept": true
 }
 
+### [BE-14a - ĐÚNG] Điều phối đề xuất đổi xe dự phòng
+POST {{baseUrl}}/api/incidents/1/propose
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "proposedAction": "Điều xe TRK-009 tới sang ngựa và tiếp tục hành trình",
+  "responseAction": "ReplaceVehicle",
+  "replacementVehicleId": 9,
+  "additionalCost": 450
+}
+
+### [BE-14a - ĐÚNG] Điều phối đề xuất thay áp tải
+POST {{baseUrl}}/api/incidents/1/propose
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "proposedAction": "Thay áp tải bị ốm tại trạm dừng",
+  "responseAction": "ReplaceCrew",
+  "removeUserId": 14,
+  "addUserId": 21,
+  "crewRole": "Escort"
+}
+
+### [BE-14a - ĐÚNG] Quản lý duyệt phương án đổi xe / đổi người
+POST {{baseUrl}}/api/incidents/1/approve
+Authorization: Bearer {{managerToken}}
+
 ### [ĐÚNG] Đoàn xe ghi không giao được (xe phải đang đứng ở điểm giao của đơn)
 POST {{baseUrl}}/api/trips/1/bookings/1/delivery-failed
 Authorization: Bearer {{driverToken}}

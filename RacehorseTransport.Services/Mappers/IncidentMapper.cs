@@ -27,6 +27,7 @@ namespace RacehorseTransport.Services.Mappers
                 ReportedAt = entity.ReportedAt,
                 ProposedAction = entity.ProposedAction,
                 ResponseAction = entity.ResponseAction,
+                ActionPayload = ParseActionPayload(entity.ActionPayload),
                 RouteChange = ParseRouteChange(entity.RouteChange),
                 RevisedRouteNotes = entity.RevisedRouteNotes,
                 AdditionalCost = entity.AdditionalCost,
@@ -59,6 +60,16 @@ namespace RacehorseTransport.Services.Mappers
         public static string? SerializeRouteChange(IncidentRouteChangeModel? routeChange)
         {
             return routeChange == null ? null : JsonSerializer.Serialize(routeChange);
+        }
+
+        public static IncidentActionPayloadModel? ParseActionPayload(string? json)
+        {
+            return string.IsNullOrWhiteSpace(json) ? null : JsonSerializer.Deserialize<IncidentActionPayloadModel>(json);
+        }
+
+        public static string? SerializeActionPayload(IncidentActionPayloadModel? payload)
+        {
+            return payload == null ? null : JsonSerializer.Serialize(payload);
         }
     }
 }

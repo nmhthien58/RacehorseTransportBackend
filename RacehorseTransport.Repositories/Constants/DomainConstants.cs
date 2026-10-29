@@ -398,12 +398,14 @@ namespace RacehorseTransport.Repositories.Constants
         public const string Reroute = "Reroute";                     // đổi tuyến: bắt buộc kèm thay đổi tuyến
         public const string VeterinaryCare = "VeterinaryCare";       // dừng chăm sóc thú y
         public const string OffloadHorse = "OffloadHorse";           // cho ngựa rời chuyến
+        public const string ReplaceVehicle = "ReplaceVehicle";       // đổi xe khi xe hiện tại gặp sự cố
+        public const string ReplaceCrew = "ReplaceCrew";             // đổi tài xế / áp tải không thể tiếp tục
         // R-14 (BE-14b)
         public const string ReturnToOrigin = "ReturnToOrigin";       // cả đoàn quay về nơi đi: hệ thống dựng tuyến về, e-POD ký ở nơi đi
         public const string HoldAtStable = "HoldAtStable";           // gửi ngựa ở chuồng tạm chờ (biên giới mở lại, bổ sung giấy...)
         public const string Other = "Other";
 
-        public static readonly string[] All = { WaitAndContinue, RepairAndContinue, Reroute, VeterinaryCare, OffloadHorse, ReturnToOrigin, HoldAtStable, Other };
+        public static readonly string[] All = { WaitAndContinue, RepairAndContinue, Reroute, VeterinaryCare, OffloadHorse, ReplaceVehicle, ReplaceCrew, ReturnToOrigin, HoldAtStable, Other };
     }
 
     // Nguyên nhân sự cố, chọn khi đóng sự cố (R-09): quyết định ai chịu chi phí và có bồi thường giao trễ không
