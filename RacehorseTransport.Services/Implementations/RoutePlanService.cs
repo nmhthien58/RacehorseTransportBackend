@@ -38,7 +38,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IBookingService _bookingService;
         private readonly IGeoService _geoService;
         private readonly ITransitTimeEstimator _transitEstimator;
-        private readonly IBookingQuoteService _quoteService;
+        private readonly IFinalQuoteIssuer _quoteIssuer;
         private readonly IRepository<TripHorse> _tripHorseRepo;
         private readonly ISystemSettingService _settingService;
         private readonly INotificationService _notificationService;
@@ -51,7 +51,7 @@ namespace RacehorseTransport.Services.Implementations
             IBookingService bookingService,
             IGeoService geoService,
             ITransitTimeEstimator transitEstimator,
-            IBookingQuoteService quoteService,
+            IFinalQuoteIssuer quoteIssuer,
             IRepository<TripHorse> tripHorseRepo,
             ISystemSettingService settingService,
             INotificationService notificationService,
@@ -63,7 +63,7 @@ namespace RacehorseTransport.Services.Implementations
             _bookingService = bookingService;
             _geoService = geoService;
             _transitEstimator = transitEstimator;
-            _quoteService = quoteService;
+            _quoteIssuer = quoteIssuer;
             _tripHorseRepo = tripHorseRepo;
             _settingService = settingService;
             _notificationService = notificationService;
@@ -286,7 +286,7 @@ namespace RacehorseTransport.Services.Implementations
                     await _bookingRepo.SaveChangesAsync();
 
                     // R-10: báo giá chốt theo tuyến vừa duyệt, đơn -> Quoted, email cho khách
-                    await _quoteService.IssueFinalQuoteAsync(booking.BookingId, plan.RoutePlanId);
+                    await _quoteIssuer.IssueAsync(booking.BookingId, plan.RoutePlanId);
                 }
 
                 await _notificationService.SendAsync(

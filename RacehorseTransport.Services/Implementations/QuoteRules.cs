@@ -34,6 +34,14 @@ namespace RacehorseTransport.Services.Implementations
             return lines;
         }
 
+        // Đường bay không lập tuyến trên bản đồ: báo giá chốt phát hành ngay khi Manager duyệt sơ bộ
+        public static bool QuotesOnPreApproval(string transportMode) => transportMode == TransportModes.Air;
+
+        // Duyệt sơ bộ từ Submitted. Đơn bay đã kẹt ở PreApproved (duyệt trước khi có báo giá đường bay) duyệt lại được để ra báo giá.
+        public static bool CanPreApprove(string transportMode, string status) =>
+            status == BookingStatuses.Submitted
+            || (QuotesOnPreApproval(transportMode) && status == BookingStatuses.PreApproved);
+
         public static DateTimeOffset ExpiresAt(DateTimeOffset quotedAt, int acceptDays) => quotedAt.AddDays(acceptDays);
 
         // Hết hạn đúng tại thời điểm hạn (không còn chấp nhận / cọc được từ giây đó)

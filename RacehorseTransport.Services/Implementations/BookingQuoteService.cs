@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using RacehorseTransport.Repositories.Constants;
 using RacehorseTransport.Repositories.Entities;
@@ -12,18 +11,14 @@ using RacehorseTransport.Services.Interfaces;
 namespace RacehorseTransport.Services.Implementations
 {
     // R-10 (Chính sách mục 2, 3): báo giá chốt -> chấp nhận + cọc trong hạn.
-    //   Manager duyệt tuyến -> tính báo giá chốt theo tuyến (quãng đường thật, phí từng nước quá cảnh, bảo hiểm từng con, Express)
-    //   -> đơn Quoted, hạn = bây giờ + Booking.QuoteAcceptDays, email QuoteReady
+    //   Báo giá chốt do IFinalQuoteIssuer phát hành (đường bộ: khi duyệt tuyến; đường bay: khi duyệt sơ bộ)
     //   -> khách chấp nhận (đồng ý chính sách hiện hành) -> AwaitingDeposit, cọc tính trên báo giá chốt, hạn cọc = hạn báo giá
     //   -> quá hạn mà chưa chấp nhận hoặc chưa cọc -> QuoteExpired (không mất phí). Khách từ chối -> Cancelled.
     public class BookingQuoteService : IBookingQuoteService
     {
         private static readonly TimeSpan VietnamOffset = TimeSpan.FromHours(7);
-        private static readonly CultureInfo VietnameseCulture = new("vi-VN");
 
         private readonly IRepository<BookingRequest> _bookingRepo;
-        private readonly IRepository<RoutePlan> _planRepo;
-        private readonly IPricingService _pricingService;
         private readonly ISystemSettingService _settingService;
         private readonly IBookingService _bookingService;
         private readonly IBookingActivator _bookingActivator;
@@ -33,8 +28,6 @@ namespace RacehorseTransport.Services.Implementations
 
         public BookingQuoteService(
             IRepository<BookingRequest> bookingRepo,
-            IRepository<RoutePlan> planRepo,
-            IPricingService pricingService,
             ISystemSettingService settingService,
             IBookingService bookingService,
             IBookingActivator bookingActivator,
@@ -43,87 +36,12 @@ namespace RacehorseTransport.Services.Implementations
             IUnitOfWork unitOfWork)
         {
             _bookingRepo = bookingRepo;
-            _planRepo = planRepo;
-            _pricingService = pricingService;
             _settingService = settingService;
             _bookingService = bookingService;
             _bookingActivator = bookingActivator;
             _notificationService = notificationService;
             _contractService = contractService;
             _unitOfWork = unitOfWork;
-        }
-
-        // =============================================================================================
-        // Báo giá chốt
-        // =============================================================================================
-
-        public async Task IssueFinalQuoteAsync(int bookingId, int routePlanId)
-        {
-            var booking = await _bookingRepo.GetQueryable()
-                .Include(b => b.BookingHorses).ThenInclude(bh => bh.Horse)
-                .FirstAsync(b => b.BookingId == bookingId);
-            var plan = await _planRepo.GetQueryable().AsNoTracking().FirstAsync(p => p.RoutePlanId == routePlanId);
-
-            var policy = await _settingService.GetPolicySettingsAsync();
-            var payment = await _settingService.GetPaymentSettingsAsync();
-            var horses = booking.BookingHorses.Where(bh => bh.Status != BookingHorseStatuses.Cancelled).ToList();
-
-            // Lịch đã kiểm tra lúc khách gửi đơn; giữ Express như lúc đó để không bắt khách đổi ngày vì công ty lập tuyến lâu
-            var quote = await _pricingService.CalculateQuoteAsync(new QuoteInputModel
-            {
-                TransportMode = booking.TransportMode,
-                PickupCountryCode = booking.PickupCountryCode,
-                DropoffCountryCode = booking.DropoffCountryCode,
-                DistanceKm = (int)Math.Ceiling(plan.TotalDistanceKm),
-                RequiresClimateControl = booking.RequiresClimateControl,
-                DeclaredValue = null, // bảo hiểm tính theo từng con bên dưới
-                PickupWindowStart = booking.PickupWindowStart,
-                PickupWindowEnd = booking.PickupWindowEnd,
-                DeliveryDeadline = booking.DeliveryDeadline,
-                TransitCountryCodes = JsonSerializer.Deserialize<List<string>>(plan.TransitCountryCodes) ?? new List<string>(),
-                QuotedAt = booking.CreatedAt,
-                StallClasses = horses.Select(bh => bh.StallClass).ToList(),
-                SkipScheduleCheck = true,
-                ForceExpress = booking.IsExpress
-            });
-
-            // R-13: phí bảo hiểm toàn giá trị theo từng con (thay dòng INS_TRANSIT cũ)
-            quote.Lines.AddRange(QuoteRules.InsuranceLines(
-                horses.Select(bh => new QuoteRules.InsuredHorse(bh.Horse?.Name ?? $"#{bh.HorseId}", bh.InsurancePlan, bh.AgreedValue, bh.DeclaredValue)),
-                policy.InsurancePremiumPercent));
-            decimal total = quote.Lines.Sum(l => l.Amount);
-
-            var now = DateTimeOffset.UtcNow;
-            booking.EstimatedCost = total;
-            booking.CurrencyCode = quote.CurrencyCode;
-            booking.QuoteBreakdown = _pricingService.SerializeLines(quote.Lines);
-            booking.EstimatedTransitHours = plan.EstimatedHours;
-            booking.QuotedAt = now;
-            booking.QuoteExpiresAt = QuoteRules.ExpiresAt(now, policy.QuoteAcceptDays);
-            booking.QuoteReminderSentAt = null;
-            booking.Status = BookingStatuses.Quoted;
-            await _bookingRepo.SaveChangesAsync();
-
-            // R-17: hợp đồng nháp theo báo giá này (bản nháp cũ, nếu có, bị thay)
-            await _contractService.CreateDraftAsync(booking.BookingId, ContractReasons.Initial);
-
-            await _notificationService.SendAsync(
-                booking.CustomerUserId,
-                $"Final quote for booking {booking.BookingCode}",
-                $"The route is planned. Final price: {total:N2} {booking.CurrencyCode}. Accept the quote and pay the deposit by {VietnamTime(booking.QuoteExpiresAt.Value)} (Vietnam time); after that the booking closes without any fee.",
-                NotificationReferenceTypes.Booking,
-                booking.BookingId);
-            await _notificationService.EmailCustomerAsync(
-                booking.CustomerUserId,
-                EmailTemplateNames.QuoteReady,
-                CustomerPages.Booking(booking.BookingId),
-                new Dictionary<string, string>
-                {
-                    ["BookingCode"] = booking.BookingCode,
-                    ["PriceUsd"] = total.ToString("N2", CultureInfo.InvariantCulture),
-                    ["PriceVnd"] = Math.Round(total * payment.UsdVndRate).ToString("N0", VietnameseCulture),
-                    ["ExpiresAt"] = VietnamTime(booking.QuoteExpiresAt.Value)
-                });
         }
 
         // =============================================================================================
