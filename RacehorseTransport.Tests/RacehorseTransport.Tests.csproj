@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\RacehorseTransport.API\RacehorseTransport.API.csproj" />
     <ProjectReference Include="..\RacehorseTransport.Repositories\RacehorseTransport.Repositories.csproj" />
     <ProjectReference Include="..\RacehorseTransport.Services\RacehorseTransport.Services.csproj" />
   </ItemGroup>
