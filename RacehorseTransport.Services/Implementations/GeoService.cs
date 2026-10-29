@@ -140,9 +140,12 @@ namespace RacehorseTransport.Services.Implementations
 
             var route = new GeoRouteModel();
             var fullLine = new List<GeoPointModel>();
-            for (int i = 0; i < points.Count - 1; i++)
+            // Gọi chỉ đường các chặng song song: tuyến nhiều mốc không phải chờ từng chặng một
+            var legs = await Task.WhenAll(Enumerable.Range(0, points.Count - 1)
+                .Select(i => RouteLegAsync(points[i], points[i + 1], cancellationToken)));
+            for (int i = 0; i < legs.Length; i++)
             {
-                var leg = await RouteLegAsync(points[i], points[i + 1], cancellationToken);
+                var leg = legs[i];
                 leg.FromIndex = i;
                 leg.ToIndex = i + 1;
                 route.Legs.Add(leg);
