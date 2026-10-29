@@ -13,6 +13,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? DocumentNumber { get; set; }
         public FileUploadModel File { get; set; } = null!;
         public DateOnly? ExpiryDate { get; set; }
+        public DateOnly? IssueDate { get; set; } // chỉ dùng cho FIT_EXAM (ngày bác sĩ thú y khám)
     }
 
     // Dòng trong danh sách hồ sơ
@@ -66,6 +67,12 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? RegulationNote { get; set; }
         public List<string> RequiredBy { get; set; } = new(); // ví dụ: "VN Export", "CN Import"
 
+        // true: giấy nộp sau thông quan (FIT_EXAM), không tính vào điều kiện nộp cơ quan chức năng / hạn nộp giấy
+        public bool PostClearance { get; set; }
+        // Khoảng khám FIT_EXAM = [giờ xuất phát dự kiến - 48 giờ, giờ xuất phát dự kiến]; null khi ngựa chưa có chuyến đã duyệt
+        public DateTimeOffset? ExamWindowStart { get; set; }
+        public DateTimeOffset? ExamWindowEnd { get; set; }
+
         // Missing | Pending | Approved | Rejected (theo bản nộp mới nhất của loại giấy này)
         public string State { get; set; } = ChecklistStates.Missing;
         public DossierDocumentModel? LatestDocument { get; set; }
@@ -96,6 +103,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public string Status { get; set; } = string.Empty;
         public string? CorrectionNote { get; set; }
         public DateOnly? ExpiryDate { get; set; }
+        public DateOnly? IssueDate { get; set; } // chỉ FIT_EXAM
         public int RejectionCount { get; set; }
         public int UploadedByUserId { get; set; }
         public string? UploadedByName { get; set; }

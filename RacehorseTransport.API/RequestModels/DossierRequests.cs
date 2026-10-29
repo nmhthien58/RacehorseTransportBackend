@@ -32,6 +32,9 @@ namespace RacehorseTransport.API.RequestModels
         public IFormFile? File { get; set; }
 
         public DateOnly? ExpiryDate { get; set; }
+
+        // Chỉ dùng cho giấy khám lâm sàng FIT_EXAM: ngày bác sĩ thú y khám (yyyy-MM-dd). Bỏ trống thì lấy ngày tải lên.
+        public DateOnly? IssueDate { get; set; }
     }
 
     public class RejectDocumentRequest

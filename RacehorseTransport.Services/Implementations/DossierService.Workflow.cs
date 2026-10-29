@@ -20,6 +20,13 @@ namespace RacehorseTransport.Services.Implementations
             DossierStatuses.Draft, DossierStatuses.AwaitingDocs, DossierStatuses.Reviewing
         };
 
+        // Giấy khám lâm sàng FIT_EXAM có sau khi thông quan nên vẫn nộp / thẩm định được ở các trạng thái này
+        private static readonly string[] OpenForFitExam =
+        {
+            DossierStatuses.Draft, DossierStatuses.AwaitingDocs, DossierStatuses.Reviewing,
+            DossierStatuses.SubmittedToAuthorities, DossierStatuses.Cleared
+        };
+
         public async Task<DossierDetailModel> RequestDocumentsAsync(int dossierId, string? note, CurrentUser currentUser)
         {
             var dossier = await GetTrackedDossierAsync(dossierId);
@@ -31,11 +38,12 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             var booking = dossier.BookingHorse!.Booking!;
-            var checklist = await BuildChecklistAsync(booking, ToDocumentModels(dossier));
+            var checklist = await BuildChecklistAsync(booking, dossier.BookingHorseId, ToDocumentModels(dossier));
 
-            // Chỉ nhắc khách những giấy khách phải nộp; giấy công ty xin do chuyên viên tự lo (R-19)
-            var outstanding = checklist
-                .Where(c => c.IsMandatory && c.ProvidedBy == DocumentProviders.Customer
+            // Chỉ nhắc khách những giấy khách phải nộp; giấy công ty xin do chuyên viên tự lo (R-19).
+            // FIT_EXAM có nhắc riêng theo giờ xuất phát.
+            var outstanding = FitExamRules.RequiredForClearance(checklist)
+                .Where(c => c.ProvidedBy == DocumentProviders.Customer
                     && c.State != DocumentStatuses.Approved && c.State != DocumentStatuses.Pending)
                 .Select(c => c.DocTypeName)
                 .ToList();
@@ -96,15 +104,21 @@ namespace RacehorseTransport.Services.Implementations
                 throw new ForbiddenException("You cannot upload documents to this dossier.");
             }
 
-            if (!OpenForDocuments.Contains(dossier.Status))
-            {
-                throw new BusinessException($"Documents cannot be uploaded while the dossier is in status {dossier.Status}.");
-            }
-
             var docType = await _docTypeRepo.GetByIdAsync(model.DocTypeId);
             if (docType == null)
             {
                 throw new BusinessException($"Document type with ID {model.DocTypeId} does not exist.");
+            }
+
+            bool isFitExam = docType.Code == DocumentTypeCodes.FitExam;
+            if (!(isFitExam ? OpenForFitExam : OpenForDocuments).Contains(dossier.Status))
+            {
+                throw new BusinessException($"Documents cannot be uploaded while the dossier is in status {dossier.Status}.");
+            }
+
+            if (isFitExam && model.IssueDate.HasValue && model.IssueDate.Value > DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1))
+            {
+                throw new BusinessException("The exam date (issueDate) cannot be in the future.");
             }
 
             // R-19: giấy phép của cơ quan nhà nước (kiểm dịch xuất khẩu, nhập khẩu, quá cảnh) do chuyên viên xin, khách không nộp
@@ -122,7 +136,7 @@ namespace RacehorseTransport.Services.Implementations
                     $"'{docType.Name}' expires on {model.ExpiryDate:yyyy-MM-dd}, before the end of the pickup window {latestPickupDay:yyyy-MM-dd}.");
             }
 
-            if (model.ExpiryDate.HasValue && model.ExpiryDate.Value < DateOnly.FromDateTime(DateTime.UtcNow))
+            if (!isFitExam && model.ExpiryDate.HasValue && model.ExpiryDate.Value < DateOnly.FromDateTime(DateTime.UtcNow))
             {
                 throw new BusinessException("The document has already expired.");
             }
@@ -130,7 +144,8 @@ namespace RacehorseTransport.Services.Implementations
             var existing = dossier.Documents.FirstOrDefault(d => d.DocTypeId == model.DocTypeId);
             if (existing != null)
             {
-                if (existing.Status == DocumentStatuses.Approved)
+                // Giấy khám đã duyệt vẫn thay được: khám lại khi giờ xuất phát đổi
+                if (existing.Status == DocumentStatuses.Approved && !isFitExam)
                 {
                     throw new BusinessException($"'{docType.Name}' has already been approved and cannot be replaced.");
                 }
@@ -148,6 +163,8 @@ namespace RacehorseTransport.Services.Implementations
             string newStatus = companyDocument ? DocumentStatuses.Approved : DocumentStatuses.Pending;
             int? reviewerId = companyDocument ? currentUser.UserId : null;
             DateTimeOffset? reviewedAt = companyDocument ? DateTimeOffset.UtcNow : null;
+            // FIT_EXAM không có hạn dùng: cột expiry_date lưu ngày khám (FitExamRules.IssueDateOf)
+            DateOnly? storedDate = isFitExam ? model.IssueDate : model.ExpiryDate;
 
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
@@ -159,7 +176,7 @@ namespace RacehorseTransport.Services.Implementations
                         DocTypeId = model.DocTypeId,
                         DocumentNumber = model.DocumentNumber,
                         FileUrl = stored.Path,
-                        ExpiryDate = model.ExpiryDate,
+                        ExpiryDate = storedDate,
                         UploadedByUserId = currentUser.UserId,
                         Status = newStatus,
                         ReviewedByUserId = reviewerId,
@@ -170,7 +187,7 @@ namespace RacehorseTransport.Services.Implementations
                 {
                     existing.DocumentNumber = model.DocumentNumber;
                     existing.FileUrl = stored.Path;
-                    existing.ExpiryDate = model.ExpiryDate;
+                    existing.ExpiryDate = storedDate;
                     existing.UploadedByUserId = currentUser.UserId;
                     existing.UploadedAt = DateTimeOffset.UtcNow;
                     existing.Status = newStatus;
@@ -198,10 +215,23 @@ namespace RacehorseTransport.Services.Implementations
                     return;
                 }
 
-                dossier.Status = DossierStatuses.Reviewing;
+                // FIT_EXAM không đổi trạng thái hồ sơ (thường đã thông quan)
+                if (!isFitExam)
+                {
+                    dossier.Status = DossierStatuses.Reviewing;
+                }
                 await _dossierRepo.UpdateAsync(dossier);
 
-                if (currentUser.UserId != dossier.SpecialistUserId)
+                if (isFitExam && currentUser.UserId != dossier.SpecialistUserId)
+                {
+                    await _notificationService.SendAsync(
+                        dossier.SpecialistUserId,
+                        $"Fit-to-travel exam uploaded for dossier {dossier.DossierCode}",
+                        $"The fit-to-travel exam of {dossier.BookingHorse.Horse!.Name} is waiting for your review. The horse cannot depart until you approve it.",
+                        NotificationReferenceTypes.Dossier,
+                        dossier.DossierId);
+                }
+                else if (currentUser.UserId != dossier.SpecialistUserId)
                 {
                     await _notificationService.SendAsync(
                         dossier.SpecialistUserId,
@@ -220,6 +250,11 @@ namespace RacehorseTransport.Services.Implementations
             var (dossier, document) = await GetDocumentForReviewAsync(documentId, currentUser);
             var booking = dossier.BookingHorse!.Booking!;
 
+            if (document.DocumentType!.Code == DocumentTypeCodes.FitExam)
+            {
+                return await ApproveFitExamAsync(dossier, document, currentUser);
+            }
+
             // Giấy phải còn hiệu lực tới ngày cuối của khoảng pickup (chưa biết chuyến chạy ngày nào trong khoảng)
             var latestPickupDay = DateOnly.FromDateTime(booking.PickupWindowEnd.UtcDateTime);
             if (document.ExpiryDate.HasValue && document.ExpiryDate.Value < latestPickupDay)
@@ -234,6 +269,44 @@ namespace RacehorseTransport.Services.Implementations
             document.ReviewedAt = DateTimeOffset.UtcNow;
 
             await _documentRepo.UpdateAsync(document);
+            return await GetDossierByIdAsync(dossier.DossierId, currentUser);
+        }
+
+        // Giấy khám phải cấp trong N giờ trước giờ xuất phát dự kiến của chuyến đã duyệt chở con ngựa
+        private async Task<DossierDetailModel> ApproveFitExamAsync(DigitalDossier dossier, DossierDocument document, CurrentUser currentUser)
+        {
+            int hours = _bookingOptions.FitExamValidHours;
+            var departureAt = await GetPlannedDepartureAsync(dossier.BookingHorseId);
+            if (departureAt == null)
+            {
+                throw new BusinessException(
+                    "The fit-to-travel exam cannot be approved yet: the horse is not on an approved trip, so the departure time is not known. Approve it after the manager approves the trip.");
+            }
+
+            var issueDate = FitExamRules.IssueDateOf(document.ExpiryDate, document.UploadedAt);
+            if (!FitExamRules.IsIssuedInWindow(issueDate, departureAt.Value, hours))
+            {
+                var (start, end) = FitExamRules.ExamWindow(departureAt.Value, hours);
+                throw new BusinessException(
+                    $"The exam date {issueDate:yyyy-MM-dd} is not within {hours} hours before the planned departure ({start:yyyy-MM-dd HH:mm} - {end:yyyy-MM-dd HH:mm} UTC). Reject it and ask the customer for a new exam.");
+            }
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                document.Status = DocumentStatuses.Approved;
+                document.CorrectionNote = null;
+                document.ReviewedByUserId = currentUser.UserId;
+                document.ReviewedAt = DateTimeOffset.UtcNow;
+                await _documentRepo.UpdateAsync(document);
+
+                await _notificationService.SendAsync(
+                    dossier.BookingHorse!.Booking!.CustomerUserId,
+                    $"Fit-to-travel exam approved for {dossier.BookingHorse.Horse!.Name}",
+                    "The specialist has approved the fit-to-travel exam. The horse is ready on the document side for departure.",
+                    NotificationReferenceTypes.Dossier,
+                    dossier.DossierId);
+            });
+
             return await GetDossierByIdAsync(dossier.DossierId, currentUser);
         }
 
@@ -254,12 +327,14 @@ namespace RacehorseTransport.Services.Implementations
                 document.ReviewedAt = DateTimeOffset.UtcNow;
 
                 bool limitReached = document.RejectionCount >= DocumentStatuses.MaxRejectionCount;
-                if (limitReached)
+                // Giấy khám nộp sau thông quan: không đổi trạng thái hồ sơ
+                bool isFitExam = document.DocumentType.Code == DocumentTypeCodes.FitExam;
+                if (!isFitExam && limitReached)
                 {
                     dossier.Status = DossierStatuses.Issue;
                     dossier.IssueReason = $"'{docName}' was rejected {document.RejectionCount} times. Last reason: {document.CorrectionNote}";
                 }
-                else
+                else if (!isFitExam)
                 {
                     dossier.Status = DossierStatuses.AwaitingDocs;
                 }
@@ -275,7 +350,7 @@ namespace RacehorseTransport.Services.Implementations
                     NotificationReferenceTypes.Dossier,
                     dossier.DossierId, emailCustomers: true);
 
-                if (limitReached)
+                if (limitReached && !isFitExam)
                 {
                     await _notificationService.SendToRoleAsync(
                         UserRoles.LogisticsManager,
@@ -300,10 +375,11 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             var booking = dossier.BookingHorse!.Booking!;
-            var checklist = await BuildChecklistAsync(booking, ToDocumentModels(dossier));
+            var checklist = await BuildChecklistAsync(booking, dossier.BookingHorseId, ToDocumentModels(dossier));
 
-            var notApproved = checklist
-                .Where(c => c.IsMandatory && c.State != DocumentStatuses.Approved)
+            // FIT_EXAM (PostClearance) nộp sau thông quan, không chặn bước này
+            var notApproved = FitExamRules.RequiredForClearance(checklist)
+                .Where(c => c.State != DocumentStatuses.Approved)
                 .Select(c => $"{c.DocTypeName} ({c.State})")
                 .ToList();
 
@@ -444,7 +520,7 @@ namespace RacehorseTransport.Services.Implementations
             return dossier;
         }
 
-        // Thẩm định một giấy tờ: phải là Specialist phụ trách, hồ sơ còn mở, giấy đang chờ duyệt
+        // Thẩm định một giấy tờ: phải là Specialist phụ trách, hồ sơ còn mở (FIT_EXAM: kể cả đã thông quan), giấy đang chờ duyệt
         private async Task<(DigitalDossier Dossier, DossierDocument Document)> GetDocumentForReviewAsync(int documentId, CurrentUser currentUser)
         {
             int? dossierId = await _documentRepo.GetQueryable()
@@ -460,12 +536,13 @@ namespace RacehorseTransport.Services.Implementations
             var dossier = await GetTrackedDossierAsync(dossierId.Value);
             EnsureSpecialistInCharge(dossier, currentUser);
 
-            if (!OpenForDocuments.Contains(dossier.Status))
+            var document = dossier.Documents.First(d => d.DocumentId == documentId);
+            bool isFitExam = document.DocumentType!.Code == DocumentTypeCodes.FitExam;
+            if (!(isFitExam ? OpenForFitExam : OpenForDocuments).Contains(dossier.Status))
             {
                 throw new BusinessException($"Documents cannot be reviewed while the dossier is in status {dossier.Status}.");
             }
 
-            var document = dossier.Documents.First(d => d.DocumentId == documentId);
             if (document.Status != DocumentStatuses.Pending)
             {
                 throw new BusinessException($"Only a pending document can be reviewed (current status: {document.Status}).");

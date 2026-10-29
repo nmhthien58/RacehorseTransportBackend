@@ -72,7 +72,7 @@ Công ty **từ chối vận chuyển** ngựa thuộc một trong các trườn
 - Ngựa cái mang thai **đã quá 90% thai kỳ** tại ngày đi, hoặc **vừa đẻ trong 7 ngày**.
 - Ngựa ốm, bị thương, suy yếu hoặc có dấu hiệu bệnh lúc nhận ngựa.
 
-Công ty **không giới hạn tuổi tối đa**. Thay vào đó, **mọi con ngựa** phải có giấy khám lâm sàng của bác sĩ thú y xác nhận đủ sức khỏe để đi, cấp trong vòng **48 giờ** trước giờ xuất phát.
+Công ty **không giới hạn tuổi tối đa**. Thay vào đó, **mọi con ngựa** phải có giấy khám lâm sàng của bác sĩ thú y xác nhận đủ sức khỏe để đi, cấp trong vòng **48 giờ** trước giờ xuất phát. Khách tải giấy khám lên hồ sơ kiểm dịch của đơn và chuyên viên của Công ty duyệt; ngựa chỉ được xuất phát khi giấy khám đã được duyệt.
 
 **Khách cam kết khai báo trung thực** về tuổi, tình trạng mang thai, tiền sử bệnh và giá trị của ngựa. Khai sai là lỗi của Khách (mục 9) và có thể làm mất quyền bồi thường bảo hiểm (mục 8).
 

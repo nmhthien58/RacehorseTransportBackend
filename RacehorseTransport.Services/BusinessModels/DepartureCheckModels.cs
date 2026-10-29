@@ -40,6 +40,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public const string DocumentExpired = "DocumentExpired";
         public const string DocumentExpiresBeforeArrival = "DocumentExpiresBeforeArrival";
         public const string FitExamMissing = "FitExamMissing";
+        public const string FitExamPendingReview = "FitExamPendingReview";
         public const string FitExamTypeNotConfigured = "FitExamTypeNotConfigured";
         public const string BalanceUnpaid = "BalanceUnpaid";
         public const string NotEnoughDrivers = "NotEnoughDrivers";
@@ -75,8 +76,11 @@ namespace RacehorseTransport.Services.BusinessModels
         // Giấy đã duyệt trong hồ sơ của đơn
         public List<DepartureDocumentInput> Documents { get; set; } = new();
 
-        // Ngày cấp các giấy khám FIT_EXAM của con ngựa (hồ sơ thú y của ngựa + hồ sơ của đơn)
+        // Ngày cấp các giấy khám FIT_EXAM ĐÃ DUYỆT trong hồ sơ của đơn (hồ sơ thú y của ngựa không tính)
         public List<DateOnly> FitExamIssueDates { get; set; } = new();
+
+        // Có giấy khám đang chờ chuyên viên duyệt
+        public bool HasPendingFitExam { get; set; }
     }
 
     public class DepartureDocumentInput

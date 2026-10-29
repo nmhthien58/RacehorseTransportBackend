@@ -29,6 +29,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ICodeGenerator _codeGenerator;
         private readonly INotificationService _notificationService;
         private readonly IRecipientService _recipientService;
+        private readonly IFitExamReminderService _fitExamReminderService;
         private readonly ISystemSettingService _settingService;
         private readonly IDistanceService _distanceService;
         private readonly ITransitTimeEstimator _transitEstimator;
@@ -49,6 +50,7 @@ namespace RacehorseTransport.Services.Implementations
             ICodeGenerator codeGenerator,
             INotificationService notificationService,
             IRecipientService recipientService,
+            IFitExamReminderService fitExamReminderService,
             ISystemSettingService settingService,
             IDistanceService distanceService,
             ITransitTimeEstimator transitEstimator,
@@ -68,6 +70,7 @@ namespace RacehorseTransport.Services.Implementations
             _codeGenerator = codeGenerator;
             _notificationService = notificationService;
             _recipientService = recipientService;
+            _fitExamReminderService = fitExamReminderService;
             _settingService = settingService;
             _distanceService = distanceService;
             _transitEstimator = transitEstimator;

@@ -1,0 +1,28 @@
+Subject: Nhắc khám lâm sàng cho ngựa {{HorseName}} trước chuyến {{TripCode}}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Nhắc khám lâm sàng trước khi xuất phát</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#174c3c;">Cho ngựa khám lâm sàng trước khi xuất phát</h2>
+    <p>Xin chào {{FullName}},</p>
+    <p>Ngựa <strong>{{HorseName}}</strong> thuộc đơn <strong>{{BookingCode}}</strong> đã được xếp lên chuyến <strong>{{TripCode}}</strong>.
+       Theo chính sách vận chuyển, mọi ngựa cần giấy khám lâm sàng đủ sức khỏe do bác sĩ thú y cấp trong 48 giờ trước giờ xuất phát.</p>
+    <table style="border-collapse:collapse;margin:8px 0 16px;">
+      <tr>
+        <td style="padding:6px 16px 6px 0;color:#6b7280;">Khám trong khoảng</td>
+        <td style="padding:6px 0;"><strong>{{ExamWindowStart}} – {{ExamWindowEnd}}</strong> (giờ Việt Nam)</td>
+      </tr>
+    </table>
+    <p>Sau khi khám, vui lòng tải giấy khám lên hồ sơ kiểm dịch của ngựa. Chuyên viên của chúng tôi sẽ kiểm tra và duyệt giấy;
+       ngựa chỉ được xuất phát khi giấy khám đã được duyệt.</p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Tải giấy khám lên</a>
+    </p>
+    <p>Cảm ơn bạn đã tin tưởng Racehorse Transport.</p>
+  </div>
+</body>
+</html>

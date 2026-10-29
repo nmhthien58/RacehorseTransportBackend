@@ -27,7 +27,8 @@ namespace RacehorseTransport.API.Mappers
                 DocTypeId = request.DocTypeId,
                 DocumentNumber = string.IsNullOrWhiteSpace(request.DocumentNumber) ? null : request.DocumentNumber.Trim(),
                 File = file,
-                ExpiryDate = request.ExpiryDate
+                ExpiryDate = request.ExpiryDate,
+                IssueDate = request.IssueDate
             };
         }
 
@@ -57,6 +58,9 @@ namespace RacehorseTransport.API.Mappers
                     ValidityDays = c.ValidityDays,
                     RegulationNote = c.RegulationNote,
                     RequiredBy = c.RequiredBy,
+                    PostClearance = c.PostClearance,
+                    ExamWindowStart = c.ExamWindowStart,
+                    ExamWindowEnd = c.ExamWindowEnd,
                     State = c.State,
                     LatestDocument = c.LatestDocument?.ToResponse()
                 }).ToList(),
@@ -80,6 +84,7 @@ namespace RacehorseTransport.API.Mappers
                 Status = model.Status,
                 CorrectionNote = model.CorrectionNote,
                 ExpiryDate = model.ExpiryDate,
+                IssueDate = model.IssueDate,
                 RejectionCount = model.RejectionCount,
                 UploadedByUserId = model.UploadedByUserId,
                 UploadedByName = model.UploadedByName,

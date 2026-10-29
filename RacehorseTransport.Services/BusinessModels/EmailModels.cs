@@ -44,6 +44,8 @@ namespace RacehorseTransport.Services.BusinessModels
         public const string DeliveryFailed = "DeliveryFailed";                           // {{BookingCode}}, {{Reason}}, {{DecisionDeadline}}
         public const string DelayCompensation = "DelayCompensation";                     // {{BookingCode}}, {{DelayHours}}, {{Amount}}
         public const string ContractAccepted = "ContractAccepted";                       // {{BookingCode}}, {{ContractCode}}, {{Version}} (R-17)
+        public const string FitExamReminder = "FitExamReminder";                         // {{BookingCode}}, {{HorseName}}, {{TripCode}}, {{ExamWindowStart}}, {{ExamWindowEnd}}
+        public const string FitExamRetake = "FitExamRetake";                             // {{BookingCode}}, {{HorseName}}, {{TripCode}}, {{ExamWindowStart}}, {{ExamWindowEnd}}
         public const string ClaimDecision = "ClaimDecision";                             // {{ClaimCode}}, {{BookingCode}}, {{HorseName}}, {{Decision}}, {{Amount}}, {{Reason}}
     }
 }

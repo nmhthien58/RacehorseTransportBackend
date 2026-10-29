@@ -1,3 +1,4 @@
+using RacehorseTransport.Repositories.Constants;
 using RacehorseTransport.Repositories.Entities;
 using RacehorseTransport.Services.BusinessModels;
 
@@ -30,6 +31,8 @@ namespace RacehorseTransport.Services.Mappers
             return model;
         }
 
+        private static bool IsFitExam(DossierDocument entity) => entity.DocumentType?.Code == DocumentTypeCodes.FitExam;
+
         public static DossierDocumentModel ToBusinessModel(this DossierDocument entity)
         {
             return new DossierDocumentModel
@@ -42,7 +45,9 @@ namespace RacehorseTransport.Services.Mappers
                 FileUrl = entity.FileUrl,
                 Status = entity.Status,
                 CorrectionNote = entity.CorrectionNote,
-                ExpiryDate = entity.ExpiryDate,
+                // FIT_EXAM lưu ngày cấp ở cột expiry_date (xem FitExamRules.IssueDateOf)
+                ExpiryDate = IsFitExam(entity) ? null : entity.ExpiryDate,
+                IssueDate = IsFitExam(entity) ? entity.ExpiryDate : null,
                 RejectionCount = entity.RejectionCount,
                 UploadedByUserId = entity.UploadedByUserId,
                 UploadedByName = entity.UploadedBy?.FullName,

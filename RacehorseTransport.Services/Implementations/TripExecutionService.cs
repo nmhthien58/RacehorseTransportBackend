@@ -32,7 +32,6 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IRecipientService _recipientService;
         private readonly IRepository<DeliveryFailure> _deliveryFailureRepo;
         private readonly IFileStorageService _fileStorage;
-        private readonly IRepository<HorseDocument> _horseDocumentRepo;
         private readonly IRepository<DocumentType> _docTypeRepo;
         private readonly IRepository<RoutePlan> _routePlanRepo;
         private readonly ITransitTimeEstimator _transitEstimator;
@@ -52,7 +51,6 @@ namespace RacehorseTransport.Services.Implementations
             IRecipientService recipientService,
             IRepository<DeliveryFailure> deliveryFailureRepo,
             IFileStorageService fileStorage,
-            IRepository<HorseDocument> horseDocumentRepo,
             IRepository<DocumentType> docTypeRepo,
             IRepository<RoutePlan> routePlanRepo,
             ITransitTimeEstimator transitEstimator,
@@ -71,7 +69,6 @@ namespace RacehorseTransport.Services.Implementations
             _recipientService = recipientService;
             _deliveryFailureRepo = deliveryFailureRepo;
             _fileStorage = fileStorage;
-            _horseDocumentRepo = horseDocumentRepo;
             _docTypeRepo = docTypeRepo;
             _routePlanRepo = routePlanRepo;
             _transitEstimator = transitEstimator;
@@ -498,18 +495,6 @@ namespace RacehorseTransport.Services.Implementations
                 })
                 .ToListAsync();
 
-            // Giấy khám thường có sau khi hồ sơ đã thông quan (hồ sơ đã khóa), nên khách nộp vào hồ sơ thú y của ngựa
-            var horseIds = horses.Select(h => h.HorseId).Distinct().ToList();
-            var fitExams = fitExamTypeId == null
-                ? new List<(int HorseId, DateOnly IssuedOn)>()
-                : (await _horseDocumentRepo.GetQueryable()
-                    .AsNoTracking()
-                    .Where(d => horseIds.Contains(d.HorseId) && d.DocTypeId == fitExamTypeId.Value)
-                    .Select(d => new { d.HorseId, d.IssueDate, d.UploadedAt })
-                    .ToListAsync())
-                    .Select(d => (d.HorseId, IssuedOn: d.IssueDate ?? DateOnly.FromDateTime(d.UploadedAt.UtcDateTime)))
-                    .ToList();
-
             // R-02: đơn tạo trước khi có thanh toán (DepositPercent = null) không bắt trả tiền
             var bookings = await _tripHorseRepo.GetQueryable()
                 .Where(th => th.TripId == trip.TripId && !LeftTripStatuses.Contains(th.Status))
@@ -552,11 +537,12 @@ namespace RacehorseTransport.Services.Implementations
                         .Where(d => d.Status == DocumentStatuses.Approved && d.DocTypeId != fitExamTypeId)
                         .Select(d => new DepartureDocumentInput { DocTypeName = d.Name, ExpiryDate = d.ExpiryDate })
                         .ToList(),
-                    // Specialist có thể nộp hộ giấy khám vào hồ sơ của đơn: tính theo ngày tải lên
-                    FitExamIssueDates = fitExams.Where(f => f.HorseId == h.HorseId).Select(f => f.IssuedOn)
-                        .Concat(h.Documents.Where(d => d.DocTypeId == fitExamTypeId)
-                            .Select(d => DateOnly.FromDateTime(d.UploadedAt.UtcDateTime)))
-                        .ToList()
+                    // Chỉ giấy khám trong hồ sơ của đơn, đã được chuyên viên duyệt (giấy ở hồ sơ thú y của ngựa không tính)
+                    FitExamIssueDates = h.Documents
+                        .Where(d => d.DocTypeId == fitExamTypeId && FitExamRules.CountsAtDeparture(d.Status))
+                        .Select(d => FitExamRules.IssueDateOf(d.ExpiryDate, d.UploadedAt))
+                        .ToList(),
+                    HasPendingFitExam = h.Documents.Any(d => d.DocTypeId == fitExamTypeId && d.Status == DocumentStatuses.Pending)
                 }).ToList(),
                 Bookings = bookings,
                 IsGround = isGround,

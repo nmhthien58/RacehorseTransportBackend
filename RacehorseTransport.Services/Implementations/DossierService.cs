@@ -7,6 +7,8 @@ using RacehorseTransport.Services.Exceptions;
 using RacehorseTransport.Services.Extensions;
 using RacehorseTransport.Services.Interfaces;
 using RacehorseTransport.Services.Mappers;
+using Microsoft.Extensions.Options;
+using RacehorseTransport.Services.Options;
 
 namespace RacehorseTransport.Services.Implementations
 {
@@ -23,6 +25,8 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IRepository<CountryDocRequirement> _requirementRepo;
         private readonly IRepository<BookingTransitCountry> _transitRepo;
         private readonly IRepository<DocumentType> _docTypeRepo;
+        private readonly IRepository<TripHorse> _tripHorseRepo;
+        private readonly BookingOptions _bookingOptions;
         private readonly IFileStorageService _fileStorage;
         private readonly INotificationService _notificationService;
         private readonly IUnitOfWork _unitOfWork;
@@ -33,6 +37,8 @@ namespace RacehorseTransport.Services.Implementations
             IRepository<CountryDocRequirement> requirementRepo,
             IRepository<BookingTransitCountry> transitRepo,
             IRepository<DocumentType> docTypeRepo,
+            IRepository<TripHorse> tripHorseRepo,
+            IOptions<BookingOptions> bookingOptions,
             IFileStorageService fileStorage,
             INotificationService notificationService,
             IUnitOfWork unitOfWork)
@@ -42,6 +48,8 @@ namespace RacehorseTransport.Services.Implementations
             _requirementRepo = requirementRepo;
             _transitRepo = transitRepo;
             _docTypeRepo = docTypeRepo;
+            _tripHorseRepo = tripHorseRepo;
+            _bookingOptions = bookingOptions.Value;
             _fileStorage = fileStorage;
             _notificationService = notificationService;
             _unitOfWork = unitOfWork;
@@ -115,9 +123,10 @@ namespace RacehorseTransport.Services.Implementations
             var model = dossier.ToDetailModel();
             var booking = dossier.BookingHorse!.Booking!;
 
-            model.Checklist = await BuildChecklistAsync(booking, model.Documents);
+            model.Checklist = await BuildChecklistAsync(booking, dossier.BookingHorseId, model.Documents);
 
-            var mandatory = model.Checklist.Where(c => c.IsMandatory).ToList();
+            // FIT_EXAM nộp sau thông quan nên không tính vào điều kiện nộp cơ quan chức năng
+            var mandatory = FitExamRules.RequiredForClearance(model.Checklist).ToList();
             model.RequiredCount = mandatory.Count;
             model.ApprovedCount = mandatory.Count(c => c.State == DocumentStatuses.Approved);
             model.IsReadyToSubmit = mandatory.Count > 0 && model.ApprovedCount == mandatory.Count;
@@ -131,8 +140,9 @@ namespace RacehorseTransport.Services.Implementations
         // Danh sách giấy tờ cần có = quy định xuất khẩu của nước đi + quy định quá cảnh của từng nước đi qua (R-03)
         // + quy định nhập khẩu của nước đến. Loại giấy được nhiều nước yêu cầu thì gộp thành một dòng, lấy thời hạn ngặt hơn.
         // Nếu chưa có quy định nào cho tuyến này thì dùng các loại giấy bắt buộc mặc định trong danh mục.
+        // Luôn có thêm một dòng FIT_EXAM (giấy khám lâm sàng, nộp sau thông quan, PostClearance = true).
         private async Task<List<DossierChecklistItemModel>> BuildChecklistAsync(
-            BookingRequest booking, List<DossierDocumentModel> documents)
+            BookingRequest booking, int bookingHorseId, List<DossierDocumentModel> documents)
         {
             string pickupCountry = booking.PickupCountryCode;
             string dropoffCountry = booking.DropoffCountryCode;
@@ -186,6 +196,28 @@ namespace RacehorseTransport.Services.Implementations
                     .ToList();
             }
 
+            var fitExamType = await _docTypeRepo.GetQueryable().AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Code == DocumentTypeCodes.FitExam);
+            checklist.RemoveAll(c => c.DocTypeCode == DocumentTypeCodes.FitExam);
+            if (fitExamType != null)
+            {
+                int hours = _bookingOptions.FitExamValidHours;
+                var departureAt = await GetPlannedDepartureAsync(bookingHorseId);
+                var window = departureAt.HasValue ? FitExamRules.ExamWindow(departureAt.Value, hours) : default;
+                checklist.Add(new DossierChecklistItemModel
+                {
+                    DocTypeId = fitExamType.DocTypeId,
+                    DocTypeCode = fitExamType.Code,
+                    DocTypeName = fitExamType.Name,
+                    IsMandatory = true,
+                    ProvidedBy = DocumentProviders.Customer,
+                    PostClearance = true,
+                    ExamWindowStart = departureAt.HasValue ? window.Start : null,
+                    ExamWindowEnd = departureAt.HasValue ? window.End : null,
+                    RegulationNote = $"Issued by a veterinarian within {hours} hours before departure; uploaded after clearance and approved by the specialist."
+                });
+            }
+
             // Trạng thái từng dòng lấy theo bản nộp mới nhất của loại giấy đó (documents đã sắp mới nhất trước)
             foreach (var item in checklist)
             {
@@ -194,6 +226,19 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             return checklist.OrderByDescending(c => c.IsMandatory).ThenBy(c => c.DocTypeCode).ToList();
+        }
+
+        // Giờ xuất phát dự kiến của chuyến đã duyệt (Scheduled) chở con ngựa; null nếu chưa có
+        private async Task<DateTimeOffset?> GetPlannedDepartureAsync(int bookingHorseId)
+        {
+            return await _tripHorseRepo.GetQueryable()
+                .AsNoTracking()
+                .Where(th => th.BookingHorseId == bookingHorseId
+                    && th.Status == TripHorseStatuses.Planned
+                    && th.Trip!.OverallStatus == TripStatuses.Scheduled)
+                .OrderBy(th => th.Trip!.PlannedStartDate)
+                .Select(th => (DateTimeOffset?)th.Trip!.PlannedStartDate)
+                .FirstOrDefaultAsync();
         }
 
         // Ai thấy hồ sơ nào:

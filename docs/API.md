@@ -1433,7 +1433,7 @@ Các trường gửi lên:
 | `expiryDate` | ngày | Không | Dạng `2026-11-04`, không được trước `issueDate` |
 | `notes` | chuỗi | Không | Ghi chú, tối đa 500 ký tự |
 
-**Giấy khám lâm sàng đủ sức khỏe (`FIT_EXAM`, BE-10):** mọi con ngựa phải có giấy này cấp trong **48 giờ trước giờ xuất phát**. Giấy có sau khi hồ sơ đơn đã thông quan nên khách nộp ở đây (không nộp vào hồ sơ của đơn), nhớ điền `issueDate`; không có `issueDate` thì tính theo ngày tải lên. Thiếu giấy thì chuyến không xuất phát được (xem `GET /api/trips/{id}/departure-check`).
+**Giấy khám lâm sàng đủ sức khỏe (`FIT_EXAM`):** mọi con ngựa phải có giấy này cấp trong **48 giờ trước giờ xuất phát**. Giấy **phải nộp vào hồ sơ kiểm dịch của đơn** (`POST /api/dossiers/{id}/documents`, dòng checklist `FIT_EXAM`) để chuyên viên duyệt. Giấy lưu ở hồ sơ thú y của ngựa chỉ để khách lưu trữ, **không được tính** khi xuất phát.
 
 Ví dụ code:
 
@@ -3244,8 +3244,8 @@ Response `200` — phần `data`:
 | Trường | Ý nghĩa |
 |---|---|
 | `status` | Trạng thái hồ sơ (mục 3) |
-| `requiredCount`, `approvedCount` | Số giấy bắt buộc và số giấy bắt buộc đã được duyệt. Dùng làm thanh tiến độ |
-| `isReadyToSubmit` | `true` khi mọi giấy bắt buộc đã `Approved`. Dùng để bật nút "Nộp cơ quan chức năng" |
+| `requiredCount`, `approvedCount` | Số giấy bắt buộc và số giấy bắt buộc đã được duyệt. Dùng làm thanh tiến độ. **Không tính** dòng `FIT_EXAM` (`postClearance = true`) |
+| `isReadyToSubmit` | `true` khi mọi giấy bắt buộc đã `Approved`. Dùng để bật nút "Nộp cơ quan chức năng". **Không tính** dòng `FIT_EXAM` |
 | `issueReason` | Lý do hồ sơ có vấn đề (khi `status` là `Issue`) |
 | `clearanceNumber`, `clearedAt` | Số và thời điểm thông quan (khi `Cleared`) |
 | `checklist[]` | Mỗi dòng là một loại giấy cần có |
@@ -3258,6 +3258,11 @@ Response `200` — phần `data`:
 | `transitCountryCodes` | Nước quá cảnh của đơn; mỗi nước có thể thêm giấy tờ hướng `Transit` vào checklist (ví dụ Giấy phép quá cảnh) |
 | `checklist[].state` | `Missing` (chưa nộp), `Pending` (chờ duyệt), `Approved`, `Rejected` |
 | `checklist[].latestDocument` | Giấy đã nộp cho dòng này; `null` nếu chưa nộp |
+| `checklist[].postClearance` | `true` chỉ với dòng giấy khám lâm sàng `FIT_EXAM`: giấy nộp **sau thông quan**, không tính vào `requiredCount` / `isReadyToSubmit`, hạn nộp giấy hay việc hủy đơn quá hạn |
+| `checklist[].examWindowStart`, `examWindowEnd` | Khoảng thời gian khách cho ngựa khám (giờ UTC, frontend tự đổi sang giờ Việt Nam): giờ xuất phát dự kiến − 48 giờ → giờ xuất phát dự kiến. `null` khi ngựa chưa nằm trên chuyến đã được duyệt. Dòng khác luôn `null` |
+| `latestDocument.issueDate` | Ngày khám (chỉ có ở giấy `FIT_EXAM`) |
+
+**Dòng giấy khám lâm sàng (`FIT_EXAM`):** checklist của mọi hồ sơ luôn có một dòng `docTypeCode = "FIT_EXAM"`, `providedBy = "Customer"`, `isMandatory = true`, `postClearance = true` (khi DB đã có loại giấy này, xem `database/03_update_fit_exam.sql`). Khách cho ngựa khám trong khoảng `examWindowStart` – `examWindowEnd`, tải giấy lên bằng `POST /api/dossiers/{id}/documents` (kể cả khi hồ sơ đã `SubmittedToAuthorities` / `Cleared`), chuyên viên phụ trách duyệt. Chỉ giấy đã duyệt mới cho ngựa xuất phát. Khách được nhắc khi Manager duyệt chuyến và một lần nữa khoảng 3 ngày trước giờ xuất phát nếu chưa nộp; giờ xuất phát đổi làm giấy đã duyệt không còn hợp lệ thì khách được báo khám lại.
 | `latestDocument.documentId` | Mã giấy, dùng khi duyệt / từ chối |
 | `latestDocument.fileUrl` | Link xem file |
 | `latestDocument.correctionNote` | Hướng dẫn sửa khi bị từ chối |
@@ -3326,8 +3331,19 @@ Các trường gửi lên:
 |---|---|---|---|
 | `docTypeId` | số | Có | Loại giấy, lấy từ `checklist[].docTypeId` |
 | `documentNumber` | chuỗi | Không | Số hiệu ghi trên giấy, tối đa 100 ký tự |
-| `expiryDate` | ngày | Không | Ngày hết hạn của giấy, dạng `2027-01-15` |
+| `expiryDate` | ngày | Không | Ngày hết hạn của giấy, dạng `2027-01-15`. Bỏ qua với `FIT_EXAM` |
+| `issueDate` | ngày | Không | **Chỉ dùng cho `FIT_EXAM`:** ngày bác sĩ thú y khám, dạng `2026-11-08`. Bỏ trống thì lấy ngày tải lên. Không được ở tương lai |
 | `file` | file | Có | File giấy tờ: `pdf`, `jpg`, `jpeg`, `png`, tối đa 10 MB |
+
+**Giấy khám `FIT_EXAM`:** nộp được cả khi hồ sơ đã `SubmittedToAuthorities` / `Cleared` (các giấy khác thì không); nộp không làm đổi trạng thái hồ sơ; giấy đã duyệt vẫn nộp lại được (khám lại khi giờ xuất phát đổi). Chuyên viên phụ trách nhận thông báo để duyệt.
+
+```js
+const form = new FormData();
+form.append("docTypeId", String(fitExamRow.docTypeId)); // dòng checklist có docTypeCode = "FIT_EXAM"
+form.append("issueDate", "2026-11-08");
+form.append("file", fileInput.files[0]);
+await api.post(`/api/dossiers/${dossierId}/documents`, form);
+```
 
 Ví dụ request:
 
@@ -3347,7 +3363,8 @@ Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
-| 400 | `Documents cannot be uploaded while the dossier is in status Cleared.` | Hồ sơ không còn nhận giấy (chỉ nhận khi `Draft`, `AwaitingDocs`, `Reviewing`) |
+| 400 | `Documents cannot be uploaded while the dossier is in status Cleared.` | Hồ sơ không còn nhận giấy (chỉ nhận khi `Draft`, `AwaitingDocs`, `Reviewing`; riêng `FIT_EXAM` nhận thêm khi `SubmittedToAuthorities`, `Cleared`) |
+| 400 | `The exam date (issueDate) cannot be in the future.` | `FIT_EXAM` có `issueDate` ở tương lai |
 | 400 | `'...' has already been approved and cannot be replaced.` | Giấy này đã được duyệt |
 | 400 | `'...' was rejected 3 times and can no longer be resubmitted. Please contact the specialist.` | Khách đã hết lượt nộp lại |
 | 400 | `The document has already expired.` | `expiryDate` ở quá khứ |
@@ -3376,11 +3393,15 @@ Lỗi thường gặp:
 | HTTP | `message` | Khi nào |
 |---|---|---|
 | 400 | `'...' expires on 2026-11-01, before the end of the pickup window 2026-11-30. Reject it and ask for a valid document.` | Giấy hết hạn trước ngày cuối của khoảng pickup |
+| 400 | `The fit-to-travel exam cannot be approved yet: the horse is not on an approved trip, so the departure time is not known. ...` | `FIT_EXAM` khi ngựa chưa có chuyến đã duyệt |
+| 400 | `The exam date 2026-11-01 is not within 48 hours before the planned departure (2026-11-08 08:00 - 2026-11-10 08:00 UTC). Reject it and ask the customer for a new exam.` | `FIT_EXAM` khám ngoài 48 giờ trước giờ xuất phát dự kiến |
+
+**Duyệt `FIT_EXAM`:** làm được cả khi hồ sơ đã `SubmittedToAuthorities` / `Cleared`, không đổi trạng thái hồ sơ. Ngày khám (`issueDate`, không có thì ngày tải lên) phải nằm trong 48 giờ trước **giờ xuất phát dự kiến** của chuyến đã duyệt chở con ngựa. Khách nhận thông báo khi giấy được duyệt.
 | 400 | `Only a pending document can be reviewed (current status: Approved).` | Giấy đã được xử lý rồi |
 
 ### POST /api/documents/{id}/reject — Từ chối một giấy tờ
 
-Từ chối một giấy đang `Pending`, kèm hướng dẫn sửa. Khách nhận thông báo. Hồ sơ quay về `AwaitingDocs`; nếu đây là lần từ chối thứ 3 của giấy này thì hồ sơ chuyển `Issue` và quản lý được báo.
+Từ chối một giấy đang `Pending`, kèm hướng dẫn sửa. Khách nhận thông báo. Hồ sơ quay về `AwaitingDocs`; nếu đây là lần từ chối thứ 3 của giấy này thì hồ sơ chuyển `Issue` và quản lý được báo. Riêng `FIT_EXAM`: từ chối được cả khi hồ sơ đã thông quan và **không đổi trạng thái hồ sơ**.
 
 - **Ai gọi được:** Chuyên viên phụ trách, Admin
 - **Dữ liệu gửi lên:** JSON
@@ -4579,7 +4600,8 @@ Các điều kiện (R-12, R-15):
 | `DossierNotCleared` | Error | `Dossier` | Hồ sơ của con ngựa chưa `Cleared` |
 | `DocumentExpired` | Error | `Documents` | Giấy đã duyệt trong hồ sơ hết hạn trước ngày xuất phát (giấy hết hạn đúng ngày xuất phát vẫn dùng được) |
 | `DocumentExpiresBeforeArrival` | Warning | `Documents` | Giấy còn hạn lúc đi nhưng hết hạn trước ngày tới dự kiến (cửa khẩu có thể kiểm lại) |
-| `FitExamMissing` | Error | `Documents` | Con ngựa không có giấy `FIT_EXAM` cấp trong 48 giờ trước giờ xuất phát (`Booking.FitExamValidHours`) |
+| `FitExamMissing` | Error | `Documents` | Con ngựa không có giấy `FIT_EXAM` **đã duyệt trong hồ sơ của đơn**, cấp trong 48 giờ trước giờ xuất phát (`Booking.FitExamValidHours`). Giấy ở hồ sơ thú y của ngựa (`/api/horses/{id}/documents`) không được tính |
+| `FitExamPendingReview` | Error | `Documents` | Khách đã nộp giấy `FIT_EXAM` nhưng chuyên viên chưa duyệt (chưa có giấy đã duyệt hợp lệ) |
 | `FitExamTypeNotConfigured` | Warning | `Documents` | DB chưa có loại giấy `FIT_EXAM` (chưa chạy `database/03_update_fit_exam.sql`), nên chưa kiểm giấy khám |
 | `BalanceUnpaid` | Error | `Payment` | Đơn trên chuyến chưa trả đủ cọc + phần còn lại (mục 19) |
 | `NotEnoughDrivers` | Error | `Crew` | Chuyến đường bộ ước tính lái quá 9 giờ mà có dưới 2 tài xế (quy tắc BE-07) |
@@ -9085,7 +9107,7 @@ Tổng cộng 139 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | GET | `/api/dossiers` | Danh sách hồ sơ | Customer, LogisticsManager, TransportSpecialist, FleetCoordinator, Admin |
 | GET | `/api/dossiers/{id}` | Chi tiết hồ sơ và checklist giấy tờ | Như danh sách hồ sơ |
 | POST | `/api/dossiers/{id}/request-documents` | Yêu cầu khách nộp giấy tờ | Chuyên viên phụ trách, Admin |
-| POST | `/api/dossiers/{id}/documents` | Nộp hoặc nộp lại một giấy tờ | Chủ ngựa (Customer), chuyên viên phụ trách, Admin |
+| POST | `/api/dossiers/{id}/documents` | Nộp hoặc nộp lại một giấy tờ (`FIT_EXAM` nộp được cả sau thông quan) | Chủ ngựa (Customer), chuyên viên phụ trách, Admin |
 | POST | `/api/documents/{id}/approve` | Duyệt một giấy tờ | Chuyên viên phụ trách, Admin |
 | POST | `/api/documents/{id}/reject` | Từ chối một giấy tờ | Chuyên viên phụ trách, Admin |
 | POST | `/api/dossiers/{id}/submit-to-authorities` | Nộp hồ sơ cho cơ quan chức năng | Chuyên viên phụ trách, Admin |
