@@ -57,13 +57,8 @@ namespace RacehorseTransport.Services.Implementations
             var payment = await _settingService.GetPaymentSettingsAsync();
             var horses = booking.BookingHorses.Where(bh => bh.Status != BookingHorseStatuses.Cancelled).ToList();
 
-            var quote = await _pricingService.CalculateQuoteAsync(BuildQuoteInput(booking, horses, plan));
-
-            // R-13: phí bảo hiểm toàn giá trị theo từng con (thay dòng INS_TRANSIT cũ)
-            quote.Lines.AddRange(QuoteRules.InsuranceLines(
-                horses.Select(bh => new QuoteRules.InsuredHorse(bh.Horse?.Name ?? $"#{bh.HorseId}", bh.InsurancePlan, bh.AgreedValue, bh.DeclaredValue)),
-                policy.InsurancePremiumPercent));
-            decimal total = quote.Lines.Sum(l => l.Amount);
+            var quote = await ComputeAsync(booking, horses, plan, policy.InsurancePremiumPercent);
+            decimal total = quote.Total;
 
             var now = DateTimeOffset.UtcNow;
             booking.EstimatedCost = total;
@@ -102,6 +97,32 @@ namespace RacehorseTransport.Services.Implementations
         // Hàm thuần (dễ test): đầu vào tính giá chốt. Đường bộ lấy quãng đường + nước quá cảnh từ tuyến đã duyệt;
         // đường bay không có tuyến, giá tính theo con nên không cần km.
         // Lịch đã kiểm tra lúc khách gửi đơn; giữ Express như lúc đó để không bắt khách đổi ngày vì công ty duyệt lâu.
+        // Manager xem trước báo giá chốt của một tuyến đang chờ duyệt: tính y như lúc phát hành, không lưu gì
+        public async Task<QuoteModel> PreviewAsync(int routePlanId)
+        {
+            var plan = await _planRepo.GetQueryable().AsNoTracking().FirstOrDefaultAsync(p => p.RoutePlanId == routePlanId)
+                ?? throw new NotFoundException($"Route plan with ID {routePlanId} was not found.");
+            var booking = await _bookingRepo.GetQueryable().AsNoTracking()
+                .Include(b => b.BookingHorses).ThenInclude(bh => bh.Horse)
+                .Include(b => b.TransitCountries)
+                .FirstAsync(b => b.BookingId == plan.BookingId);
+            var policy = await _settingService.GetPolicySettingsAsync();
+            var horses = booking.BookingHorses.Where(bh => bh.Status != BookingHorseStatuses.Cancelled).ToList();
+            return await ComputeAsync(booking, horses, plan, policy.InsurancePremiumPercent);
+        }
+
+        private async Task<QuoteModel> ComputeAsync(BookingRequest booking, List<BookingHorse> horses, RoutePlan? plan, decimal insurancePremiumPercent)
+        {
+            var quote = await _pricingService.CalculateQuoteAsync(BuildQuoteInput(booking, horses, plan));
+
+            // R-13: phí bảo hiểm toàn giá trị theo từng con (thay dòng INS_TRANSIT cũ)
+            quote.Lines.AddRange(QuoteRules.InsuranceLines(
+                horses.Select(bh => new QuoteRules.InsuredHorse(bh.Horse?.Name ?? $"#{bh.HorseId}", bh.InsurancePlan, bh.AgreedValue, bh.DeclaredValue)),
+                insurancePremiumPercent));
+            quote.Total = quote.Lines.Sum(l => l.Amount);
+            return quote;
+        }
+
         public static QuoteInputModel BuildQuoteInput(BookingRequest booking, IReadOnlyList<BookingHorse> horses, RoutePlan? plan)
         {
             if (plan == null && booking.TransportMode != TransportModes.Air)

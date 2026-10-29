@@ -20,10 +20,12 @@ namespace RacehorseTransport.API.Controllers
         private const string ReviewRoles = UserRoles.LogisticsManager + "," + UserRoles.Admin;
 
         private readonly IRoutePlanService _service;
+        private readonly IFinalQuoteIssuer _quoteIssuer;
 
-        public RoutePlansController(IRoutePlanService service)
+        public RoutePlansController(IRoutePlanService service, IFinalQuoteIssuer quoteIssuer)
         {
             _service = service;
+            _quoteIssuer = quoteIssuer;
         }
 
         /// <summary>
@@ -106,6 +108,19 @@ namespace RacehorseTransport.API.Controllers
         {
             var plan = await _service.SubmitAsync(id, User.ToCurrentUser());
             return Ok(ApiResponse<RoutePlanResponse>.SuccessResult(plan.ToResponse(), "Route plan submitted successfully"));
+        }
+
+        /// <summary>
+        /// Final quote the customer would get if this route is approved (same calculation as on approval, nothing is saved).
+        /// </summary>
+        [HttpGet("route-plans/{id:int}/quote-preview")]
+        [Authorize(Roles = ReviewRoles)]
+        [ProducesResponseType(typeof(ApiResponse<QuoteResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> QuotePreview(int id)
+        {
+            var quote = await _quoteIssuer.PreviewAsync(id);
+            return Ok(ApiResponse<QuoteResponse>.SuccessResult(quote.ToResponse(), "Quote preview calculated successfully"));
         }
 
         /// <summary>
