@@ -289,6 +289,10 @@ namespace RacehorseTransport.API.Mappers
             response.TotalHorses = model.TotalHorses;
             response.EstimatedCost = model.EstimatedCost;
             response.QuoteMin = model.QuoteMin;
+            response.PickupLat = model.PickupLat;
+            response.PickupLng = model.PickupLng;
+            response.DropoffLat = model.DropoffLat;
+            response.DropoffLng = model.DropoffLng;
             response.QuoteMax = model.QuoteMax;
             response.CurrencyCode = model.CurrencyCode;
             response.Status = model.Status;
