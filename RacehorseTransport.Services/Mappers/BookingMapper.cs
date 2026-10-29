@@ -115,6 +115,10 @@ namespace RacehorseTransport.Services.Mappers
             model.TotalHorses = entity.TotalHorses;
             model.EstimatedCost = entity.EstimatedCost;
             model.QuoteMin = entity.QuoteMin;
+            model.PickupLat = entity.PickupLat;
+            model.PickupLng = entity.PickupLng;
+            model.DropoffLat = entity.DropoffLat;
+            model.DropoffLng = entity.DropoffLng;
             model.QuoteMax = entity.QuoteMax;
             model.CurrencyCode = entity.CurrencyCode;
             model.Status = entity.Status;

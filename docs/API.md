@@ -2130,6 +2130,8 @@ Tham số query (gắn sau dấu `?`):
 
 Ví dụ: `GET /api/bookings?status=Submitted&sort=-createdAt&page=1&size=10`. `search` tìm theo mã đơn và địa chỉ. Màn "Đơn vận chuyển" của khách: `GET /api/bookings?stage=AwaitingPayment` để mở tab "Chờ thanh toán".
 
+`pickupLat`, `pickupLng`, `dropoffLat`, `dropoffLng`: tọa độ điểm đón / giao khách chọn trên bản đồ, dùng để vẽ bản đồ ở màn duyệt đơn. Có cả trong danh sách và `GET /api/bookings/{id}`; `null` với đơn tạo trước khi có bản đồ.
+
 Response `200` — phần `data`:
 
 ```json
@@ -2141,8 +2143,12 @@ Response `200` — phần `data`:
     "customerName": "Jane Smith",
     "pickupAddress": "Trang trại Yên Bài, Ba Vì, Hà Nội",
     "pickupCountryCode": "VN",
+    "pickupLat": 21.0956,
+    "pickupLng": 105.4129,
     "dropoffAddress": "Trường đua Tùng Hóa, Quảng Châu",
     "dropoffCountryCode": "CN",
+    "dropoffLat": 23.1291,
+    "dropoffLng": 113.2644,
     "transitCountryCodes": [],
     "pickupWindowStart": "2026-11-24T17:00:00+00:00",
     "pickupWindowEnd": "2026-11-29T17:00:00+00:00",

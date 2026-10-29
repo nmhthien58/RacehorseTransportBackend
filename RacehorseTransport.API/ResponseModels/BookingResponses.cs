@@ -70,6 +70,11 @@ namespace RacehorseTransport.API.ResponseModels
         public string? CustomerName { get; set; }
         public string PickupAddress { get; set; } = string.Empty;
         public string PickupCountryCode { get; set; } = string.Empty;
+        // Tọa độ điểm đón / giao để vẽ bản đồ (null với đơn cũ)
+        public decimal? PickupLat { get; set; }
+        public decimal? PickupLng { get; set; }
+        public decimal? DropoffLat { get; set; }
+        public decimal? DropoffLng { get; set; }
         public string DropoffAddress { get; set; } = string.Empty;
         public string DropoffCountryCode { get; set; } = string.Empty;
         public List<string> TransitCountryCodes { get; set; } = new(); // nước quá cảnh theo thứ tự
