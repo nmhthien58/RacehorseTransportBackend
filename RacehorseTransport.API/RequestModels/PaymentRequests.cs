@@ -59,3 +59,40 @@ namespace RacehorseTransport.API.RequestModels
         public int ExtraPaymentDueDays { get; set; }
     }
 }
+
+namespace RacehorseTransport.API.RequestModels
+{
+    // GET /api/payments: trang Giao dịch của Manager. search = mã đơn hoặc tên khách
+    public class PaymentQueryRequest : QueryOptionsRequest
+    {
+        public PaymentQueryRequest()
+        {
+            Size = 20;
+        }
+
+        // Deposit | Balance | Extra | Refund | Compensation
+        [Microsoft.AspNetCore.Mvc.FromQuery(Name = "type")]
+        public string? Type { get; set; }
+
+        // Pending | Succeeded | Failed | Expired
+        [Microsoft.AspNetCore.Mvc.FromQuery(Name = "status")]
+        public string? Status { get; set; }
+
+        // Ngày tạo giao dịch theo giờ Việt Nam (yyyy-MM-dd), tính cả hai đầu
+        [Microsoft.AspNetCore.Mvc.FromQuery(Name = "from")]
+        public DateOnly? From { get; set; }
+
+        [Microsoft.AspNetCore.Mvc.FromQuery(Name = "to")]
+        public DateOnly? To { get; set; }
+    }
+
+    // GET /api/payments/summary
+    public class PaymentSummaryQueryRequest
+    {
+        [Microsoft.AspNetCore.Mvc.FromQuery(Name = "from")]
+        public DateOnly? From { get; set; }
+
+        [Microsoft.AspNetCore.Mvc.FromQuery(Name = "to")]
+        public DateOnly? To { get; set; }
+    }
+}

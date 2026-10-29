@@ -172,3 +172,33 @@ namespace RacehorseTransport.Services.BusinessModels
         public string? RawResponse { get; set; }
     }
 }
+
+namespace RacehorseTransport.Services.BusinessModels
+{
+    // Bộ lọc trang "Giao dịch" của Manager; From / To là ngày theo giờ Việt Nam, lọc theo ngày tạo giao dịch
+    public class PaymentFilterOptions : BusinessQueryOptions
+    {
+        public string? Type { get; set; }
+        public string? Status { get; set; }
+        public DateOnly? From { get; set; }
+        public DateOnly? To { get; set; }
+    }
+
+    public class PaymentListItemModel : PaymentModel
+    {
+        public string? CustomerName { get; set; }
+    }
+
+    public class PaymentListSummaryModel
+    {
+        public int SucceededCount { get; set; }
+        public decimal SucceededAmount { get; set; }
+        public int PendingCount { get; set; }
+        public decimal PendingAmount { get; set; }
+        public int FailedCount { get; set; }
+        public int ExpiredCount { get; set; }
+        public decimal RefundedAmount { get; set; }
+        public int RefundsNeedingActionCount { get; set; }
+        public string CurrencyCode { get; set; } = "USD";
+    }
+}

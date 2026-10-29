@@ -32,6 +32,66 @@ namespace RacehorseTransport.API.Mappers
             };
         }
 
+        public static PaymentListItemResponse ToResponse(this PaymentListItemModel model)
+        {
+            var b = ((PaymentModel)model).ToResponse();
+            return new PaymentListItemResponse
+            {
+                PaymentId = b.PaymentId,
+                PaymentCode = b.PaymentCode,
+                BookingId = b.BookingId,
+                BookingCode = b.BookingCode,
+                PaymentType = b.PaymentType,
+                Provider = b.Provider,
+                Status = b.Status,
+                Amount = b.Amount,
+                CurrencyCode = b.CurrencyCode,
+                ExchangeRate = b.ExchangeRate,
+                AmountVnd = b.AmountVnd,
+                ProviderTxnNo = b.ProviderTxnNo,
+                BankCode = b.BankCode,
+                ResponseCode = b.ResponseCode,
+                RefundOfPaymentId = b.RefundOfPaymentId,
+                Note = b.Note,
+                CreatedByName = b.CreatedByName,
+                CreatedAt = b.CreatedAt,
+                PaidAt = b.PaidAt,
+                TxnRef = model.TxnRef,
+                CustomerName = model.CustomerName
+            };
+        }
+
+        public static PaymentListSummaryResponse ToResponse(this PaymentListSummaryModel model)
+        {
+            return new PaymentListSummaryResponse
+            {
+                SucceededCount = model.SucceededCount,
+                SucceededAmount = model.SucceededAmount,
+                PendingCount = model.PendingCount,
+                PendingAmount = model.PendingAmount,
+                FailedCount = model.FailedCount,
+                ExpiredCount = model.ExpiredCount,
+                RefundedAmount = model.RefundedAmount,
+                RefundsNeedingActionCount = model.RefundsNeedingActionCount,
+                CurrencyCode = model.CurrencyCode
+            };
+        }
+
+        public static PaymentFilterOptions ToBusinessOptions(this PaymentQueryRequest request)
+        {
+            return new PaymentFilterOptions
+            {
+                Search = request.Search,
+                Sort = request.Sort,
+                Page = request.Page,
+                Size = request.Size,
+                Type = request.Type?.Trim(),
+                Status = request.Status?.Trim(),
+                From = request.From,
+                To = request.To
+            };
+        }
+
         public static BookingPaymentSummaryResponse ToResponse(this BookingPaymentSummaryModel model)
         {
             return new BookingPaymentSummaryResponse

@@ -8288,6 +8288,155 @@ Lỗi thường gặp:
 | 401 | (không có body) | Chưa đăng nhập hoặc token hết hạn |
 | 403 | `You do not have permission to perform this action.` | Tài khoản không phải Customer (nhân viên xem thanh toán theo từng đơn bằng `GET /api/bookings/{id}/payments`) |
 
+### GET /api/payments — Danh sách giao dịch (trang Giao dịch của Manager)
+
+Mọi giao dịch trên **mọi đơn** (thu cọc, phần còn lại, phát sinh, hoàn tiền, bồi thường), có lọc, tìm kiếm, sắp xếp và phân trang. Dùng cho trang "Giao dịch" của Manager / Admin. Muốn xem số tổng ở đầu trang thì gọi thêm `GET /api/payments/summary` với cùng `from` / `to`.
+
+- **Ai gọi được:** LogisticsManager, Admin
+
+Tham số query (gắn sau dấu `?`):
+
+| Tham số | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `type` | chuỗi | Không | Loại giao dịch: `Deposit`, `Balance`, `Extra`, `Refund`, `Compensation` |
+| `status` | chuỗi | Không | Trạng thái: `Pending`, `Succeeded`, `Failed`, `Expired` |
+| `from` | ngày `yyyy-MM-dd` | Không | Chỉ lấy giao dịch **tạo** từ 00:00 ngày này, **giờ Việt Nam** (GMT+7) |
+| `to` | ngày `yyyy-MM-dd` | Không | Chỉ lấy giao dịch tạo tới hết ngày này (23:59:59 giờ Việt Nam), tính cả ngày `to` |
+| `search` | chuỗi | Không | Tìm theo mã đơn (`bookingCode`) hoặc tên khách (`customerName`), không phân biệt hoa thường |
+| `sort` | chuỗi | Không | Trường sắp xếp của giao dịch, thêm `-` phía trước để giảm dần, ví dụ `-createdAt`, `amount`, `paidAt`, `status`. Mặc định `-createdAt` (mới nhất trước) |
+| `page` | số | Không | Trang, bắt đầu từ 1 (mặc định 1) |
+| `size` | số | Không | Số dòng mỗi trang, 1–100 (mặc định **20**) |
+
+Ví dụ: `GET /api/payments?type=Refund&status=Failed&from=2026-10-01&to=2026-10-31&page=1&size=20`
+
+Response `200` (dạng phân trang giống `GET /api/bookings`):
+
+```json
+{
+  "success": true,
+  "message": "Payments retrieved successfully",
+  "data": [
+    {
+      "paymentId": 12,
+      "paymentCode": "PAY-2026-0012",
+      "bookingId": 101,
+      "bookingCode": "BKG-2026-0101",
+      "customerName": "Jane Smith",
+      "paymentType": "Refund",
+      "provider": "VnPay",
+      "status": "Failed",
+      "amount": 900.0,
+      "currencyCode": "USD",
+      "exchangeRate": 26000.0,
+      "amountVnd": 23400000,
+      "txnRef": "PAY20260012",
+      "providerTxnNo": null,
+      "bankCode": null,
+      "responseCode": "94",
+      "refundOfPaymentId": 5,
+      "note": "Cancellation refund",
+      "createdByName": "Logistics Manager",
+      "createdAt": "2026-10-20T03:15:00+00:00",
+      "paidAt": null
+    }
+  ],
+  "errors": null,
+  "pagination": { "page": 1, "pageSize": 20, "totalItems": 1, "totalPages": 1 }
+}
+```
+
+Ý nghĩa các trường của mỗi dòng: giống `payments[]` của `GET /api/bookings/{id}/payments`, thêm:
+
+| Trường | Kiểu | Ý nghĩa |
+|---|---|---|
+| `bookingId`, `bookingCode` | số, chuỗi | Đơn của giao dịch (bấm để mở chi tiết đơn) |
+| `customerName` | chuỗi | Tên khách chủ đơn |
+| `txnRef` | chuỗi | Mã tham chiếu hệ thống gửi sang cổng thanh toán (tra cứu trên trang quản trị VNPay) |
+| `amount` | số | Số tiền USD. Với `Refund` / `Compensation` là tiền **chi ra** cho khách |
+| `amountVnd`, `exchangeRate` | số | Số tiền VND và tỉ giá lúc tạo giao dịch |
+| `providerTxnNo` | chuỗi | Mã giao dịch phía cổng (hoặc mã tham chiếu chuyển khoản khi đánh dấu hoàn thủ công) |
+| `refundOfPaymentId` | số | Với dòng `Refund`: id khoản thu được hoàn |
+| `paidAt` | ngày giờ | Lúc giao dịch thành công, `null` nếu chưa |
+
+Dòng `Refund` có `status` là `Failed` hoặc `Pending`: hiện nút "Thử hoàn lại" (`POST /api/payments/{id}/retry-refund`, không dùng được khi `provider` là `Manual`) và "Đánh dấu đã hoàn" (`POST /api/payments/{id}/mark-refunded`).
+
+```js
+const res = await api.get('/api/payments', {
+  params: { type: 'Refund', status: 'Failed', from: '2026-10-01', to: '2026-10-31', search: 'BKG-2026', page: 1, size: 20 },
+});
+const rows = res.data.data;
+const { totalItems, totalPages } = res.data.pagination;
+```
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Type 'Cash' is invalid. Allowed values: Deposit, Balance, Extra, Refund, Compensation.` | `type` sai |
+| 400 | `Status 'Done' is invalid. Allowed values: Pending, Succeeded, Failed, Expired.` | `status` sai |
+| 400 | `'from' must be on or before 'to'.` | `from` sau `to` |
+| 400 | `Unknown sort field 'xyz'.` | `sort` không phải trường của giao dịch |
+| 400 | `Size must be between 1 and 100.` | `size` ngoài khoảng 1–100 |
+| 400 | (lỗi kiểm tra dữ liệu) | `from` / `to` không đúng dạng `yyyy-MM-dd` |
+| 401 | (không có body) | Chưa đăng nhập hoặc token hết hạn |
+| 403 | `You do not have permission to perform this action.` | Không phải LogisticsManager / Admin |
+
+### GET /api/payments/summary — Số liệu tổng hợp giao dịch
+
+Các con số cho hàng thẻ thống kê ở đầu trang "Giao dịch". Tính trên **mọi** giao dịch tạo trong khoảng `from`–`to` (không lọc theo `type`, `status`, `search`). Số tiền tính bằng USD.
+
+- **Ai gọi được:** LogisticsManager, Admin
+
+Tham số query:
+
+| Tham số | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `from` | ngày `yyyy-MM-dd` | Không | Giao dịch tạo từ 00:00 ngày này, giờ Việt Nam |
+| `to` | ngày `yyyy-MM-dd` | Không | Giao dịch tạo tới hết ngày này, giờ Việt Nam (tính cả ngày `to`) |
+
+Ví dụ: `GET /api/payments/summary?from=2026-10-01&to=2026-10-31`
+
+Response `200` — phần `data`:
+
+```json
+{
+  "succeededCount": 14,
+  "succeededAmount": 52300.0,
+  "pendingCount": 3,
+  "pendingAmount": 6400.0,
+  "failedCount": 2,
+  "expiredCount": 5,
+  "refundedAmount": 1650.0,
+  "refundsNeedingActionCount": 1,
+  "currencyCode": "USD"
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `succeededCount`, `succeededAmount` | Số giao dịch **thu** (`Deposit`, `Balance`, `Extra`) đã thành công và tổng tiền thu được |
+| `pendingCount`, `pendingAmount` | Số giao dịch thu đang chờ khách trả (link chưa trả) và tổng tiền |
+| `failedCount` | Số giao dịch thất bại, mọi loại (kể cả dòng hoàn tiền thất bại) |
+| `expiredCount` | Số giao dịch hết hạn (link quá 15 phút hoặc bị thay bằng link mới), mọi loại |
+| `refundedAmount` | Tổng tiền đã hoàn cho khách (dòng `Refund` thành công). Không gồm bồi thường `Compensation` |
+| `refundsNeedingActionCount` | Số dòng `Refund` đang `Failed` hoặc `Pending`: Manager cần thử hoàn lại hoặc đánh dấu đã hoàn thủ công. Lớn hơn 0 thì nên hiện cảnh báo, bấm vào mở `GET /api/payments?type=Refund&status=Failed` |
+| `currencyCode` | Luôn `USD` |
+
+```js
+const res = await api.get('/api/payments/summary', { params: { from: '2026-10-01', to: '2026-10-31' } });
+const s = res.data.data;
+// Thẻ: Đã thu = s.succeededAmount, Đang chờ = s.pendingAmount, Đã hoàn = s.refundedAmount, Cần xử lý = s.refundsNeedingActionCount
+```
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `'from' must be on or before 'to'.` | `from` sau `to` |
+| 400 | (lỗi kiểm tra dữ liệu) | `from` / `to` không đúng dạng `yyyy-MM-dd` |
+| 401 | (không có body) | Chưa đăng nhập hoặc token hết hạn |
+| 403 | `You do not have permission to perform this action.` | Không phải LogisticsManager / Admin |
+
 ### POST /api/bookings/{id}/payments — Tạo link thanh toán
 
 Tạo một giao dịch cho khoản đang mở của đơn và trả về đường dẫn sang cổng thanh toán. Link cũ chưa trả của cùng khoản sẽ chuyển `Expired`, nên khách bấm nhiều lần cũng không bị trả trùng. Link VNPay có hiệu lực 15 phút.
@@ -9317,6 +9466,8 @@ Tổng cộng 139 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 |---|---|---|---|
 | GET | `/api/bookings/{id}/payments` | Tóm tắt thanh toán của đơn | Customer (chủ đơn), LogisticsManager, TransportSpecialist, FleetCoordinator, Admin |
 | GET | `/api/payments/my` | Trang Thanh toán của khách: mọi đơn có thanh toán + mọi giao dịch | Customer |
+| GET | `/api/payments` | Danh sách giao dịch mọi đơn (lọc loại / trạng thái / ngày, tìm mã đơn / tên khách, phân trang) | LogisticsManager, Admin |
+| GET | `/api/payments/summary` | Số liệu tổng hợp giao dịch theo khoảng ngày | LogisticsManager, Admin |
 | POST | `/api/bookings/{id}/payments` | Tạo link thanh toán | Customer (chủ đơn) |
 | POST | `/api/bookings/{id}/payments/manual` | Ghi nhận khoản trả ngoài hệ thống | LogisticsManager, Admin |
 | GET | `/api/payments/vnpay-return` | VNPay đưa khách về (frontend không gọi) | Không cần đăng nhập |
