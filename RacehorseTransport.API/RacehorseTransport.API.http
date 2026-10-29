@@ -1362,3 +1362,27 @@ Content-Type: application/json
 ### Bảng giá chung (không gắn nước đến)
 GET {{baseUrl}}/api/price-items?globalOnly=true&size=100
 Authorization: Bearer {{managerToken}}
+
+# =============================================================================================
+# BE-10: kiểm tra trước khi xuất phát (hồ sơ Cleared, hạn giấy, FIT_EXAM 48 giờ, thanh toán, số tài xế)
+# =============================================================================================
+
+### Tài xế của chuyến xem danh sách vấn đề trước khi bấm xuất phát
+GET {{baseUrl}}/api/trips/1/departure-check
+Authorization: Bearer {{driverToken}}
+
+### Điều phối viên xem cùng danh sách
+GET {{baseUrl}}/api/trips/1/departure-check
+Authorization: Bearer {{coordinatorToken}}
+
+### Sai mã chuyến -> 404
+GET {{baseUrl}}/api/trips/999999/departure-check
+Authorization: Bearer {{coordinatorToken}}
+
+### Khách không được gọi -> 403
+GET {{baseUrl}}/api/trips/1/departure-check
+Authorization: Bearer {{customerToken}}
+
+### Xuất phát: còn vấn đề Error thì 400 liệt kê tất cả
+POST {{baseUrl}}/api/trips/1/start
+Authorization: Bearer {{driverToken}}
