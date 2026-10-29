@@ -31,6 +31,10 @@ namespace RacehorseTransport.Services.Interfaces
 
         // null = gọi lỗi hoặc không có địa chỉ
         Task<GeoPlaceModel?> ReverseAsync(double lat, double lng, CancellationToken cancellationToken);
+
+        // Chỉ lấy mã nước (dò nước dọc tuyến). Mặc định dùng ReverseAsync; nhà cung cấp có thể gọi bản rẻ hơn.
+        async Task<string?> CountryCodeAsync(double lat, double lng, CancellationToken cancellationToken) =>
+            (await ReverseAsync(lat, lng, cancellationToken))?.CountryCode;
     }
 
     // Nhà cung cấp chỉ đường (Goong, OSRM...)

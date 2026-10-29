@@ -1608,7 +1608,7 @@ Tính đường bộ đi qua các điểm **theo đúng thứ tự gửi lên**:
 | `points` | mảng | Có | 2–25 điểm theo thứ tự đi |
 | `points[].lat`, `points[].lng` | số | Có | Tọa độ |
 | `points[].countryCode` | chuỗi | Không | Nước của điểm (lấy từ kết quả `search` / `reverse`). Gửi kèm thì backend khỏi tra lại, nhanh hơn |
-| `includeCountries` | true/false | Không (mặc định `false`) | `true` = trả thêm các nước tuyến đi qua theo thứ tự. Lần đầu có thể mất vài giây đến vài chục giây với tuyến dài (mỗi điểm phải tra nước, 1 lần / giây); các lần sau lấy từ bộ nhớ đệm |
+| `includeCountries` | true/false | Không (mặc định `false`) | `true` = trả thêm các nước tuyến đi qua theo thứ tự. Đây là **ước tính nhanh**: chỉ tra mã nước ở tối đa 12 điểm, dừng sau khoảng 8 giây và trả các nước đã biết (ít nhất nước đi, nước đến), không báo lỗi. Kết quả được nhớ theo ô lưới 0,5° nên các tuyến gần nhau trả về ngay. Điều phối viên xác nhận nước quá cảnh ở bước lập tuyến |
 
 Ví dụ request:
 
@@ -1762,7 +1762,7 @@ Tính **khoảng giá ước tính** cho một đơn dự kiến. Không lưu g�
 
 - Đường bộ, có tọa độ điểm đón / trả (`pickupLat`, `pickupLng`, `dropoffLat`, `dropoffLng` từ component bản đồ): quãng đường thật A → B và **các nước đường đi qua** lấy từ bản đồ (mục 6b). `quoteMin` = giá theo quãng đường thật, **chưa có** phí quá cảnh; `quoteMax` = quãng đường × 1,25 (đi vòng, mốc nghỉ) + phí thủ tục cho các nước đường A → B đi qua (tối đa 2 nước).
 - **Khách không còn nhập nước quá cảnh** (`transitCountryCodes` bị bỏ khỏi request; gửi lên cũng bị bỏ qua). Không có tọa độ (app cũ) thì quãng đường tính như trước (`distanceKm` hoặc theo tên thành phố) và không tính nước quá cảnh.
-- Lần đầu tính một tuyến mới có thể mất **10–40 giây** (phải tra nước theo từng đoạn đường, nhà cung cấp chỉ cho 1 lượt / giây); các lần sau trả về ngay. Nên hiện vòng xoay "Đang tính giá..." và tránh gọi lại khi người dùng chưa đổi điểm.
+- Các nước đi qua chỉ là **ước tính nhanh, có giới hạn thời gian** (khoảng 8 giây cho bước dò nước, xem mục 6b): tuyến mới thường trả về trong vài giây đến khoảng 15 giây, các lần sau nhanh hơn nhờ bộ nhớ đệm. Hết giờ thì báo giá vẫn trả về với các nước đã biết. Nên hiện vòng xoay "Đang tính giá..." và tránh gọi lại khi người dùng chưa đổi điểm.
 - Đường hàng không: `quoteMin` = `quoteMax`.
 
 **Khách không chọn ngày khởi hành.** Khách chỉ cho biết ngựa sẵn sàng được đón trong khoảng ngày nào (`pickupWindowStart` → `pickupWindowEnd`) và hạn giao trễ nhất (`deliveryDeadline`). Ngày chạy thật do điều phối viên chốt khi lập chuyến.
