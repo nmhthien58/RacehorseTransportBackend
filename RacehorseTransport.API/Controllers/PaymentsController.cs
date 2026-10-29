@@ -57,6 +57,36 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
+        /// Manager transactions page: payments of every booking with filters (type, status, created date in Vietnam time), search by booking code or customer name, paging and sorting.
+        /// </summary>
+        [HttpGet("payments")]
+        [Authorize(Roles = ManagerRoles)]
+        [ProducesResponseType(typeof(ApiCollectionResponse<PaymentListItemResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetPayments([FromQuery] PaymentQueryRequest queryOptions)
+        {
+            var pagedResult = await _paymentService.GetPaymentsAsync(queryOptions.ToBusinessOptions());
+            var items = pagedResult.Items.Select(p => p.ToResponse()).ToList();
+            return Ok(ApiCollectionResponse<PaymentListItemResponse>.SuccessResult(
+                items, pagedResult.ToPagination(), "Payments retrieved successfully"));
+        }
+
+        /// <summary>
+        /// Totals for the manager transactions page (amounts in USD), optionally limited to a created-date range in Vietnam time.
+        /// </summary>
+        [HttpGet("payments/summary")]
+        [Authorize(Roles = ManagerRoles)]
+        [ProducesResponseType(typeof(ApiResponse<PaymentListSummaryResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetPaymentSummary([FromQuery] PaymentSummaryQueryRequest query)
+        {
+            var summary = await _paymentService.GetPaymentSummaryAsync(query.From, query.To);
+            return Ok(ApiResponse<PaymentListSummaryResponse>.SuccessResult(summary.ToResponse(), "Payment summary retrieved successfully"));
+        }
+
+        /// <summary>
         /// Customer starts a payment (Deposit / Balance / Extra) and gets the VNPay (or mock) payment URL to open.
         /// </summary>
         [HttpPost("bookings/{id:int}/payments")]

@@ -1410,3 +1410,15 @@ Authorization: Bearer {{customerToken}}
 ### Xuất phát: còn vấn đề Error thì 400 liệt kê tất cả
 POST {{baseUrl}}/api/trips/1/start
 Authorization: Bearer {{driverToken}}
+
+### Trang Giao dịch (Manager / Admin): danh sách giao dịch mọi đơn
+GET {{baseUrl}}/api/payments?type=Refund&status=Failed&from=2026-10-01&to=2026-10-31&page=1&size=20
+Authorization: Bearer {{adminToken}}
+
+### Trang Giao dịch: số liệu tổng hợp
+GET {{baseUrl}}/api/payments/summary?from=2026-10-01&to=2026-10-31
+Authorization: Bearer {{adminToken}}
+
+### Lỗi 400: from sau to
+GET {{baseUrl}}/api/payments/summary?from=2026-10-31&to=2026-10-01
+Authorization: Bearer {{adminToken}}

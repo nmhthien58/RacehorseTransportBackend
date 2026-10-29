@@ -7,6 +7,7 @@ using RacehorseTransport.Repositories.Interfaces;
 using RacehorseTransport.Services.BusinessModels;
 using RacehorseTransport.Services.Constants;
 using RacehorseTransport.Services.Exceptions;
+using RacehorseTransport.Services.Extensions;
 using RacehorseTransport.Services.Interfaces;
 using RacehorseTransport.Services.Options;
 
@@ -92,6 +93,62 @@ namespace RacehorseTransport.Services.Implementations
                 .ToListAsync();
 
             return BuildCustomerBilling(bookings, await _settingService.GetPaymentSettingsAsync());
+        }
+
+        public async Task<PagedBusinessResult<PaymentListItemModel>> GetPaymentsAsync(PaymentFilterOptions options)
+        {
+            var query = _paymentRepo.GetQueryable()
+                .AsNoTracking()
+                .Include(p => p.Booking!).ThenInclude(b => b.Customer)
+                .Include(p => p.CreatedBy)
+                .AsQueryable();
+
+            query = PaymentListRules.ApplyFilter(query, options);
+
+            // Mặc định giao dịch mới nhất lên đầu
+            query = query.ApplySort(string.IsNullOrWhiteSpace(options.Sort) ? "-createdAt" : options.Sort, nameof(Payment.PaymentId));
+
+            return await query.ToPagedResultAsync(options, ToListItemModel);
+        }
+
+        public async Task<PaymentListSummaryModel> GetPaymentSummaryAsync(DateOnly? from, DateOnly? to)
+        {
+            var query = PaymentListRules.ApplyCreatedRange(_paymentRepo.GetQueryable().AsNoTracking(), from, to);
+
+            // Chỉ lấy các cột cần cho tổng hợp, gộp trong bộ nhớ theo PaymentListRules
+            var rows = await query
+                .Select(p => new Payment { PaymentType = p.PaymentType, Status = p.Status, Amount = p.Amount })
+                .ToListAsync();
+            return PaymentListRules.Summarize(rows);
+        }
+
+        private static PaymentListItemModel ToListItemModel(Payment p)
+        {
+            var model = ToModel(p);
+            return new PaymentListItemModel
+            {
+                PaymentId = model.PaymentId,
+                PaymentCode = model.PaymentCode,
+                BookingId = model.BookingId,
+                BookingCode = model.BookingCode,
+                PaymentType = model.PaymentType,
+                Provider = model.Provider,
+                Status = model.Status,
+                Amount = model.Amount,
+                CurrencyCode = model.CurrencyCode,
+                ExchangeRate = model.ExchangeRate,
+                AmountVnd = model.AmountVnd,
+                TxnRef = model.TxnRef,
+                ProviderTxnNo = model.ProviderTxnNo,
+                BankCode = model.BankCode,
+                ResponseCode = model.ResponseCode,
+                RefundOfPaymentId = model.RefundOfPaymentId,
+                Note = model.Note,
+                CreatedByName = model.CreatedByName,
+                CreatedAt = model.CreatedAt,
+                PaidAt = model.PaidAt,
+                CustomerName = p.Booking?.Customer?.FullName
+            };
         }
 
         public CustomerBillingModel BuildCustomerBilling(IEnumerable<BookingRequest> bookings, PaymentSettingsModel settings)

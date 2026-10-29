@@ -116,3 +116,26 @@ namespace RacehorseTransport.API.ResponseModels
         public string? UpdatedByName { get; set; }
     }
 }
+
+namespace RacehorseTransport.API.ResponseModels
+{
+    // Một dòng trang Giao dịch: đủ trường như PaymentResponse + mã tham chiếu gửi cổng và tên khách
+    public class PaymentListItemResponse : PaymentResponse
+    {
+        public string TxnRef { get; set; } = string.Empty;
+        public string? CustomerName { get; set; }
+    }
+
+    public class PaymentListSummaryResponse
+    {
+        public int SucceededCount { get; set; }
+        public decimal SucceededAmount { get; set; }
+        public int PendingCount { get; set; }
+        public decimal PendingAmount { get; set; }
+        public int FailedCount { get; set; }
+        public int ExpiredCount { get; set; }
+        public decimal RefundedAmount { get; set; }
+        public int RefundsNeedingActionCount { get; set; }
+        public string CurrencyCode { get; set; } = "USD";
+    }
+}
