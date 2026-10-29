@@ -43,6 +43,9 @@ namespace RacehorseTransport.Services.Options
         // Giấy khám lâm sàng đủ sức khỏe phải cấp trong bấy nhiêu giờ trước giờ xuất phát (chính sách mục 5)
         public int FitExamValidHours { get; set; } = 48;
 
+        // Nhắc khách đi khám lần hai khi còn bấy nhiêu ngày tới giờ xuất phát mà ngựa chưa có giấy khám nộp lên hồ sơ
+        public int FitExamReminderDaysBeforeDeparture { get; set; } = 3;
+
         // Số ngày cần tính từ lúc DUYỆT đơn tới ngày pickup, với thời gian làm hồ sơ của tuyến (R-03)
         public int ApprovalLeadDaysFor(int clearanceDays) => DepositDays + clearanceDays + PlanningBufferDays;
 

@@ -46,8 +46,12 @@ namespace RacehorseTransport.Services.Implementations
 
                 if (input.FitExamTypeConfigured && !HasValidFitExam(horse.FitExamIssueDates, input.DepartureAt, input.FitExamValidHours))
                 {
-                    issues.Add(Error(DepartureIssueCodes.FitExamMissing, DepartureIssueCategories.Documents,
-                        $"{horse.HorseName}: no fit-to-travel exam within {input.FitExamValidHours} hours", horse));
+                    // Khách đã nộp nhưng chuyên viên chưa duyệt: báo riêng để tài xế biết đang chờ ai
+                    issues.Add(horse.HasPendingFitExam
+                        ? Error(DepartureIssueCodes.FitExamPendingReview, DepartureIssueCategories.Documents,
+                            $"{horse.HorseName}: the fit-to-travel exam is waiting for the specialist's review", horse)
+                        : Error(DepartureIssueCodes.FitExamMissing, DepartureIssueCategories.Documents,
+                            $"{horse.HorseName}: no fit-to-travel exam within {input.FitExamValidHours} hours", horse));
                 }
             }
 
@@ -84,13 +88,8 @@ namespace RacehorseTransport.Services.Implementations
             };
         }
 
-        // Giấy khám chỉ ghi ngày cấp nên so theo ngày (UTC): cấp từ ngày của mốc "xuất phát - N giờ" tới ngày xuất phát
-        public static bool HasValidFitExam(IEnumerable<DateOnly> issueDates, DateTimeOffset departureAt, int validHours)
-        {
-            var earliest = DateOnly.FromDateTime(departureAt.AddHours(-validHours).UtcDateTime);
-            var latest = DateOnly.FromDateTime(departureAt.UtcDateTime);
-            return issueDates.Any(d => d >= earliest && d <= latest);
-        }
+        public static bool HasValidFitExam(IEnumerable<DateOnly> issueDates, DateTimeOffset departureAt, int validHours) =>
+            issueDates.Any(d => FitExamRules.IsIssuedInWindow(d, departureAt, validHours));
 
         // Thông báo lỗi khi bấm xuất phát: liệt kê mọi lỗi chặn trong một câu
         public static string ToBlockingMessage(DepartureCheckModel check) =>

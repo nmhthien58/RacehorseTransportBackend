@@ -1,0 +1,27 @@
+Subject: Cần khám lâm sàng lại cho ngựa {{HorseName}} do đổi giờ xuất phát
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Cần khám lâm sàng lại</title>
+</head>
+<body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:24px auto;padding:24px;background:#ffffff;border-radius:8px;">
+    <h2 style="margin-top:0;color:#9a6700;">Giờ xuất phát đã thay đổi – cần khám lại</h2>
+    <p>Xin chào {{FullName}},</p>
+    <p>Giờ xuất phát của chuyến <strong>{{TripCode}}</strong> chở ngựa <strong>{{HorseName}}</strong> (đơn <strong>{{BookingCode}}</strong>) đã thay đổi.
+       Giấy khám lâm sàng đã duyệt trước đây không còn nằm trong 48 giờ trước giờ xuất phát mới, nên không được dùng cho chuyến này.</p>
+    <table style="border-collapse:collapse;margin:8px 0 16px;">
+      <tr>
+        <td style="padding:6px 16px 6px 0;color:#6b7280;">Khám lại trong khoảng</td>
+        <td style="padding:6px 0;"><strong>{{ExamWindowStart}} – {{ExamWindowEnd}}</strong> (giờ Việt Nam)</td>
+      </tr>
+    </table>
+    <p>Vui lòng cho ngựa khám lại và tải giấy khám mới lên hồ sơ kiểm dịch để chuyên viên duyệt.</p>
+    <p style="margin:28px 0;">
+      <a href="{{Link}}" style="display:inline-block;padding:12px 20px;background:#174c3c;color:#ffffff;text-decoration:none;border-radius:6px;">Tải giấy khám mới</a>
+    </p>
+    <p>Cảm ơn bạn đã hợp tác cùng Racehorse Transport.</p>
+  </div>
+</body>
+</html>

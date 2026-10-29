@@ -1367,6 +1367,30 @@ Authorization: Bearer {{managerToken}}
 # BE-10: kiểm tra trước khi xuất phát (hồ sơ Cleared, hạn giấy, FIT_EXAM 48 giờ, thanh toán, số tài xế)
 # =============================================================================================
 
+### [ĐÚNG] Khách nộp giấy khám FIT_EXAM vào hồ sơ đơn (cả khi hồ sơ đã Cleared); docTypeId lấy từ dòng checklist FIT_EXAM
+POST {{baseUrl}}/api/dossiers/1/documents
+Authorization: Bearer {{customerToken}}
+Content-Type: multipart/form-data; boundary=fit
+
+--fit
+Content-Disposition: form-data; name="docTypeId"
+
+12
+--fit
+Content-Disposition: form-data; name="issueDate"
+
+2026-11-08
+--fit
+Content-Disposition: form-data; name="file"; filename="fit-exam.pdf"
+Content-Type: application/pdf
+
+< ./fit-exam.pdf
+--fit--
+
+### [SAI] Admin (như chuyên viên phụ trách) duyệt FIT_EXAM khi ngựa chưa có chuyến đã duyệt / ngày khám ngoài 48 giờ -> 400
+POST {{baseUrl}}/api/documents/1/approve
+Authorization: Bearer {{adminToken}}
+
 ### Tài xế của chuyến xem danh sách vấn đề trước khi bấm xuất phát
 GET {{baseUrl}}/api/trips/1/departure-check
 Authorization: Bearer {{driverToken}}

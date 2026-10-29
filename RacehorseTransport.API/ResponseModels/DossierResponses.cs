@@ -45,6 +45,9 @@ namespace RacehorseTransport.API.ResponseModels
         public int? ValidityDays { get; set; }
         public string? RegulationNote { get; set; }
         public List<string> RequiredBy { get; set; } = new();
+        public bool PostClearance { get; set; } // true: giấy nộp sau thông quan (FIT_EXAM)
+        public DateTimeOffset? ExamWindowStart { get; set; }
+        public DateTimeOffset? ExamWindowEnd { get; set; }
         public string State { get; set; } = string.Empty; // Missing | Pending | Approved | Rejected
         public DossierDocumentResponse? LatestDocument { get; set; }
     }
@@ -60,6 +63,7 @@ namespace RacehorseTransport.API.ResponseModels
         public string Status { get; set; } = string.Empty;
         public string? CorrectionNote { get; set; }
         public DateOnly? ExpiryDate { get; set; }
+        public DateOnly? IssueDate { get; set; } // chỉ FIT_EXAM
         public int RejectionCount { get; set; }
         public int UploadedByUserId { get; set; }
         public string? UploadedByName { get; set; }

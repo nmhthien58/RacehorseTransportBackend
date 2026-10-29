@@ -289,6 +289,9 @@ namespace RacehorseTransport.Services.Implementations
                 // R-16: email người nhận "chuyến đã lên lịch"
                 await _recipientService.OnTripApprovedAsync(trip.TripId);
 
+                // Chính sách mục 5: nhắc khám lâm sàng trong 48 giờ trước giờ đi (hoặc khám lại khi giờ đi đổi)
+                await _fitExamReminderService.NotifyTripScheduledAsync(trip.TripId);
+
                 foreach (var b in balances)
                 {
                     await _notificationService.EmailCustomerAsync(
