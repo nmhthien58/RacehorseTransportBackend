@@ -191,7 +191,6 @@ Công ty có thể cho đoàn chờ biên giới mở lại (ngựa ở chuồng
 
 ### 10.2 Liên hệ trước khi giao
 - Người nhận được gửi **email** khi chuyến được lên lịch, khi xe xuất phát (kèm giờ dự kiến tới), và khi xe sắp tới (rời điểm dừng ngay trước điểm giao).
-- **24 giờ trước giờ dự kiến tới**, Khách được nhắc **xác nhận trên ứng dụng** rằng người nhận sẽ có mặt (hoặc cập nhật người nhận khác).
 - Khi xe sắp tới, tài xế **gọi điện** cho người nhận theo số điện thoại trong đơn.
 - Khi người nhận ký biên bản bàn giao, Khách được thông báo ngay trên ứng dụng và qua email.
 
