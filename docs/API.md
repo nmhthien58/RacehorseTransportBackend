@@ -3872,8 +3872,8 @@ Mỗi phần tử của `checkpoints`:
 | `checkpointName` | chuỗi | Có | Tên mốc, tối đa 100 ký tự |
 | `checkpointType` | chuỗi | Có | `Origin` (mốc đầu), `PickUp`, `RestStop`, `BorderGate`, `DropOff`, `Destination` (mốc cuối) |
 | `address` | chuỗi | Có | Địa chỉ, tối đa 255 ký tự |
-| `latitude`, `longitude` | số | Có trước khi trình | Tọa độ mốc; tuyến chép từ bản `Approved` có sẵn hai giá trị này |
-| `distanceKmFromPrevious` | số | Không với mốc đầu, có với mốc sau | Quãng đường từ mốc trước; lấy từ `legDistanceKm` của gợi ý hoặc tuyến đã duyệt |
+| `latitude`, `longitude` | số | Không | Tọa độ mốc (gửi cả hai hoặc không gửi). Tuyến chép từ bản `Approved` có sẵn hai giá trị này. Có đủ tọa độ thì server dò được nước đi qua và quãng đường chính xác hơn |
+| `distanceKmFromPrevious` | số | Không | Quãng đường từ mốc trước; lấy từ `legDistanceKm` của gợi ý hoặc tuyến đã duyệt |
 | `plannedTime` | ngày giờ | Có | Giờ dự kiến tới mốc |
 | `mandatoryRestMinutes` | số | Không | Số phút bắt buộc nghỉ tại mốc (0–2880). Đoàn xe chưa nghỉ đủ thì chưa rời mốc được |
 | `bookingId` | số | Với `PickUp` / `DropOff` | Đơn được đón / trả ở mốc này (phải có ngựa trên chuyến). Để trống với các loại mốc khác |
@@ -4133,7 +4133,7 @@ Lỗi thường gặp:
 
 ### POST /api/trips/{id}/submit — Trình duyệt kế hoạch
 
-Chuyển chuyến từ `Draft` sang `PendingApproval` và báo cho quản lý. Hệ thống kiểm tra lộ trình trước khi cho trình: mọi mốc có tọa độ, từng đơn chỉ đi qua các nước trong tuyến `Approved`, và chuyến có thời gian lái trên `Transit:MaxDrivingHoursPerDaySingleDriver` (mặc định 9 giờ) phải có ít nhất 2 tài xế.
+Chuyển chuyến từ `Draft` sang `PendingApproval` và báo cho quản lý. Hệ thống kiểm tra lộ trình trước khi cho trình (và kiểm tra lại khi duyệt). Với chuyến **đường bộ**: mọi đơn phải có tuyến `Approved`; chuyến có thời gian lái trên `Transit:MaxDrivingHoursPerDaySingleDriver` (mặc định 9 giờ) phải có ít nhất 2 tài xế (quãng đường lấy theo km từng chặng, hoặc tọa độ các mốc, hoặc tuyến đã duyệt dài nhất của các đơn khi mốc chưa có tọa độ); nếu mốc của một đơn có đủ tọa độ thì đơn đó chỉ được đi qua các nước trong tuyến `Approved`. Chuyến **đường bay** không cần tuyến đã duyệt và không áp quy tắc số tài xế.
 
 - **Ai gọi được:** Người lập chuyến, Admin
 - **Dữ liệu gửi lên:** không có (không cần body)
@@ -4160,7 +4160,7 @@ Lỗi thường gặp:
 | 400 | `Booking BKG-2026-0201 must be picked up before it is dropped off.` | Mốc trả đứng trước mốc đón |
 | 400 | `Booking BKG-2026-0201 can only be picked up between 2026-11-09 and 2026-11-12; it is planned at 'X' on ...` | Giờ đón của đơn (mốc `PickUp` hoặc `Origin`) nằm ngoài khoảng pickup |
 | 400 | `Booking BKG-2026-0201 must be delivered by ...; it reaches 'X' at ...` | Giờ tới điểm trả của đơn (mốc `DropOff` hoặc `Destination`) trễ hạn giao |
-| 400 | `Every checkpoint needs latitude and longitude before the trip can be submitted.` | Có mốc chưa có tọa độ |
+| 400 | `Approved route plan is missing for booking(s): BKG-...` | Đơn đường bộ chưa có tuyến đã duyệt |
 | 400 | `A trip with 10 estimated driving hours needs at least 2 drivers; this trip has 1.` | Tuyến lái trên 9 giờ nhưng đoàn chỉ có một tài xế |
 | 400 | `Trip route for booking BKG-... passes through country ..., which is outside its approved route.` | Chuyến đi qua nước chưa nằm trong tuyến đã duyệt của đơn |
 

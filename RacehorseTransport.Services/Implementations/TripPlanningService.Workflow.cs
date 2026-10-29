@@ -624,8 +624,12 @@ namespace RacehorseTransport.Services.Implementations
                 .AsNoTracking()
                 .Include(p => p.Booking)
                 .Include(p => p.Stops)
-                .FirstOrDefaultAsync(p => p.BookingId == bookingId && p.Status == RoutePlanStatuses.Approved)
-                ?? throw new BusinessException($"Booking ID {bookingId} has no approved route plan. Approve its route before assigning horses to a trip.");
+                .FirstOrDefaultAsync(p => p.BookingId == bookingId && p.Status == RoutePlanStatuses.Approved);
+            // Đơn đường bay không có tuyến trên bản đồ: Coordinator tự nhập mốc. Đơn đường bộ thiếu tuyến bị chặn khi trình duyệt.
+            if (approved == null)
+            {
+                return null;
+            }
 
             var ordered = approved.Stops.OrderBy(s => s.SequenceOrder).ToList();
             if (ordered.Count < 2)
@@ -662,6 +666,14 @@ namespace RacehorseTransport.Services.Implementations
 
         private async Task ValidateApprovedRouteAndDriversAsync(Trip trip, List<RouteBookingRule> bookings)
         {
+            // Đường bay không lập tuyến trên bản đồ (báo giá chốt phát hành ngay khi duyệt sơ bộ) và không có chặng lái dài
+            // như đường bộ: không đòi tuyến đã duyệt, không áp quy tắc số tài xế.
+            string mode = bookings.Select(b => b.TransportMode).Distinct().Single();
+            if (mode != TransportModes.Ground)
+            {
+                return;
+            }
+
             var route = trip.Checkpoints.Where(c => c.IsActive).OrderBy(c => c.SequenceOrder).ToList();
             var bookingIds = bookings.Select(b => b.BookingId).ToList();
             var plans = await _routePlanRepo.GetQueryable()
@@ -676,18 +688,8 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Approved route plan is missing for booking(s): {string.Join(", ", missing)}.");
             }
 
-            var points = RoutePoints(route);
-            decimal distance;
-            if (route.Skip(1).All(c => c.DistanceKmFromPrevious.HasValue))
-            {
-                distance = route.Skip(1).Sum(c => c.DistanceKmFromPrevious!.Value);
-            }
-            else
-            {
-                distance = (await _geoService.RouteAsync(points, includeCountries: false)).TotalDistanceKm;
-            }
+            decimal distance = await EstimateTripDistanceKmAsync(route, plans);
             int driverCount = trip.Crew.Count(c => c.CrewRole == CrewRoles.Driver);
-            string mode = bookings.Select(b => b.TransportMode).Distinct().Single();
             var estimate = _transitEstimator.Estimate(new TransitEstimateInputModel
             {
                 TransportMode = mode,
@@ -697,19 +699,19 @@ namespace RacehorseTransport.Services.Implementations
             });
             TripAssignmentRules.EnsureDriverCount(estimate.DrivingHours, driverCount, _transitOptions.MaxDrivingHoursPerDaySingleDriver);
 
-            // Nước bay ngang qua không phải nước quá cảnh thủ tục; quy tắc này chỉ áp cho tuyến đường bộ.
-            if (mode != TransportModes.Ground)
-            {
-                return;
-            }
-
             foreach (var booking in bookings)
             {
+                // Chỉ dò nước đi qua khi mọi mốc của đơn có tọa độ (mốc nhập tay, mốc cửa khẩu gợi ý có thể chưa có).
+                // Thiếu tọa độ hoặc bản đồ không trả được nước thì bỏ qua, không chặn trình duyệt chuyến.
                 var segment = SegmentForBooking(route, booking.BookingId);
+                if (!segment.All(HasCoordinates))
+                {
+                    continue;
+                }
                 var actual = await _geoService.RouteAsync(RoutePoints(segment), includeCountries: true);
                 if (actual.CountryCodes == null || actual.CountryCodes.Count == 0)
                 {
-                    throw new BusinessException($"The countries along the trip route for booking {booking.BookingCode} could not be determined. Check all checkpoint coordinates and try again.");
+                    continue;
                 }
                 var approved = plans.Single(p => p.BookingId == booking.BookingId).Stops
                     .Where(s => !string.IsNullOrWhiteSpace(s.CountryCode))
@@ -717,6 +719,28 @@ namespace RacehorseTransport.Services.Implementations
                 TripAssignmentRules.EnsureCountriesAreApproved(booking.BookingCode, actual.CountryCodes, approved);
             }
         }
+
+        // Quãng đường để ước tính giờ lái: ưu tiên km từng chặng đã lưu, rồi chỉ đường qua tọa độ các mốc;
+        // mốc chưa có tọa độ thì lấy tuyến đã duyệt dài nhất của các đơn trên chuyến (chuyến ít nhất phải chạy hết tuyến đó).
+        private async Task<decimal> EstimateTripDistanceKmAsync(List<RouteCheckpoint> route, List<RoutePlan> plans)
+        {
+            if (route.Count > 1 && route.Skip(1).All(c => c.DistanceKmFromPrevious.HasValue))
+            {
+                return route.Skip(1).Sum(c => c.DistanceKmFromPrevious!.Value);
+            }
+            if (route.Count > 1 && route.All(HasCoordinates))
+            {
+                var routed = await _geoService.RouteAsync(RoutePoints(route), includeCountries: false);
+                if (routed.TotalDistanceKm > 0)
+                {
+                    return (decimal)routed.TotalDistanceKm;
+                }
+            }
+            return plans.Count == 0 ? 0 : plans.Max(p => p.TotalDistanceKm);
+        }
+
+        private static bool HasCoordinates(RouteCheckpoint checkpoint) =>
+            checkpoint.Latitude.HasValue && checkpoint.Longitude.HasValue;
 
         private static List<RouteCheckpoint> SegmentForBooking(List<RouteCheckpoint> route, int bookingId)
         {
