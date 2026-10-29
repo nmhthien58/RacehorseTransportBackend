@@ -1411,12 +1411,14 @@ namespace RacehorseTransport.Services.Implementations
                     }
                 }
 
+                // Thông báo ghi tên người cũ, không ghi mã số
+                string removedName = (await _userRepo.GetByIdAsync(removed.UserId))?.FullName ?? $"user {removed.UserId}";
                 await _crewRepo.DeleteAsync(removed);
                 await _crewRepo.AddAsync(added);
                 await _notificationService.SendToUsersAsync(
                     new[] { removed.UserId, plan.AddedUser.UserId },
                     $"Crew replacement on trip {trip.TripCode}",
-                    $"Incident {incident.IncidentCode}: {removed.CrewRole} assignment changed from user {removed.UserId} to {plan.AddedUser.FullName}.",
+                    $"Incident {incident.IncidentCode}: {removed.CrewRole} assignment changed from {removedName} to {plan.AddedUser.FullName}.",
                     NotificationReferenceTypes.Incident,
                     incident.IncidentId);
             }
