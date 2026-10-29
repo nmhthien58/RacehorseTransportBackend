@@ -65,13 +65,8 @@ namespace RacehorseTransport.API.BackgroundJobs
                         _logger.LogInformation("Sent {Count} fit-to-travel exam reminder(s).", fitExams);
                     }
 
-                    // R-16 (BE-15): 24 giờ trước ETA tới điểm giao -> nhắc khách xác nhận người nhận có mặt
-                    var recipientService = scope.ServiceProvider.GetRequiredService<IRecipientService>();
-                    int confirms = await recipientService.ProcessConfirmationRemindersAsync();
-                    if (confirms > 0)
-                    {
-                        _logger.LogInformation("Sent {Count} recipient confirmation reminder(s).", confirms);
-                    }
+                    // R-16 (BE-15): bỏ bước nhắc khách xác nhận người nhận có mặt (29/10/2026):
+                    // người nhận đã nhận email và tài xế chủ động gọi trước khi tới điểm giao
 
                     // R-16 (BE-16): không giao được, quá hạn khách chọn -> chuồng tạm
                     var deliveryService = scope.ServiceProvider.GetRequiredService<IDeliveryService>();
