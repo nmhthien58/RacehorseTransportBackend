@@ -24,8 +24,16 @@ namespace RacehorseTransport.Services.Options
         // Tìm các nước đi qua: hai đầu một đoạn cùng nước và đoạn ngắn hơn TrustSegmentKm thì coi như không qua nước nào khác;
         // không chia đoạn nhỏ hơn MinSegmentKm; tối đa MaxCountryLookups lần tra quốc gia cho một tuyến
         public decimal CountryTrustSegmentKm { get; set; } = 300;
-        public decimal CountryMinSegmentKm { get; set; } = 20;
-        public int MaxCountryLookups { get; set; } = 60;
+        // Báo giá chỉ cần biết đi qua nước nào nên giữ ít lượt tra (Nominatim 1 request / giây)
+        public decimal CountryMinSegmentKm { get; set; } = 50;
+        public int MaxCountryLookups { get; set; } = 12;
+
+        // Hết thời gian này thì dừng dò nước, trả các nước đã biết (ít nhất nước đi, nước đến)
+        public int CountryLookupBudgetSeconds { get; set; } = 8;
+
+        // Mã nước được cache theo ô lưới CountryGridDegrees độ, giữ CountryCacheDays ngày (biên giới hầu như không đổi)
+        public double CountryGridDegrees { get; set; } = 0.5;
+        public int CountryCacheDays { get; set; } = 90;
 
         // Số điểm tối đa của đường vẽ trả về cho frontend (đường đầy đủ của OSRM có thể rất dài)
         public int MaxPolylinePoints { get; set; } = 2000;

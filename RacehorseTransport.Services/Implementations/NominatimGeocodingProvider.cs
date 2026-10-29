@@ -72,6 +72,19 @@ namespace RacehorseTransport.Services.Implementations
             return place;
         }
 
+        // Chỉ cần mã nước: zoom=3 (cấp quốc gia) trả nhanh hơn zoom=14
+        public async Task<string?> CountryCodeAsync(double lat, double lng, CancellationToken cancellationToken)
+        {
+            using var doc = await GetJsonAsync($"reverse?lat={GeoMath.Num(lat)}&lon={GeoMath.Num(lng)}&format=jsonv2&zoom=3", cancellationToken);
+            if (doc == null || doc.RootElement.TryGetProperty("error", out _))
+            {
+                return null;
+            }
+            return doc.RootElement.TryGetProperty("address", out var address) && address.TryGetProperty("country_code", out var cc)
+                ? cc.GetString()?.ToUpperInvariant()
+                : null;
+        }
+
         private static GeoPlaceModel? ReadPlace(JsonElement item)
         {
             if (!item.TryGetProperty("lat", out var latEl) || !item.TryGetProperty("lon", out var lonEl))

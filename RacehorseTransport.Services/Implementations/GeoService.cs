@@ -157,7 +157,14 @@ namespace RacehorseTransport.Services.Implementations
 
             if (includeCountries)
             {
-                route.CountryCodes = (await CountriesAlongAsync(fullLine, cancellationToken)).ToList();
+                // Hai đầu tuyến đã biết nước (từ bước trên): gắn vào bản sao để không tra lại và luôn có khi hết giờ
+                var line = fullLine.ToList();
+                if (line.Count > 0)
+                {
+                    line[0] = new GeoPointModel(line[0].Lat, line[0].Lng, points[0].CountryCode);
+                    line[^1] = new GeoPointModel(line[^1].Lat, line[^1].Lng, points[^1].CountryCode);
+                }
+                route.CountryCodes = (await CountriesAlongAsync(line, cancellationToken)).ToList();
             }
 
             // Trả về đường đã rút gọn: từng chặng và cả tuyến
@@ -214,14 +221,52 @@ namespace RacehorseTransport.Services.Implementations
         // Các nước tuyến đi qua
         // =============================================================================================
 
+        // Ước tính nhanh: chỉ tra mã nước, có giới hạn số lượt và thời gian. Điều phối viên xác nhận lại ở bước lập tuyến.
         public async Task<IReadOnlyList<string>> CountriesAlongAsync(IReadOnlyList<GeoPointModel> polyline, CancellationToken cancellationToken = default)
         {
+            using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            if (_options.CountryLookupBudgetSeconds > 0)
+            {
+                budget.CancelAfter(TimeSpan.FromSeconds(_options.CountryLookupBudgetSeconds));
+            }
             return await CountriesAlongAsync(
                 polyline,
-                async p => (await ReverseAsync(p.Lat, p.Lng, cancellationToken))?.CountryCode,
+                p => CountryCodeAtAsync(p.Lat, p.Lng, budget.Token),
                 _options.CountryTrustSegmentKm,
                 _options.CountryMinSegmentKm,
-                _options.MaxCountryLookups);
+                _options.MaxCountryLookups,
+                budget.Token);
+        }
+
+        // Mã nước tại một điểm, cache theo ô lưới thô để các tuyến gần nhau dùng lại.
+        // Chỉ hỏi nhà cung cấp toàn cầu (Nominatim), không gọi Goong vì không cần địa chỉ.
+        public async Task<string?> CountryCodeAtAsync(double lat, double lng, CancellationToken cancellationToken = default)
+        {
+            ValidateCoordinate(lat, lng);
+            string key = $"geo:country:{GridCell(lat, lng, _options.CountryGridDegrees)}";
+            var cached = await _cache.GetAsync<string>(key);
+            if (cached != null)
+            {
+                return cached.Length == 0 ? null : cached;
+            }
+
+            foreach (var provider in _geocoders.Where(p => p.Supports(null)))
+            {
+                var code = await provider.CountryCodeAsync(lat, lng, cancellationToken);
+                if (!string.IsNullOrEmpty(code))
+                {
+                    await _cache.SetAsync(key, code, TimeSpan.FromDays(Math.Max(1, _options.CountryCacheDays)));
+                    return code;
+                }
+            }
+            return null; // lỗi hoặc giữa biển: không cache để lần sau tra lại
+        }
+
+        public static string GridCell(double lat, double lng, double degrees)
+        {
+            double size = degrees > 0 ? degrees : 0.5;
+            return string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"{Math.Floor(lat / size) * size:0.###},{Math.Floor(lng / size) * size:0.###}");
         }
 
         // Hàm thuần (nhận cách tra nước từ ngoài) để viết unit test.
@@ -233,7 +278,8 @@ namespace RacehorseTransport.Services.Implementations
             Func<GeoPointModel, Task<string?>> countryAt,
             decimal trustKm,
             decimal minSegmentKm,
-            int maxLookups)
+            int maxLookups,
+            CancellationToken stopToken = default)
         {
             if (polyline.Count == 0)
             {
@@ -246,12 +292,30 @@ namespace RacehorseTransport.Services.Implementations
 
             async Task<string?> At(int index)
             {
-                if (!known.TryGetValue(index, out var code))
+                if (known.TryGetValue(index, out var code))
                 {
-                    lookups++;
-                    code = await countryAt(polyline[index]);
-                    known[index] = code;
+                    return code;
                 }
+                // Điểm đã biết nước (đầu / cuối tuyến) thì không tốn lượt tra
+                if (!string.IsNullOrEmpty(polyline[index].CountryCode))
+                {
+                    return known[index] = polyline[index].CountryCode;
+                }
+                // Hết thời gian: không tra thêm, không ném lỗi
+                if (stopToken.IsCancellationRequested)
+                {
+                    return null;
+                }
+                lookups++;
+                try
+                {
+                    code = await countryAt(polyline[index]);
+                }
+                catch (OperationCanceledException) when (stopToken.IsCancellationRequested)
+                {
+                    return null;
+                }
+                known[index] = code;
                 return code;
             }
 
@@ -260,7 +324,7 @@ namespace RacehorseTransport.Services.Implementations
             async Task Walk(int from, int to, string? fromCountry, string? toCountry)
             {
                 double length = cumulative[to] - cumulative[from];
-                if (to - from <= 1 || lookups >= maxLookups || length <= (double)minSegmentKm)
+                if (to - from <= 1 || lookups >= maxLookups || length <= (double)minSegmentKm || stopToken.IsCancellationRequested)
                 {
                     return;
                 }

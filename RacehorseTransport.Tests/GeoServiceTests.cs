@@ -529,4 +529,81 @@ public class GeoServiceTests
         Assert.Empty(await GeoService.CountriesAlongAsync(new List<GeoPointModel>(), lookup, 300, 20, 10));
         Assert.Equal(new[] { "VN" }, await GeoService.CountriesAlongAsync(new[] { new GeoPointModel(10, 106) }, lookup, 300, 20, 10));
     }
+
+    [Fact]
+    public async Task CountriesAlong_StopsWhenBudgetExpires_KeepsKnownEnds()
+    {
+        var line = Line(100, 110);
+        line[0].CountryCode = "TH";
+        line[^1].CountryCode = "VN";
+        using var stop = new CancellationTokenSource();
+        int calls = 0;
+        Func<GeoPointModel, Task<string?>> lookup = _ =>
+        {
+            calls++;
+            stop.Cancel(); // hết giờ ngay sau lượt tra đầu tiên
+            return Task.FromResult<string?>("KH");
+        };
+
+        var countries = await GeoService.CountriesAlongAsync(line, lookup, trustKm: 300, minSegmentKm: 20, maxLookups: 100, stop.Token);
+
+        Assert.Equal(1, calls);
+        Assert.Equal(new[] { "TH", "KH", "VN" }, countries);
+    }
+
+    [Fact]
+    public async Task CountriesAlong_CancelledLookup_ReturnsKnownCountriesWithoutThrowing()
+    {
+        var line = Line(100, 110);
+        line[0].CountryCode = "TH";
+        line[^1].CountryCode = "VN";
+        using var stop = new CancellationTokenSource();
+        Func<GeoPointModel, Task<string?>> lookup = _ =>
+        {
+            stop.Cancel();
+            throw new OperationCanceledException(stop.Token);
+        };
+
+        var countries = await GeoService.CountriesAlongAsync(line, lookup, trustKm: 300, minSegmentKm: 20, maxLookups: 100, stop.Token);
+
+        Assert.Equal(new[] { "TH", "VN" }, countries);
+    }
+
+    [Fact]
+    public async Task CountriesAlong_KnownEndsDoNotUseLookups()
+    {
+        var line = Line(100, 101);
+        line[0].CountryCode = "VN";
+        line[^1].CountryCode = "VN";
+        int calls = 0;
+        Func<GeoPointModel, Task<string?>> lookup = _ => { calls++; return Task.FromResult<string?>("VN"); };
+
+        var countries = await GeoService.CountriesAlongAsync(line, lookup, trustKm: 300, minSegmentKm: 50, maxLookups: 12);
+
+        Assert.Equal(new[] { "VN" }, countries);
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public async Task CountryCodeAt_UsesNominatimOnly_AndCachesByGridCell()
+    {
+        var goongHandler = new FakeHandler(_ => Fail());
+        var nominatimHandler = new FakeHandler(_ => Json(new { lat = "15.1", lon = "105.1", display_name = "Laos", address = new { country_code = "la" } }));
+        var service = Service(Goong(goongHandler), Nominatim(nominatimHandler), Osrm(new FakeHandler(_ => Fail())));
+
+        Assert.Equal("LA", await service.CountryCodeAtAsync(15.1, 105.1));
+        Assert.Equal("LA", await service.CountryCodeAtAsync(15.3, 105.4)); // cùng ô 0,5°
+
+        Assert.Single(nominatimHandler.Requests);
+        Assert.Contains("zoom=3", nominatimHandler.Requests[0].RequestUri!.Query);
+        Assert.Empty(goongHandler.Requests);
+    }
+
+    [Fact]
+    public void GridCell_RoundsDownToCell()
+    {
+        Assert.Equal(GeoService.GridCell(15.1, 105.4, 0.5), GeoService.GridCell(15.4, 105.0, 0.5));
+        Assert.NotEqual(GeoService.GridCell(15.4, 105.0, 0.5), GeoService.GridCell(15.6, 105.0, 0.5));
+        Assert.Equal("-0.5,-1", GeoService.GridCell(-0.1, -0.6, 0.5));
+    }
 }
