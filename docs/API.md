@@ -2827,6 +2827,36 @@ Hệ thống kiểm tra lại cảnh báo cửa khẩu; còn cảnh báo thì 40
 | 400 | `Only a draft or rejected route can be submitted (current status: Submitted).` | Đã trình rồi |
 | 400 | `The pickup / drop-off of this booking changed after the route was saved. Save the route again (PUT) before submitting.` | Khách vừa đổi điểm đón / trả: gọi `PUT /api/route-plans/{id}` (cùng danh sách mốc) để tính lại rồi trình |
 
+### GET /api/route-plans/{id}/quote-preview — Xem trước báo giá chốt của tuyến
+
+**Ai gọi được:** LogisticsManager, Admin.
+
+Tính báo giá chốt mà khách sẽ nhận nếu Manager duyệt tuyến `{id}`: cùng cách tính với lúc duyệt (quãng đường và nước quá cảnh của tuyến, hạng chuồng, phụ phí, bảo hiểm theo giá trị thỏa thuận từng con). **Không lưu gì**, không đổi trạng thái đơn. Dùng ở màn duyệt tuyến để Manager thấy giá trước khi bấm duyệt.
+
+Ví dụ: `GET /api/route-plans/12/quote-preview`
+
+Response `200` — phần `data` có cùng dạng với `POST /api/bookings/quote-preview` (mục trên): `lines` (từng dòng giá: `code`, `name`, `quantity`, `unitPrice`, `amount`), `total`, `currencyCode`, `distanceKm`, `estimatedHours`, ...
+
+```json
+{
+  "lines": [
+    { "code": "FREIGHT_PRIVATE", "name": "Cước vận chuyển - Chuồng riêng (Private)", "quantity": 1, "unitPrice": 1210.0, "amount": 1210.0 },
+    { "code": "INS_FULL", "name": "Bảo hiểm toàn giá trị - Hoàng Hôn", "quantity": 1, "unitPrice": 500.0, "amount": 500.0 }
+  ],
+  "total": 1968.0,
+  "currencyCode": "USD",
+  "distanceKm": 218,
+  "estimatedHours": 12.0
+}
+```
+
+```js
+const res = await api.get(`/route-plans/${routePlanId}/quote-preview`);
+const quote = res.data.data; // quote.lines, quote.total
+```
+
+Lỗi thường gặp: `404` không có tuyến `{id}`; `403` không phải Manager / Admin.
+
 ### POST /api/route-plans/{id}/approve — Duyệt tuyến
 
 - **Ai gọi được:** LogisticsManager, Admin
