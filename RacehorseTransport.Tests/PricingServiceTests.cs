@@ -437,7 +437,7 @@ public class PricingServiceTests
             Task.FromResult<IReadOnlyList<string>>(_countries);
     }
 
-    private static PricingService CreateService(int? clearanceDays = null, IGeoService? geo = null)
+    private static PricingService CreateService(int? clearanceDays = null, IGeoService? geo = null, int bufferDays = 2)
     {
         var prices = new List<PriceItem>
         {
@@ -468,7 +468,66 @@ public class PricingServiceTests
             new TransitTimeEstimator(Microsoft.Extensions.Options.Options.Create(new TransitOptions())),
             new FixedClearanceSchedule(clearanceDays ?? Options.DefaultClearanceDays),
             geo ?? new FakeGeoService(0),
+            new FixedPolicySettings(bufferDays),
             Microsoft.Extensions.Options.Options.Create(Options));
+    }
+
+    // Cấu hình chính sách cố định (chỉ Delivery.DeadlineBufferDays dùng trong báo giá)
+    private sealed class FixedPolicySettings : ISystemSettingService
+    {
+        private readonly int _bufferDays;
+        public FixedPolicySettings(int bufferDays) => _bufferDays = bufferDays;
+
+        public Task<PolicySettingsModel> GetPolicySettingsAsync() =>
+            Task.FromResult(new PolicySettingsModel { DeliveryDeadlineBufferDays = _bufferDays });
+
+        public Task<PaymentSettingsModel> GetPaymentSettingsAsync() => throw new NotSupportedException();
+        public Task<PaymentSettingsModel> UpdatePaymentSettingsAsync(PaymentSettingsModel model, CurrentUser currentUser) => throw new NotSupportedException();
+        public Task<PolicySettingsModel> UpdatePolicySettingsAsync(PolicySettingsModel model, CurrentUser currentUser) => throw new NotSupportedException();
+        public Task<PublicPolicyModel> GetPublicPolicyAsync() => throw new NotSupportedException();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task CalculateQuote_EarliestDeliveryDateAddsBufferDays(int bufferDays)
+    {
+        var service = CreateService(bufferDays: bufferDays);
+        var input = CreateInput(new[] { StallClasses.Shared }, EarliestPickup().AddDays(10));
+        input.DeliveryDeadline = null;
+        var end = input.PickupWindowEnd!.Value;
+
+        var quote = await service.CalculateQuoteAsync(input);
+        var expected = DeliveryDeadlineRules.EarliestDeliveryDate(
+            new DateTimeOffset(end.Date.AddDays(1), end.Offset), quote.Transit.MaxHours, bufferDays);
+
+        Assert.Equal(bufferDays, quote.DeliveryBufferDays);
+        Assert.Equal(expected, quote.EarliestDeliveryDate);
+
+        // Ngày sớm nhất được nhận (giờ nào trong ngày cũng được), ngày trước đó bị từ chối và nêu ngày sớm nhất
+        input.DeliveryDeadline = new DateTimeOffset(expected.ToDateTime(new TimeOnly(0, 30)), end.Offset);
+        await service.CalculateQuoteAsync(input);
+
+        input.DeliveryDeadline = input.DeliveryDeadline.Value.AddHours(-1);
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => service.CalculateQuoteAsync(input));
+        Assert.Contains(expected.ToString("yyyy-MM-dd"), ex.Message);
+    }
+
+    [Fact]
+    public async Task CalculateQuote_WithoutDates_EarliestDeliveryDateUsesEarliestPickupDay()
+    {
+        var service = CreateService(bufferDays: 2);
+        var input = CreateInput(new[] { StallClasses.Shared });
+        input.PickupWindowStart = null;
+        input.PickupWindowEnd = null;
+        input.DeliveryDeadline = null;
+
+        var quote = await service.CalculateQuoteAsync(input);
+
+        var pickupEnd = new DateTimeOffset(quote.EarliestPickupDate.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+        Assert.Equal(DeliveryDeadlineRules.EarliestDeliveryDate(pickupEnd, quote.Transit.MaxHours, 2), quote.EarliestDeliveryDate);
+        Assert.Equal(2, quote.DeliveryBufferDays);
     }
 
     // Thời gian làm hồ sơ của tuyến cố định cho kiểm thử (bản thật đọc country_doc_requirements.processing_days)

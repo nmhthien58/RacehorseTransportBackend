@@ -74,7 +74,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public List<string> TransitCountryCodes { get; set; } = new(); // đã chuẩn hóa
         public DateOnly EarliestPickupDate { get; set; }
         public DateOnly ExpressUntilDate { get; set; }
-        public DateTimeOffset EarliestDeliveryDeadline { get; set; }
+        public DateTimeOffset EarliestDeliveryDeadline { get; set; } // 00:00 của EarliestDeliveryDate
+        public DateOnly EarliestDeliveryDate { get; set; }  // hạn giao sớm nhất (theo ngày), đã cộng DeliveryBufferDays
+        public int DeliveryBufferDays { get; set; }          // Delivery.DeadlineBufferDays
 
         public TransitEstimateModel Transit { get; set; } = new();
 

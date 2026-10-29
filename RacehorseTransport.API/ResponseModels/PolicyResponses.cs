@@ -24,6 +24,7 @@ namespace RacehorseTransport.API.ResponseModels
         public decimal DeliveryWaitingFeePerHourUsd { get; set; }
         public int DeliveryMaxWaitingHours { get; set; }
         public int DeliveryDecisionHours { get; set; }
+        public int DeliveryDeadlineBufferDays { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
         public string? UpdatedByName { get; set; }
     }
@@ -93,5 +94,6 @@ namespace RacehorseTransport.API.ResponseModels
         public decimal WaitingFeePerHourUsd { get; set; }
         public int MaxWaitingHours { get; set; }
         public int DecisionHours { get; set; }
+        public int DeadlineBufferDays { get; set; }
     }
 }

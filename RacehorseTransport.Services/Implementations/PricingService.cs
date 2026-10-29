@@ -31,6 +31,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ITransitTimeEstimator _transitTimeEstimator;
         private readonly IClearanceScheduleService _clearanceSchedule;
         private readonly IGeoService _geoService;
+        private readonly ISystemSettingService _settingService;
         private readonly BookingOptions _bookingOptions;
 
         public PricingService(
@@ -40,6 +41,7 @@ namespace RacehorseTransport.Services.Implementations
             ITransitTimeEstimator transitTimeEstimator,
             IClearanceScheduleService clearanceSchedule,
             IGeoService geoService,
+            ISystemSettingService settingService,
             IOptions<BookingOptions> bookingOptions)
         {
             _priceItemRepo = priceItemRepo;
@@ -48,6 +50,7 @@ namespace RacehorseTransport.Services.Implementations
             _transitTimeEstimator = transitTimeEstimator;
             _clearanceSchedule = clearanceSchedule;
             _geoService = geoService;
+            _settingService = settingService;
             _bookingOptions = bookingOptions.Value;
         }
 
@@ -175,8 +178,8 @@ namespace RacehorseTransport.Services.Implementations
             int clearanceDays = await _clearanceSchedule.GetClearanceDaysAsync(origin, transitCountries, destination);
             int leadTimeDays = _bookingOptions.LeadTimeDaysFor(clearanceDays);
             var schedule = input.SkipScheduleCheck
-                ? new ScheduleCheck(input.ForceExpress ?? false, default, default, default)
-                : CheckSchedule(input, transit, leadTimeDays);
+                ? new ScheduleCheck(input.ForceExpress ?? false, default, default, default, default, 0)
+                : CheckSchedule(input, transit, leadTimeDays, (await _settingService.GetPolicySettingsAsync()).DeliveryDeadlineBufferDays);
 
             var prices = await GetApplicablePricesAsync(mode, destination);
 
@@ -321,18 +324,19 @@ namespace RacehorseTransport.Services.Implementations
                 EarliestPickupDate = schedule.EarliestPickupDate,
                 ExpressUntilDate = schedule.ExpressUntilDate,
                 EarliestDeliveryDeadline = schedule.EarliestDeliveryDeadline,
+                EarliestDeliveryDate = schedule.EarliestDeliveryDate,
+                DeliveryBufferDays = schedule.DeliveryBufferDays,
                 Transit = transit
             };
         }
 
         // Kiểm tra khoảng pickup / hạn giao khách chọn và xác định Express.
         // Ngày được so theo lịch của chính múi giờ khách gửi lên (khách chọn "ngày 10" thì là ngày 10 của họ).
-        private ScheduleCheck CheckSchedule(QuoteInputModel input, TransitEstimateModel transit, int leadTimeDays)
+        private ScheduleCheck CheckSchedule(QuoteInputModel input, TransitEstimateModel transit, int leadTimeDays, int bufferDays)
         {
             var quotedAt = input.QuotedAt ?? DateTimeOffset.UtcNow;
             var earliestPickup = DateOnly.FromDateTime(quotedAt.UtcDateTime).AddDays(leadTimeDays);
             var expressUntil = earliestPickup.AddDays(_bookingOptions.ExpressWindowDays);
-            var maxTransit = TimeSpan.FromHours((double)transit.MaxHours);
 
             if (input.PickupWindowStart == null)
             {
@@ -341,9 +345,10 @@ namespace RacehorseTransport.Services.Implementations
                     throw new BusinessException("PickupWindowStart is required when PickupWindowEnd or DeliveryDeadline is given.");
                 }
 
-                // Chưa chọn ngày (xem giá trước): chỉ báo lịch sớm nhất có thể, chưa tính Express
-                var earliestStart = new DateTimeOffset(earliestPickup.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-                return new ScheduleCheck(false, earliestPickup, expressUntil, earliestStart + maxTransit);
+                // Chưa chọn ngày (xem giá trước): chỉ báo lịch sớm nhất có thể (coi như đón trong ngày sớm nhất, UTC), chưa tính Express
+                var earliestPickupEnd = new DateTimeOffset(earliestPickup.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+                var firstDate = DeliveryDeadlineRules.EarliestDeliveryDate(earliestPickupEnd, transit.MaxHours, bufferDays);
+                return new ScheduleCheck(false, earliestPickup, expressUntil, StartOf(firstDate, TimeSpan.Zero), firstDate, bufferDays);
             }
 
             var start = input.PickupWindowStart.Value;
@@ -365,27 +370,33 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             // Ngựa có thể được đón vào bất kỳ lúc nào tới hết ngày cuối của khoảng đón,
-            // nên hạn giao phải đủ cho trường hợp đón muộn nhất (cuối ngày cuối) + thời gian chạy chậm nhất
+            // nên hạn giao phải đủ cho trường hợp đón muộn nhất (cuối ngày cuối) + thời gian chạy chậm nhất,
+            // làm tròn lên hết ngày + số ngày dự phòng
             var latestPickup = new DateTimeOffset(end.Date.AddDays(1), end.Offset);
-            var earliestDeadline = latestPickup + maxTransit;
-            if (input.DeliveryDeadline.HasValue && input.DeliveryDeadline.Value < earliestDeadline)
+            var earliestDate = DeliveryDeadlineRules.EarliestDeliveryDate(latestPickup, transit.MaxHours, bufferDays);
+            if (input.DeliveryDeadline.HasValue && !DeliveryDeadlineRules.IsDeadlineAllowed(input.DeliveryDeadline.Value, earliestDate))
             {
                 throw new BusinessException(
-                    $"DeliveryDeadline must be on or after {earliestDeadline:yyyy-MM-dd HH:mm zzz}: the horses may be picked up as late as the end of {end:yyyy-MM-dd} and this route is estimated to take up to {transit.MaxHours} hours.");
+                    $"DeliveryDeadline must be on or after {earliestDate:yyyy-MM-dd}: the horses may be picked up as late as the end of {end:yyyy-MM-dd}, this route is estimated to take up to {transit.MaxHours} hours, and {bufferDays} buffer day(s) are added. Please choose a later delivery date.");
             }
 
+            var earliestDeadline = StartOf(earliestDate, end.Offset);
             bool urgentPickup = startDay < expressUntil;
             bool tightDeadline = input.DeliveryDeadline.HasValue
                 && (input.DeliveryDeadline.Value - earliestDeadline).TotalHours < _bookingOptions.TightDeadlineHours;
 
-            return new ScheduleCheck(urgentPickup || tightDeadline, earliestPickup, expressUntil, earliestDeadline);
+            return new ScheduleCheck(urgentPickup || tightDeadline, earliestPickup, expressUntil, earliestDeadline, earliestDate, bufferDays);
         }
+
+        private static DateTimeOffset StartOf(DateOnly day, TimeSpan offset) => new(day.ToDateTime(TimeOnly.MinValue), offset);
 
         private sealed record ScheduleCheck(
             bool IsExpress,
             DateOnly EarliestPickupDate,
             DateOnly ExpressUntilDate,
-            DateTimeOffset EarliestDeliveryDeadline);
+            DateTimeOffset EarliestDeliveryDeadline,
+            DateOnly EarliestDeliveryDate,
+            int DeliveryBufferDays);
 
         public string SerializeLines(IEnumerable<QuoteLineModel> lines)
         {

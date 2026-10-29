@@ -30,6 +30,8 @@ namespace RacehorseTransport.API.ResponseModels
         public DateOnly EarliestPickupDate { get; set; }
         public DateOnly ExpressUntilDate { get; set; }
         public DateTimeOffset EarliestDeliveryDeadline { get; set; }
+        public int DeliveryBufferDays { get; set; }          // số ngày dự phòng đã cộng vào hạn giao sớm nhất
+        public DateOnly EarliestDeliveryDate { get; set; }   // hạn giao sớm nhất khách được chọn (theo ngày)
         public TransitEstimateResponse Transit { get; set; } = new();
 
         // R-10: khoảng giá ước tính (giá chốt gửi sau khi công ty lập tuyến); Total = QuoteMin

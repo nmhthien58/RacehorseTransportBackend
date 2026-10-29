@@ -32,6 +32,7 @@ namespace RacehorseTransport.API.Mappers
                 DeliveryWaitingFeePerHourUsd = model.DeliveryWaitingFeePerHourUsd,
                 DeliveryMaxWaitingHours = model.DeliveryMaxWaitingHours,
                 DeliveryDecisionHours = model.DeliveryDecisionHours,
+                DeliveryDeadlineBufferDays = model.DeliveryDeadlineBufferDays,
                 UpdatedAt = model.UpdatedAt,
                 UpdatedByName = model.UpdatedByName
             };
@@ -61,7 +62,8 @@ namespace RacehorseTransport.API.Mappers
                 DeliveryFreeWaitingHours = request.DeliveryFreeWaitingHours,
                 DeliveryWaitingFeePerHourUsd = request.DeliveryWaitingFeePerHourUsd,
                 DeliveryMaxWaitingHours = request.DeliveryMaxWaitingHours,
-                DeliveryDecisionHours = request.DeliveryDecisionHours
+                DeliveryDecisionHours = request.DeliveryDecisionHours,
+                DeliveryDeadlineBufferDays = request.DeliveryDeadlineBufferDays
             };
         }
 
@@ -110,7 +112,8 @@ namespace RacehorseTransport.API.Mappers
                     FreeWaitingHours = s.DeliveryFreeWaitingHours,
                     WaitingFeePerHourUsd = s.DeliveryWaitingFeePerHourUsd,
                     MaxWaitingHours = s.DeliveryMaxWaitingHours,
-                    DecisionHours = s.DeliveryDecisionHours
+                    DecisionHours = s.DeliveryDecisionHours,
+                    DeadlineBufferDays = s.DeliveryDeadlineBufferDays
                 },
                 Values = new Dictionary<string, object>
                 {
@@ -139,7 +142,8 @@ namespace RacehorseTransport.API.Mappers
                     [SystemSettingService.DeliveryFreeWaitingHoursKey] = s.DeliveryFreeWaitingHours,
                     [SystemSettingService.DeliveryWaitingFeePerHourUsdKey] = s.DeliveryWaitingFeePerHourUsd,
                     [SystemSettingService.DeliveryMaxWaitingHoursKey] = s.DeliveryMaxWaitingHours,
-                    [SystemSettingService.DeliveryDecisionHoursKey] = s.DeliveryDecisionHours
+                    [SystemSettingService.DeliveryDecisionHoursKey] = s.DeliveryDecisionHours,
+                    [SystemSettingService.DeliveryDeadlineBufferDaysKey] = s.DeliveryDeadlineBufferDays
                 }
             };
         }

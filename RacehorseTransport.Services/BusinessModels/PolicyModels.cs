@@ -4,7 +4,7 @@ namespace RacehorseTransport.Services.BusinessModels
     // Giá trị mặc định = giá trị ghi trong chính sách; thiếu khóa trong DB thì dùng mặc định.
     public class PolicySettingsModel
     {
-        public string PolicyVersion { get; set; } = "1.0";            // Policy.Version
+        public string PolicyVersion { get; set; } = "1.1";            // Policy.Version
 
         public int QuoteAcceptDays { get; set; } = 3;                  // Booking.QuoteAcceptDays
         public int DossierSubmitDays { get; set; } = 7;                // Dossier.SubmitDays (R-10: hạn nộp giấy tính từ lúc cọc)
@@ -30,6 +30,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public decimal DeliveryWaitingFeePerHourUsd { get; set; } = 40; // Delivery.WaitingFeePerHourUsd
         public int DeliveryMaxWaitingHours { get; set; } = 24;         // Delivery.MaxWaitingHours
         public int DeliveryDecisionHours { get; set; } = 24;           // Delivery.DecisionHours
+        public int DeliveryDeadlineBufferDays { get; set; } = 2;       // Delivery.DeadlineBufferDays (dự phòng cho hạn giao sớm nhất)
 
         public DateTimeOffset? UpdatedAt { get; set; }
         public string? UpdatedByName { get; set; }

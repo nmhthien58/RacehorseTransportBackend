@@ -1769,8 +1769,8 @@ Tính **khoảng giá ước tính** cho một đơn dự kiến. Không lưu g�
 
 - **Ngày pickup sớm nhất:** hôm nay + `leadTimeDays` ngày = 2 ngày duyệt + 2 ngày đặt cọc + **số ngày làm hồ sơ của tuyến** (`clearanceDays`) + 3 ngày xếp chuyến. `clearanceDays` = giấy lâu nhất trong các quy định của nước đi (Export), các nước quá cảnh (Transit) và nước đến (Import), ví dụ VN → Campuchia 7 ngày, VN → Trung Quốc 21 ngày; tuyến chưa có số liệu thì 14 ngày. Server trả về `earliestPickupDate`; form nên khóa các ngày sớm hơn.
 - **Nước quá cảnh** (`transitCountryCodes` trong response): server tự xác định từ bản đồ. Mỗi nước thêm một dòng phí `FEE_TRANSIT`, thêm một lần qua cửa khẩu trong thời gian vận chuyển, và có thể làm `clearanceDays` dài hơn.
-- **Thời gian vận chuyển** do server ước tính từ quãng đường và phương thức (`transit`), không lấy từ ngày khách nhập. Hạn giao phải từ `earliestDeliveryDeadline` trở đi (= đầu khoảng pickup + thời gian vận chuyển chậm nhất).
-- **Phụ phí gấp (Express):** khi đầu khoảng pickup trước `expressUntilDate` (sát ngày sớm nhất, phải làm hồ sơ gấp) hoặc hạn giao dư ít hơn 24 giờ so với `earliestDeliveryDeadline`.
+- **Thời gian vận chuyển** do server ước tính từ quãng đường và phương thức (`transit`), không lấy từ ngày khách nhập. **Hạn giao sớm nhất** `earliestDeliveryDate` (theo **ngày**) = (hết ngày cuối khoảng pickup + `transit.maxHours`) làm tròn lên hết ngày, theo múi giờ khách gửi lên, + `deliveryBufferDays` ngày dự phòng (`Delivery.DeadlineBufferDays`, mặc định 2). Ngày của `deliveryDeadline` phải ≥ `earliestDeliveryDate` (giờ trong ngày không quan trọng). Nên hiển thị theo ngày, ví dụ "Hạn giao sớm nhất có thể: 26/11/2026", không hiện giờ phút.
+- **Phụ phí gấp (Express):** khi đầu khoảng pickup trước `expressUntilDate` (sát ngày sớm nhất, phải làm hồ sơ gấp) hoặc hạn giao dư ít hơn 24 giờ so với `earliestDeliveryDeadline` (tức là chọn đúng ngày `earliestDeliveryDate`).
 - Chưa chọn ngày thì cứ bỏ trống 3 trường ngày: server vẫn trả về `earliestPickupDate`, `expressUntilDate` và thời gian vận chuyển để form hiển thị gợi ý.
 
 - **Ai gọi được:** Mọi người đã đăng nhập
@@ -1791,7 +1791,7 @@ Các trường gửi lên:
 | `declaredValue` | số | Không | Giá trị khai báo để mua bảo hiểm. Bỏ trống hoặc `null` là không mua |
 | `pickupWindowStart` | ngày giờ | Không | Ngày đầu của khoảng ngựa sẵn sàng được đón; không sớm hơn `earliestPickupDate` |
 | `pickupWindowEnd` | ngày giờ | Không | Ngày cuối của khoảng đón; không trước `pickupWindowStart`, khoảng dài tối đa 30 ngày. Bỏ trống thì bằng `pickupWindowStart` |
-| `deliveryDeadline` | ngày giờ | Không | Hạn giao trễ nhất; không sớm hơn `earliestDeliveryDeadline` |
+| `deliveryDeadline` | ngày giờ | Không | Hạn giao trễ nhất; ngày không sớm hơn `earliestDeliveryDate` |
 | `pickupLat`, `pickupLng` | số | Không (nên gửi) | Tọa độ điểm đón chọn trên bản đồ (`GET /api/geo/search` / `reverse`). Gửi đủ 4 tọa độ thì quãng đường và các nước đi qua lấy từ bản đồ |
 | `dropoffLat`, `dropoffLng` | số | Không (nên gửi) | Tọa độ điểm trả |
 | `horses` | mảng | Có | Mỗi phần tử là một con ngựa, chỉ cần `stallClass`: `Shared`, `Comfort` hoặc `Private` |
@@ -1872,7 +1872,9 @@ Response `200` — phần `data`:
   "transitCountryCodes": [],
   "earliestPickupDate": "2026-11-15",
   "expressUntilDate": "2026-11-22",
-  "earliestDeliveryDeadline": "2026-11-26T10:18:00+00:00",
+  "earliestDeliveryDeadline": "2026-11-26T00:00:00+07:00",
+  "deliveryBufferDays": 2,
+  "earliestDeliveryDate": "2026-11-26",
   "transit": {
     "drivingHours": 16.4,
     "restHours": 11.5,
@@ -1905,7 +1907,9 @@ Response `200` — phần `data`:
 | `leadTimeDays` | Số ngày cần từ hôm nay tới ngày pickup sớm nhất của tuyến này |
 | `earliestPickupDate` | Ngày pickup sớm nhất được chọn (dạng `yyyy-MM-dd`) |
 | `expressUntilDate` | Pickup trước ngày này thì có phụ phí gấp |
-| `earliestDeliveryDeadline` | Hạn giao sớm nhất được chọn, tính từ `pickupWindowStart` (hoặc từ `earliestPickupDate` khi chưa chọn ngày) |
+| `earliestDeliveryDate` | Hạn giao sớm nhất được chọn (dạng `yyyy-MM-dd`), tính từ ngày cuối khoảng pickup trong request (chưa chọn ngày thì từ `earliestPickupDate`), đã cộng `deliveryBufferDays`. Dùng trường này để khóa lịch chọn hạn giao |
+| `deliveryBufferDays` | Số ngày dự phòng đã cộng (`Delivery.DeadlineBufferDays`) |
+| `earliestDeliveryDeadline` | 00:00 của `earliestDeliveryDate` (theo múi giờ khách gửi lên; UTC khi chưa chọn ngày). Giữ cho app cũ |
 | `transit` | Thời gian vận chuyển tách theo thành phần (giờ): `drivingHours` lái xe, `restHours` nghỉ giữa chặng + nghỉ đêm (`overnightStops` số đêm), `borderHours` qua cửa khẩu, `handlingHours` xếp / dỡ ngựa, `flightHours` phần bay (có mặt trước giờ bay + bay + kiểm tra ở nơi đến), `totalHours` dự kiến, `maxHours` chậm nhất (đã cộng 15% dự phòng), `transitDays` số ngày |
 
 Cách server ước tính thời gian (tham số chỉnh trong `appsettings.json`, section `Transit`):
@@ -1927,7 +1931,7 @@ Lỗi thường gặp:
 | 400 | `PickupWindowStart must be on or after 2026-11-15: a booking on this route needs about 28 days ...` | Chọn ngày pickup quá gần |
 | 400 | `PickupWindowEnd must be on or after PickupWindowStart.` | Ngày cuối khoảng trước ngày đầu |
 | 400 | `The pickup window cannot be longer than 30 days.` | Khoảng pickup quá dài |
-| 400 | `DeliveryDeadline must be on or after ...: this route is estimated to take up to 41.3 hours ...` | Hạn giao không đủ thời gian vận chuyển |
+| 400 | `DeliveryDeadline must be on or after 2026-11-26: ... this route is estimated to take up to 41.3 hours, and 2 buffer day(s) are added. Please choose a later delivery date.` | Ngày hạn giao trước `earliestDeliveryDate` |
 | 400 | `PickupWindowStart is required when PickupWindowEnd or DeliveryDeadline is given.` | Gửi ngày cuối / hạn giao mà thiếu ngày đầu |
 
 ### POST /api/bookings — Gửi đơn vận chuyển
@@ -1957,7 +1961,7 @@ Các trường gửi lên:
 | `declaredValue` | số | Không | Tổng giá trị khai báo của cả đơn (cách cũ). **Nên khai theo từng con** bằng `horses[].declaredValue` (bên dưới); khi đó trường này bị bỏ qua và server lấy tổng các con |
 | `pickupWindowStart` | ngày giờ | Có | Ngày đầu của khoảng ngựa sẵn sàng được đón (không phải ngày khởi hành); không sớm hơn `earliestPickupDate` của xem giá |
 | `pickupWindowEnd` | ngày giờ | Có | Ngày cuối của khoảng đón; từ `pickupWindowStart` trở đi, khoảng dài tối đa 30 ngày |
-| `deliveryDeadline` | ngày giờ | Có | Hạn giao trễ nhất; không sớm hơn `earliestDeliveryDeadline` của xem giá |
+| `deliveryDeadline` | ngày giờ | Có | Hạn giao trễ nhất; ngày không sớm hơn `earliestDeliveryDate` của xem giá |
 | `specialInstructions` | chuỗi | Không | Ghi chú cho công ty, tối đa 2000 ký tự |
 | `pickupLat`, `pickupLng` | số | Không (nên gửi) | Tọa độ điểm đón chọn trên bản đồ (`GET /api/geo/search` / `reverse`). Gửi đủ 4 tọa độ thì quãng đường và các nước đi qua lấy từ bản đồ |
 | `dropoffLat`, `dropoffLng` | số | Không (nên gửi) | Tọa độ điểm trả |
@@ -8840,7 +8844,7 @@ Response `200`:
       "proofThresholdUsd": 50000
     },
     "horse": { "minAgeMonths": 6, "gestationDays": 340, "latePregnancyPercent": 90, "postFoalingDays": 7 },
-    "delivery": { "stableFeePerHorsePerDayUsd": 50, "extraKmFeeUsd": 2, "freeWaitingHours": 2, "waitingFeePerHourUsd": 40, "maxWaitingHours": 24, "decisionHours": 24 },
+    "delivery": { "stableFeePerHorsePerDayUsd": 50, "extraKmFeeUsd": 2, "freeWaitingHours": 2, "waitingFeePerHourUsd": 40, "maxWaitingHours": 24, "decisionHours": 24, "deadlineBufferDays": 2 },
     "values": {
       "Policy.Version": "1.0",
       "Payment.DepositPercent": 30,
@@ -8867,7 +8871,8 @@ Response `200`:
       "Delivery.FreeWaitingHours": 2,
       "Delivery.WaitingFeePerHourUsd": 40,
       "Delivery.MaxWaitingHours": 24,
-      "Delivery.DecisionHours": 24
+      "Delivery.DecisionHours": 24,
+      "Delivery.DeadlineBufferDays": 2
     }
   },
   "errors": null
@@ -8894,6 +8899,7 @@ Response `200`:
 | `horse.postFoalingDays` | Không chở ngựa cái vừa đẻ trong số ngày này |
 | `delivery.freeWaitingHours`, `waitingFeePerHourUsd`, `maxWaitingHours` | Phí chờ tại điểm giao: số giờ miễn phí, phí mỗi giờ (USD), số giờ tính phí tối đa |
 | `delivery.decisionHours` | Số giờ khách có để chọn cách xử lý khi không giao được |
+| `delivery.deadlineBufferDays` | Số ngày dự phòng cộng vào hạn giao sớm nhất khách được chọn (mục 7) |
 | `values` | Cùng các giá trị trên, theo **đúng tên khóa** trong văn bản chính sách. Dùng để thay các chỗ `[Tên.Khóa = ...]` trong văn bản |
 
 Ví dụ thay giá trị vào văn bản chính sách:
@@ -8940,6 +8946,7 @@ Response `200`:
     "deliveryWaitingFeePerHourUsd": 40,
     "deliveryMaxWaitingHours": 24,
     "deliveryDecisionHours": 24,
+    "deliveryDeadlineBufferDays": 2,
     "updatedAt": "2026-10-27T07:05:09.094261+00:00",
     "updatedByName": "Trần Quốc Bảo"
   },
@@ -8984,6 +8991,7 @@ Giá trị mới áp dụng từ lúc lưu. Đơn đã đồng ý chính sách g
 | `deliveryWaitingFeePerHourUsd` | số | ≥ 0 | `Delivery.WaitingFeePerHourUsd` |
 | `deliveryMaxWaitingHours` | số nguyên | 1 – 168 | `Delivery.MaxWaitingHours` |
 | `deliveryDecisionHours` | số nguyên | 1 – 168 | `Delivery.DecisionHours` |
+| `deliveryDeadlineBufferDays` | số nguyên | 0 – 30 | `Delivery.DeadlineBufferDays` (không gửi thì lấy 2) |
 
 Ví dụ request (cách dễ nhất: lấy `data` của `GET /api/settings/policy`, sửa vài trường rồi gửi lại):
 
