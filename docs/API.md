@@ -3018,7 +3018,7 @@ Hệ thống tự liên hệ người nhận (chỉ email, không SMS; người 
 | Xe xuất phát | "Xe đã xuất phát" kèm giờ dự kiến tới; hệ thống ghi **khung giờ đã báo** = giờ dự kiến ± 1 giờ (`recipientNotifiedWindowStart/End`) |
 | Xe rời mốc ngay trước điểm giao của đơn | "Xe sắp tới" kèm khung giờ mới + SĐT tài xế (khung giờ đã báo được cập nhật) |
 
-**24 giờ trước giờ dự kiến tới**, khách nhận thông báo + email nhắc **xác nhận người nhận sẽ có mặt** (`POST /api/bookings/{id}/confirm-recipient`) hoặc đổi người nhận. Đổi người nhận thì phải xác nhận lại.
+**Đã bỏ bước nhắc xác nhận người nhận có mặt (29/10/2026):** người nhận nhận email thông tin giao, tài xế chủ động gọi trước khi tới. Hệ thống không còn gửi lời nhắc 24 giờ trước giờ tới; `POST /api/bookings/{id}/confirm-recipient` vẫn còn nhưng frontend không dùng.
 
 **Ký e-POD:** người ký (`recipientName` trong `POST /api/trips/{id}/handover`) phải là người nhận trong đơn, hoặc người khách đã cho phép nhận thay (`POST /api/bookings/{id}/approve-alternate-recipient`). So tên không phân biệt hoa thường, dấu và khoảng trắng thừa. Sai người → `400 ... is not the recipient of booking ...`. Ký xong khách nhận thông báo + email "Bàn giao thành công". Đơn cũ chưa có người nhận thì không kiểm tra.
 
@@ -3049,7 +3049,7 @@ Response `200`: `data` là chi tiết đơn với người nhận mới. Nếu c
 | 400 | `The recipient can no longer be changed (booking status: Completed).` | Đơn đã đóng |
 | 403 | `You can only manage the recipient of your own bookings.` | Đơn của khách khác |
 
-### POST /api/bookings/{id}/confirm-recipient — Xác nhận người nhận sẽ có mặt
+### POST /api/bookings/{id}/confirm-recipient — Xác nhận người nhận sẽ có mặt (không còn dùng)
 
 - **Ai gọi được:** Customer (chủ đơn). Không có body.
 - Response `200`: chi tiết đơn với `recipientConfirmedAt`.
