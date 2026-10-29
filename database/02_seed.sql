@@ -21,7 +21,10 @@ INSERT INTO clearance.document_types (doc_type_id, code, name, description, is_m
 (6, 'GLANDERS_TEST',      'Xét nghiệm bệnh tỵ (Glanders)',                   'Kết quả âm tính bằng phản ứng kết hợp bổ thể (CFT)', false, 'Customer'),
 (7, 'PIROPLASMOSIS_TEST', 'Xét nghiệm lê dạng trùng (Piroplasmosis)',        'Âm tính với Theileria equi và Babesia caballi (cELISA hoặc IFAT)', false, 'Customer'),
 (8, 'EVA_TEST',           'Xét nghiệm viêm động mạch do virus (EVA)',        'Áp dụng cho ngựa đực chưa thiến ở các nước yêu cầu', false, 'Customer'),
-(9, 'TRANSIT_PERMIT',     'Giấy phép quá cảnh động vật',                     'Cơ quan thú y của nước ngựa đi qua cấp trước khi xuất phát, ghi rõ cửa khẩu vào / ra', false, 'Company');
+(9, 'TRANSIT_PERMIT',     'Giấy phép quá cảnh động vật',                     'Cơ quan thú y của nước ngựa đi qua cấp trước khi xuất phát, ghi rõ cửa khẩu vào / ra', false, 'Company'),
+-- BE-10: bắt buộc cho mọi ngựa nhưng kiểm lúc xuất phát (TripExecutionService), không nằm trong checklist hồ sơ
+-- nên is_mandatory = false; khách nộp vào hồ sơ thú y của ngựa (racehorse.horse_documents) trong 48 giờ trước giờ đi
+(10, 'FIT_EXAM',          'Khám lâm sàng đủ sức khỏe',                        'Bác sĩ thú y khám lâm sàng, xác nhận ngựa đủ sức khỏe để vận chuyển; cấp trong 48 giờ trước giờ xuất phát', false, 'Customer');
 
 -- ---------- A.2 Quy định giấy tờ theo quốc gia ----------
 -- validity_days: giấy phải được cấp / lấy mẫu trong vòng N ngày trước ngày đi (NULL = còn hiệu lực là được)
