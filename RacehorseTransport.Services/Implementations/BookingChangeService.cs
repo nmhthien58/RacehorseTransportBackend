@@ -32,6 +32,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IPricingService _pricingService;
         private readonly IPaymentService _paymentService;
         private readonly IContractService _contractService;
+        private readonly IFinalQuoteIssuer _finalQuoteIssuer;
         private readonly IBookingService _bookingService;
         private readonly INotificationService _notificationService;
         private readonly IUnitOfWork _unitOfWork;
@@ -43,6 +44,7 @@ namespace RacehorseTransport.Services.Implementations
             IPricingService pricingService,
             IPaymentService paymentService,
             IContractService contractService,
+            IFinalQuoteIssuer finalQuoteIssuer,
             IBookingService bookingService,
             INotificationService notificationService,
             IUnitOfWork unitOfWork)
@@ -53,6 +55,7 @@ namespace RacehorseTransport.Services.Implementations
             _pricingService = pricingService;
             _paymentService = paymentService;
             _contractService = contractService;
+            _finalQuoteIssuer = finalQuoteIssuer;
             _bookingService = bookingService;
             _notificationService = notificationService;
             _unitOfWork = unitOfWork;
@@ -99,6 +102,8 @@ namespace RacehorseTransport.Services.Implementations
 
             string previousStatus = booking.Status;
             bool requote = RequoteStatuses.Contains(previousStatus);
+            // Đường bay không lập tuyến: báo giá lại ngay theo điểm mới thay vì chờ điều phối
+            bool airRequote = requote && QuoteRules.QuotesOnPreApproval(booking.TransportMode);
             var plans = await _planRepo.GetQueryable()
                 .Where(p => p.BookingId == bookingId
                     && (p.Status == RoutePlanStatuses.Approved || p.Status == RoutePlanStatuses.Submitted || p.Status == RoutePlanStatuses.Draft))
@@ -160,7 +165,17 @@ namespace RacehorseTransport.Services.Implementations
                 }
                 await _bookingRepo.SaveChangesAsync();
 
-                if (previousStatus != BookingStatuses.Submitted)
+                if (airRequote)
+                {
+                    await _finalQuoteIssuer.IssueAsync(bookingId, null);
+                    await _notificationService.SendToRoleAsync(
+                        UserRoles.LogisticsManager,
+                        $"Booking {booking.BookingCode}: pickup / drop-off changed",
+                        $"The customer changed the pickup / drop-off to {booking.PickupAddress} ({booking.PickupCountryCode}) → {booking.DropoffAddress} ({booking.DropoffCountryCode}). A new final quote of {booking.EstimatedCost:N2} {booking.CurrencyCode} was sent.",
+                        NotificationReferenceTypes.Booking,
+                        booking.BookingId);
+                }
+                else if (previousStatus != BookingStatuses.Submitted)
                 {
                     string message = $"The customer changed the pickup / drop-off to {booking.PickupAddress} ({booking.PickupCountryCode}) → {booking.DropoffAddress} ({booking.DropoffCountryCode}). "
                         + (requote ? "The previous quote is withdrawn: please plan the route again." : "Please plan the route with the new points.");
