@@ -13,7 +13,7 @@ public class PolicySettingsTests
         // Giá trị trong ngoặc vuông của docs/CHINH_SACH_DICH_VU.md
         var m = new PolicySettingsModel();
 
-        Assert.Equal("1.0", m.PolicyVersion);
+        Assert.Equal("1.1", m.PolicyVersion);
         Assert.Equal(3, m.QuoteAcceptDays);
         Assert.Equal(7, m.DossierSubmitDays);
         Assert.Equal(50, m.StableFeePerHorsePerDayUsd);
@@ -34,6 +34,7 @@ public class PolicySettingsTests
         Assert.Equal(40, m.DeliveryWaitingFeePerHourUsd);
         Assert.Equal(24, m.DeliveryMaxWaitingHours);
         Assert.Equal(24, m.DeliveryDecisionHours);
+        Assert.Equal(2, m.DeliveryDeadlineBufferDays);
     }
 
     [Fact]
@@ -76,6 +77,8 @@ public class PolicySettingsTests
         yield return Case("Delivery.WaitingFeePerHourUsd", m => m.DeliveryWaitingFeePerHourUsd = -40);
         yield return Case("Delivery.MaxWaitingHours", m => m.DeliveryMaxWaitingHours = 0);
         yield return Case("Delivery.DecisionHours", m => m.DeliveryDecisionHours = 169);
+        yield return Case("Delivery.DeadlineBufferDays", m => m.DeliveryDeadlineBufferDays = -1);
+        yield return Case("Delivery.DeadlineBufferDays", m => m.DeliveryDeadlineBufferDays = 31);
     }
 
     private static object[] Case(string key, Action<PolicySettingsModel> change) => new object[] { key, change };

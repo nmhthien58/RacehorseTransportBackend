@@ -1,6 +1,6 @@
 # CHÍNH SÁCH DỊCH VỤ VẬN CHUYỂN NGỰA — RACEHORSE TRANSPORT
 
-Phiên bản: 1.0 (bản nháp, 26/10/2026)
+Phiên bản: 1.1 (29/10/2026: thêm ngày dự phòng cho hạn giao, mục 7)
 
 > Ghi chú cho nhóm phát triển (không hiển thị cho khách):
 > - Các con số trong ngoặc vuông `[...]` là **giá trị cấu hình**, trang web phải đọc từ cấu hình hệ thống thay vì viết cứng. Tên khóa cấu hình ghi bên cạnh.
@@ -93,6 +93,7 @@ Công ty **không giới hạn tuổi tối đa**. Thay vào đó, **mọi con n
 ## 7. Cam kết thời gian giao và bồi thường giao trễ
 
 - Công ty cam kết giao ngựa **trước hạn giao trễ nhất** Khách đã chọn. Hạn giao được hệ thống kiểm tra để đủ thời gian cho trường hợp ngựa được đón vào **ngày cuối** của khoảng ngày đón.
+- Thời gian vận chuyển chỉ là ước tính, nên **hạn giao sớm nhất** Khách được chọn tính theo **ngày**: hết ngày ngựa tới nơi trong trường hợp chậm nhất, cộng thêm `[Delivery.DeadlineBufferDays = 2]` ngày dự phòng.
 - **Bồi thường giao trễ** (chỉ khi trễ do lỗi của công ty):
   - Trễ không quá `[Delay.GraceHours = 6]` giờ: không bồi thường.
   - Sau đó, hoàn `[Delay.PercentPer12Hours = 5]`% **tiền cước vận chuyển** cho mỗi 12 giờ trễ (chưa đủ 12 giờ tính tròn lên 12 giờ), tối đa `[Delay.MaxPercent = 25]`%.

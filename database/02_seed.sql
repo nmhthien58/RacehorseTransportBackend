@@ -368,7 +368,7 @@ INSERT INTO common.system_settings (setting_key, setting_value, description) VAL
 ('Payment.BalanceDueDaysBeforeDeparture','2',     'Phần còn lại phải trả trước ngày xuất phát bao nhiêu ngày'),
 ('Payment.ExtraPaymentDueDays',          '7',     'Hạn trả chi phí phát sinh (ngày) tính từ khi đóng chuyến'),
 -- BE-17: giá trị cấu hình của Chính sách dịch vụ (docs/CHINH_SACH_DICH_VU.md)
-('Policy.Version',                       '1.0',   'Phiên bản Chính sách dịch vụ hiện hành (lưu vào đơn khi khách đồng ý)'),
+('Policy.Version',                       '1.1',   'Phiên bản Chính sách dịch vụ hiện hành (lưu vào đơn khi khách đồng ý)'),
 ('Booking.QuoteAcceptDays',              '3',     'Số ngày khách được xem và chấp nhận báo giá chốt + đặt cọc'),
 ('Dossier.SubmitDays',                   '7',     'Số ngày khách có để nộp đủ giấy tờ, tính từ lúc đặt cọc'),
 ('Stable.FeePerHorsePerDayUsd',          '50',    'Phí chuồng tạm + chăm sóc (USD / con / ngày)'),
@@ -388,7 +388,8 @@ INSERT INTO common.system_settings (setting_key, setting_value, description) VAL
 ('Delivery.FreeWaitingHours',            '2',     'Số giờ xe chờ miễn phí tại điểm giao'),
 ('Delivery.WaitingFeePerHourUsd',        '40',    'Phí chờ (USD / giờ) sau thời gian chờ miễn phí'),
 ('Delivery.MaxWaitingHours',             '24',    'Số giờ chờ tính phí tối đa'),
-('Delivery.DecisionHours',               '24',    'Số giờ khách có để chọn cách xử lý khi không giao được');
+('Delivery.DecisionHours',               '24',    'Số giờ khách có để chọn cách xử lý khi không giao được'),
+('Delivery.DeadlineBufferDays',          '2',     'Số ngày dự phòng cộng vào hạn giao sớm nhất khách được chọn');
 
 INSERT INTO common.system_notifications (recipient_user_id, title, message, reference_type, reference_id, is_read, created_at) VALUES
 (5, 'Đơn BKG-2026-0001 đã được phê duyệt', 'Yêu cầu vận chuyển của bạn đã được phê duyệt và phân công nhân sự phụ trách.', 'Booking', 1, true,  '2026-09-20 09:00:00+07'),

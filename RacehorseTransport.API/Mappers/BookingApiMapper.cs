@@ -160,6 +160,8 @@ namespace RacehorseTransport.API.Mappers
                 EarliestPickupDate = model.EarliestPickupDate,
                 ExpressUntilDate = model.ExpressUntilDate,
                 EarliestDeliveryDeadline = model.EarliestDeliveryDeadline,
+                DeliveryBufferDays = model.DeliveryBufferDays,
+                EarliestDeliveryDate = model.EarliestDeliveryDate,
                 Transit = model.Transit.ToResponse(),
                 QuoteMin = model.QuoteMin,
                 QuoteMax = model.QuoteMax,

@@ -68,5 +68,9 @@ namespace RacehorseTransport.API.RequestModels
 
         [Range(1, 168, ErrorMessage = "DeliveryDecisionHours must be between 1 and 168.")]
         public int DeliveryDecisionHours { get; set; }
+
+        // Không gửi thì giữ mặc định 2 (app cũ chưa có trường này)
+        [Range(0, 30, ErrorMessage = "DeliveryDeadlineBufferDays must be between 0 and 30.")]
+        public int DeliveryDeadlineBufferDays { get; set; } = 2;
     }
 }
