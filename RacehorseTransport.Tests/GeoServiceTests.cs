@@ -26,14 +26,14 @@ public class GeoServiceTests
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            Requests.Add(request);
+            lock (Requests) Requests.Add(request);
             return Task.FromResult(_respond(request));
         }
     }
 
     private sealed class MemoryCache : ICacheService
     {
-        private readonly Dictionary<string, string> _items = new();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _items = new();
 
         public Task<T?> GetAsync<T>(string key) =>
             Task.FromResult(_items.TryGetValue(key, out var json) ? JsonSerializer.Deserialize<T>(json) : default);
@@ -46,7 +46,7 @@ public class GeoServiceTests
 
         public Task RemoveAsync(string key)
         {
-            _items.Remove(key);
+            _items.TryRemove(key, out _);
             return Task.CompletedTask;
         }
 
