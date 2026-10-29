@@ -1684,12 +1684,13 @@ import { MapContainer, TileLayer, Polyline } from "react-leaflet";
 
 ## 7. Flow 1 – Đơn vận chuyển
 
-Khách hàng gửi một **đơn vận chuyển** (booking) cho một hoặc nhiều con ngựa, kèm **khoảng giá ước tính**. Quản lý **duyệt sơ bộ** (đơn khả thi) và chọn chuyên viên thủ tục phụ trách; điều phối viên **lập tuyến dự kiến** trên bản đồ (mục 7b); quản lý **duyệt tuyến**; sau đó khách nhận **báo giá chốt**, chấp nhận và **đặt cọc** (mục 19). Khi khách cọc xong, hệ thống tự mở một hồ sơ kiểm dịch cho mỗi con ngựa (Flow 2).
+Khách hàng gửi một **đơn vận chuyển** (booking) cho một hoặc nhiều con ngựa, kèm **khoảng giá ước tính**. Quản lý **duyệt sơ bộ** (đơn khả thi) và chọn chuyên viên thủ tục phụ trách; điều phối viên **lập tuyến dự kiến** trên bản đồ (mục 7b); quản lý **duyệt tuyến**; sau đó khách nhận **báo giá chốt**, chấp nhận và **đặt cọc** (mục 19). **Đơn đường bay (`transportMode = Air`) không lập tuyến:** duyệt sơ bộ xong là server phát hành báo giá chốt ngay, đơn đi thẳng `PreApproved → Quoted`. Khi khách cọc xong, hệ thống tự mở một hồ sơ kiểm dịch cho mỗi con ngựa (Flow 2).
 
 Vòng đời của một đơn:
 
 ```
 Submitted ──(quản lý duyệt sơ bộ)──> PreApproved ──(điều phối lập tuyến, quản lý duyệt tuyến)──> RoutePlanned ──(server tính ngay)──> Quoted
+Đơn đường bay: Submitted ──(quản lý duyệt sơ bộ, server tính báo giá chốt ngay)──> PreApproved ──> Quoted   (cùng một lần gọi, không lập tuyến)
     ──(khách chấp nhận báo giá)──> AwaitingDeposit ──(khách cọc)──> Approved ──(xếp chuyến)──> Assigned ──(giao xong)──> Completed
                                                                                                                        │
                                                                                                                        └─(còn phát sinh)─> AwaitingFinalPayment ─(trả xong)─> Completed
@@ -1700,7 +1701,7 @@ Mọi trạng thái trước khi lên chuyến ──(khách hủy)──> Cance
 Submitted ──(quá 48 giờ không ai duyệt)──> Expired
 ```
 
-**Báo giá chốt (R-10) và hợp đồng (R-17).** Ngay khi quản lý duyệt tuyến, server tính **giá chốt** theo quãng đường và các nước quá cảnh của tuyến (giữ nguyên bảng giá và mức hỏa tốc lúc khách gửi đơn), cộng **phí bảo hiểm toàn giá trị** cho từng con chọn gói `Full` (`Insurance.PremiumPercent`% giá trị thỏa thuận, dòng `INS_FULL`). Giá chốt nằm ở `estimatedCost` + `quoteLines`; server tạo kèm **hợp đồng PDF** bản nháp (mục 7c); đơn chuyển `Quoted` và khách nhận thông báo + email. Khách có `Booking.QuoteAcceptDays` ngày (mặc định 3, xem `GET /api/policy`) tính tới `quoteExpiresAt` để **chấp nhận và đặt cọc**; còn 1 ngày thì server gửi email nhắc một lần. Quá hạn (chưa chấp nhận, hoặc chấp nhận mà chưa cọc) thì đơn tự đóng `QuoteExpired`, không mất phí. Trong lúc đơn `Quoted`, công ty vẫn có thể lập lại tuyến; duyệt bản mới thì báo giá được tính lại với hạn mới.
+**Báo giá chốt (R-10) và hợp đồng (R-17).** Ngay khi quản lý duyệt tuyến (đường bộ) hoặc duyệt sơ bộ (đường bay), server tính **giá chốt**: đường bộ theo quãng đường và các nước quá cảnh của tuyến, đường bay theo con theo nước đến (giữ nguyên bảng giá và mức hỏa tốc lúc khách gửi đơn), cộng **phí bảo hiểm toàn giá trị** cho từng con chọn gói `Full` (`Insurance.PremiumPercent`% giá trị thỏa thuận, dòng `INS_FULL`). Giá chốt nằm ở `estimatedCost` + `quoteLines`; server tạo kèm **hợp đồng PDF** bản nháp (mục 7c); đơn chuyển `Quoted` và khách nhận thông báo + email. Khách có `Booking.QuoteAcceptDays` ngày (mặc định 3, xem `GET /api/policy`) tính tới `quoteExpiresAt` để **chấp nhận và đặt cọc**; còn 1 ngày thì server gửi email nhắc một lần. Quá hạn (chưa chấp nhận, hoặc chấp nhận mà chưa cọc) thì đơn tự đóng `QuoteExpired`, không mất phí. Trong lúc đơn `Quoted`, công ty vẫn có thể lập lại tuyến; duyệt bản mới thì báo giá được tính lại với hạn mới.
 
 Đơn tạo trước R-10 (không có `quoteExpiresAt`) vẫn theo luật cũ: quá `Payment.DepositDueHours` giờ sau khi duyệt mà chưa cọc thì `Expired`.
 
@@ -1708,7 +1709,7 @@ Submitted ──(quá 48 giờ không ai duyệt)──> Expired
 
 **Đổi tuyến do công ty (BE-06, Chính sách mục 2).** Sau khi khách đã chấp nhận báo giá (`AwaitingDeposit`, `Approved`, `Assigned` và ngựa chưa rời điểm đón), điều phối vẫn lập được phiên bản tuyến mới và quản lý duyệt như thường; **giá chốt giữ nguyên**, đơn giữ trạng thái. Tuyến mới đi qua nước mới (khi đơn đang làm giấy) thì danh sách giấy tự thêm giấy quá cảnh của nước đó, hạn nộp giấy được gia hạn thêm `Dossier.SubmitDays` ngày, khách nhận thông báo + email, và tới `routeChangeCancelUntil` khách được **hủy và hoàn 100%** (`POST /api/bookings/{id}/cancel-route-change`).
 
-**Khách đổi điểm đón / trả (BE-06).** Trước khi trả bất kỳ khoản nào, khách đổi được bằng `PUT /api/bookings/{id}/locations`: khoảng giá tính lại; nếu đã có tuyến / báo giá thì bị rút lại, đơn về `PreApproved` để lập tuyến và báo giá mới. Đã trả tiền thì khách liên hệ công ty.
+**Khách đổi điểm đón / trả (BE-06).** Trước khi trả bất kỳ khoản nào, khách đổi được bằng `PUT /api/bookings/{id}/locations`: khoảng giá tính lại; nếu đã có tuyến / báo giá thì bị rút lại, đơn về `PreApproved` để lập tuyến và báo giá mới. Đơn đường bay đã có báo giá thì server tính lại báo giá chốt ngay theo điểm mới (đơn vẫn `Quoted`, hạn mới, hợp đồng nháp mới). Đã trả tiền thì khách liên hệ công ty.
 
 Thứ tự gọi thông thường:
 
@@ -1717,7 +1718,7 @@ Thứ tự gọi thông thường:
 3. Khách: `POST /api/bookings` để gửi đơn.
 4. Quản lý: `GET /api/bookings?status=Submitted` để xem đơn chờ duyệt, `GET /api/users/staff?role=TransportSpecialist` để lấy danh sách chuyên viên.
 5. Quản lý: `POST /api/bookings/{id}/approve` (duyệt sơ bộ) hoặc `POST /api/bookings/{id}/reject`.
-6. Điều phối: `GET /api/bookings?status=PreApproved` rồi lập tuyến (mục 7b) và trình; quản lý duyệt tuyến.
+6. Điều phối: `GET /api/bookings?status=PreApproved` rồi lập tuyến (mục 7b) và trình; quản lý duyệt tuyến. Đơn đường bay bỏ qua bước này (đã `Quoted` sau bước 5).
 7. Khách: `GET /api/bookings/{id}` xem báo giá chốt (`customerStage = QuoteReady`), rồi `POST /api/bookings/{id}/accept-quote` (hoặc `decline-quote`).
 8. Khách: `GET /api/bookings/{id}/payments` và `POST /api/bookings/{id}/payments` để đặt cọc qua VNPay (mục 19) trước `quoteExpiresAt`.
 
@@ -2460,7 +2461,11 @@ Response `200`: `data` là chi tiết đơn với `status = Cancelled`; xem kho�
 
 ### POST /api/bookings/{id}/approve — Duyệt sơ bộ đơn
 
-**Đổi từ R-10:** đây là bước **duyệt sơ bộ** (đơn khả thi), chưa thu cọc. Duyệt một đơn đang `Submitted` và chọn chuyên viên phụ trách. Đơn chuyển sang `PreApproved`; khách nhận thông báo "đang lập tuyến, chưa phải thanh toán"; các điều phối viên nhận thông báo cần lập tuyến (mục 7b). Cọc chỉ thu sau khi khách chấp nhận báo giá chốt.
+**Đổi từ R-10:** đây là bước **duyệt sơ bộ** (đơn khả thi), chưa thu cọc. Duyệt một đơn đang `Submitted` và chọn chuyên viên phụ trách. Cọc chỉ thu sau khi khách chấp nhận báo giá chốt.
+
+- **Đường bộ (`Ground`):** đơn chuyển sang `PreApproved`; khách nhận thông báo "đang lập tuyến, chưa phải thanh toán"; các điều phối viên nhận thông báo cần lập tuyến (mục 7b).
+- **Đường bay (`Air`):** không lập tuyến trên bản đồ. Trong cùng lần gọi, server tính **báo giá chốt** (cước theo con theo nước đến, phụ phí, bảo hiểm từng con), tạo hợp đồng PDF nháp và chuyển đơn sang **`Quoted`** (có `estimatedCost`, `quoteLines`, `quoteExpiresAt`). Khách nhận thông báo + email báo giá chốt; điều phối không nhận thông báo lập tuyến. Vì vậy với đơn bay, quản lý chốt giá trị thỏa thuận (`PUT /api/bookings/{id}/horse-values`) **trước** khi duyệt sơ bộ.
+- Đơn bay đã nằm ở `PreApproved` từ trước bản sửa này (chưa có báo giá) gọi lại endpoint này được để phát hành báo giá chốt.
 
 - **Ai gọi được:** LogisticsManager, Admin
 - **Dữ liệu gửi lên:** JSON
@@ -2485,13 +2490,14 @@ Ví dụ request:
 }
 ```
 
-Response `200`: `data` là chi tiết đơn với `status` là `PreApproved` và `assignedSpecialistName` là chuyên viên vừa chọn.
+Response `200`: `data` là chi tiết đơn với `status` là `PreApproved` (đường bộ) hoặc `Quoted` (đường bay) và `assignedSpecialistName` là chuyên viên vừa chọn.
 
 Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
 | 400 | `Only a Submitted booking can be approved (current status: ...).` | Đơn không còn ở trạng thái chờ duyệt |
+| 400 | `No freight rate is configured for Air transport to 'JP'.` | Đơn bay: bảng giá chưa có cước `FREIGHT` đường bay cho nước đến. Thêm giá (mục 17) rồi duyệt lại; đơn giữ nguyên `Submitted` |
 | 400 | `User with ID 9 is not an active transport specialist.` | Người được chọn không phải chuyên viên, hoặc đã bị khóa |
 | 400 | `This booking can no longer be approved: its pickup window ends on ... on this route need about 26 days ...` | Duyệt quá muộn: khoảng pickup không còn đủ thời gian lập tuyến, đặt cọc, làm hồ sơ của tuyến và xếp chuyến. Từ chối và nhờ khách đặt lại khoảng ngày muộn hơn |
 

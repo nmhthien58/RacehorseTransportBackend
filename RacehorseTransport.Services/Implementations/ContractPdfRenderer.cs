@@ -91,7 +91,11 @@ namespace RacehorseTransport.Services.Implementations
                         col.Item().Text($"Điểm đón: {model.PickupAddress} ({model.PickupCountryCode}).");
                         col.Item().Text($"Điểm giao: {model.DropoffAddress} ({model.DropoffCountryCode}).");
                         col.Item().Text("Nước quá cảnh: " + (model.TransitCountryCodes.Count == 0 ? "không có." : string.Join(" → ", model.TransitCountryCodes) + "."));
-                        col.Item().Text($"Tổng quãng đường theo tuyến đã duyệt: {model.TotalDistanceKm.ToString("#,##0.#", VietnameseCulture)} km.");
+                        // Đường bay không lập tuyến trên bản đồ nên không có quãng đường theo tuyến đã duyệt
+                        if (model.TransportMode != TransportModes.Air)
+                        {
+                            col.Item().Text($"Tổng quãng đường theo tuyến đã duyệt: {model.TotalDistanceKm.ToString("#,##0.#", VietnameseCulture)} km.");
+                        }
                         if (model.Stops.Count > 0)
                         {
                             col.Item().Table(table =>

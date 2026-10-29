@@ -53,6 +53,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ISystemSettingService _settingService;
         private readonly IFileStorageService _fileStorage;
         private readonly IBookingActivator _bookingActivator;
+        private readonly IFinalQuoteIssuer _finalQuoteIssuer;
         private readonly INotificationService _notificationService;
         private readonly IRecipientService _recipientService;
         private readonly ICountryService _countryService;
@@ -73,6 +74,7 @@ namespace RacehorseTransport.Services.Implementations
             ISystemSettingService settingService,
             IFileStorageService fileStorage,
             IBookingActivator bookingActivator,
+            IFinalQuoteIssuer finalQuoteIssuer,
             INotificationService notificationService,
             IRecipientService recipientService,
             ICountryService countryService,
@@ -92,6 +94,7 @@ namespace RacehorseTransport.Services.Implementations
             _settingService = settingService;
             _fileStorage = fileStorage;
             _bookingActivator = bookingActivator;
+            _finalQuoteIssuer = finalQuoteIssuer;
             _notificationService = notificationService;
             _recipientService = recipientService;
             _countryService = countryService;
@@ -421,7 +424,11 @@ namespace RacehorseTransport.Services.Implementations
         public async Task<BookingDetailModel> ApproveBookingAsync(int id, int specialistUserId, CurrentUser currentUser)
         {
             var booking = await GetTrackedBookingAsync(id);
-            EnsureStatus(booking, BookingStatuses.Submitted, "approved");
+            if (!QuoteRules.CanPreApprove(booking.TransportMode, booking.Status))
+            {
+                throw new BusinessException($"Only a {BookingStatuses.Submitted} booking can be approved (current status: {booking.Status}).");
+            }
+            bool quoteNow = QuoteRules.QuotesOnPreApproval(booking.TransportMode);
 
             // Duyệt chậm thì khoảng pickup có thể không còn đủ thời gian cho đặt cọc, hồ sơ (theo tuyến) và xếp chuyến
             int clearanceDays = await _clearanceSchedule.GetClearanceDaysAsync(
@@ -439,6 +446,7 @@ namespace RacehorseTransport.Services.Implementations
 
             // R-10: đây là bước DUYỆT SƠ BỘ (đơn khả thi). Chưa thu cọc: Coordinator lập tuyến, Manager duyệt tuyến,
             // rồi khách nhận báo giá chốt và đặt cọc khi chấp nhận (BE-05).
+            // Đường bay không lập tuyến: báo giá chốt phát hành ngay trong bước này (PreApproved -> Quoted).
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 booking.Status = BookingStatuses.PreApproved;
@@ -447,6 +455,13 @@ namespace RacehorseTransport.Services.Implementations
                 booking.AssignedSpecialistId = specialist.UserId;
                 booking.RejectionReason = null;
                 await _bookingRepo.UpdateAsync(booking);
+
+                if (quoteNow)
+                {
+                    // Thông báo + email báo giá chốt do FinalQuoteIssuer gửi; điều phối không cần lập tuyến
+                    await _finalQuoteIssuer.IssueAsync(booking.BookingId, null);
+                    return;
+                }
 
                 await _notificationService.SendAsync(
                     booking.CustomerUserId,
@@ -842,14 +857,6 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"User with ID {specialistUserId} is not an active transport specialist.");
             }
             return specialist;
-        }
-
-        private static void EnsureStatus(BookingRequest booking, string requiredStatus, string action)
-        {
-            if (booking.Status != requiredStatus)
-            {
-                throw new BusinessException($"Only a {requiredStatus} booking can be {action} (current status: {booking.Status}).");
-            }
         }
 
         private static void CancelHorses(BookingRequest booking)

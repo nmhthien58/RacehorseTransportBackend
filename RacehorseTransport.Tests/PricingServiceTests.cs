@@ -373,6 +373,36 @@ public class PricingServiceTests
         Assert.True(quote.RouteIsEstimate);
     }
 
+    // Đơn bay được báo giá chốt ngay khi duyệt sơ bộ: không có tuyến, không có km, cước tính theo con theo nước đến
+    [Fact]
+    public async Task FinalQuote_AirBookingWithoutRoutePlan_PricedPerHorse()
+    {
+        var service = CreateService();
+        var pickup = EarliestPickup().AddDays(Options.ExpressWindowDays + 10);
+        var booking = new BookingRequest
+        {
+            BookingCode = "BK-AIR",
+            TransportMode = TransportModes.Air,
+            PickupCountryCode = "VN",
+            DropoffCountryCode = "TH",
+            PickupWindowStart = pickup,
+            PickupWindowEnd = pickup.AddDays(3),
+            DeliveryDeadline = pickup.AddDays(10)
+        };
+        var horses = new List<BookingHorse>
+        {
+            new() { StallClass = StallClasses.Shared },
+            new() { StallClass = StallClasses.Shared }
+        };
+
+        var quote = await service.CalculateQuoteAsync(FinalQuoteIssuer.BuildQuoteInput(booking, horses, plan: null));
+
+        var freight = Assert.Single(quote.Lines, l => l.Code == "FREIGHT_SHARED");
+        Assert.Equal(2, freight.Quantity);
+        Assert.Equal(2000m, freight.Amount);
+        Assert.DoesNotContain(quote.Lines, l => l.Code == "FEE_TRANSIT");
+    }
+
     private sealed class FakeGeoService : IGeoService
     {
         private readonly decimal _km;
