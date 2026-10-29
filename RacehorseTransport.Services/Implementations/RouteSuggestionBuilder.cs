@@ -328,7 +328,9 @@ namespace RacehorseTransport.Services.Implementations
                     CheckpointName = $"Border {path[i - 1]} - {path[i]}",
                     CheckpointType = CheckpointTypes.BorderGate,
                     Address = $"Border crossing {path[i - 1]} -> {path[i]}",
-                    PlannedTime = time
+                    PlannedTime = time,
+                    FromCountryCode = path[i - 1],
+                    ToCountryCode = path[i]
                 });
                 time = time.AddHours((double)_options.BorderCrossingHours);
             }

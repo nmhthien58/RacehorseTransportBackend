@@ -101,6 +101,26 @@ namespace RacehorseTransport.Services.Implementations
                 }
             }
 
+            // Cửa khẩu thật trên tuyến đã duyệt, theo cặp nước (nước của mốc trước -> nước của mốc sau)
+            var gatesByCountryPair = new Dictionary<string, RacehorseTransport.Repositories.Entities.RoutePlanStop>();
+            foreach (var plan in plans)
+            {
+                var stops = plan.Stops.OrderBy(s => s.SequenceOrder).ToList();
+                for (int i = 0; i < stops.Count; i++)
+                {
+                    if (stops[i].StopType != RouteStopTypes.BorderGate)
+                    {
+                        continue;
+                    }
+                    string? from = stops.Take(i).LastOrDefault(s => s.StopType != RouteStopTypes.BorderGate)?.CountryCode;
+                    string? to = stops.Skip(i + 1).FirstOrDefault(s => s.StopType != RouteStopTypes.BorderGate)?.CountryCode;
+                    if (from != null && to != null)
+                    {
+                        gatesByCountryPair.TryAdd(CountryPairKey(from, to), stops[i]);
+                    }
+                }
+            }
+
             foreach (var checkpoint in result.Checkpoints)
             {
                 if (coordinatesByAddress.TryGetValue(NormalizeAddress(checkpoint.Address), out var coordinates))
@@ -108,8 +128,20 @@ namespace RacehorseTransport.Services.Implementations
                     checkpoint.Latitude = coordinates.Lat;
                     checkpoint.Longitude = coordinates.Lng;
                 }
+                else if (checkpoint.CheckpointType == CheckpointTypes.BorderGate
+                    && checkpoint.FromCountryCode != null && checkpoint.ToCountryCode != null
+                    && gatesByCountryPair.TryGetValue(CountryPairKey(checkpoint.FromCountryCode, checkpoint.ToCountryCode), out var gate))
+                {
+                    // Thay tên tạm "Border VN - KH" bằng cửa khẩu Manager đã duyệt trên tuyến của đơn
+                    checkpoint.CheckpointName = gate.StopName;
+                    checkpoint.Address = gate.Address;
+                    checkpoint.Latitude = gate.Latitude;
+                    checkpoint.Longitude = gate.Longitude;
+                }
             }
         }
+
+        private static string CountryPairKey(string from, string to) => $"{from.ToUpperInvariant()}>{to.ToUpperInvariant()}";
 
         private static string NormalizeAddress(string address) => address.Trim().ToUpperInvariant();
 

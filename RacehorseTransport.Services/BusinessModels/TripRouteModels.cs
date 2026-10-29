@@ -52,6 +52,12 @@ namespace RacehorseTransport.Services.BusinessModels
         public int? BookingId { get; set; }
         public string? BookingCode { get; set; }
         public int LegDistanceKm { get; set; } // quãng đường từ mốc trước tới mốc này (0 với cửa khẩu: tính trong chặng)
+
+        // Cửa khẩu: đi từ nước nào sang nước nào (để thay bằng cửa khẩu thật của tuyến đã duyệt); không trả ra API
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? FromCountryCode { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? ToCountryCode { get; set; }
     }
 
     // Giờ đón / giờ giao dự kiến của từng đơn trên tuyến ghép
