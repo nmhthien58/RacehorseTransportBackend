@@ -142,5 +142,23 @@ namespace RacehorseTransport.API.Mappers
                 }).ToList()
             };
         }
+
+        public static DepartureCheckResponse ToResponse(this DepartureCheckModel model)
+        {
+            return new DepartureCheckResponse
+            {
+                IsReady = model.IsReady,
+                DepartureAt = model.DepartureAt,
+                Issues = model.Issues.Select(i => new DepartureIssueResponse
+                {
+                    Code = i.Code,
+                    Message = i.Message,
+                    Severity = i.Severity,
+                    Category = i.Category,
+                    HorseName = i.HorseName,
+                    BookingCode = i.BookingCode
+                }).ToList()
+            };
+        }
     }
 }

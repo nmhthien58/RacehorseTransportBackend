@@ -117,4 +117,22 @@ namespace RacehorseTransport.API.ResponseModels
         public WelfareLogResponse? LatestLog { get; set; }
         public List<WelfareLogResponse> Logs { get; set; } = new();
     }
+
+    // BE-10: GET /api/trips/{id}/departure-check
+    public class DepartureCheckResponse
+    {
+        public bool IsReady { get; set; }
+        public DateTimeOffset DepartureAt { get; set; }
+        public List<DepartureIssueResponse> Issues { get; set; } = new();
+    }
+
+    public class DepartureIssueResponse
+    {
+        public string Code { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string Severity { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string? HorseName { get; set; }
+        public string? BookingCode { get; set; }
+    }
 }

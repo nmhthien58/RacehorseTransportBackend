@@ -7,12 +7,18 @@ namespace RacehorseTransport.Services.Implementations
     {
         public static void EnsureDriverCount(decimal drivingHours, int driverCount, decimal singleDriverLimitHours)
         {
-            if (drivingHours > singleDriverLimitHours && driverCount < 2)
+            if (NeedsMoreDrivers(drivingHours, driverCount, singleDriverLimitHours))
             {
-                throw new BusinessException(
-                    $"A trip with {drivingHours:0.#} estimated driving hours needs at least 2 drivers; this trip has {driverCount}.");
+                throw new BusinessException(DriverCountMessage(drivingHours, driverCount));
             }
         }
+
+        // BE-10 kiểm lại lúc xuất phát nhưng gom vào danh sách vấn đề, không ném lỗi ngay
+        public static bool NeedsMoreDrivers(decimal drivingHours, int driverCount, decimal singleDriverLimitHours) =>
+            drivingHours > singleDriverLimitHours && driverCount < 2;
+
+        public static string DriverCountMessage(decimal drivingHours, int driverCount) =>
+            $"A trip with {drivingHours:0.#} estimated driving hours needs at least 2 drivers; this trip has {driverCount}.";
 
         public static void EnsureCountriesAreApproved(
             string bookingCode,

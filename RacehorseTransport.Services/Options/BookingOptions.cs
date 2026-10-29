@@ -39,6 +39,10 @@ namespace RacehorseTransport.Services.Options
         // ... và cộng phí thủ tục quá cảnh cho các nước đường A -> B đi qua, tối đa bấy nhiêu nước (giá thấp nhất không tính phí này)
         public int QuoteMaxTransitCountries { get; set; } = 2;
 
+        // ---------- Kiểm tra trước khi xuất phát (BE-10) ----------
+        // Giấy khám lâm sàng đủ sức khỏe phải cấp trong bấy nhiêu giờ trước giờ xuất phát (chính sách mục 5)
+        public int FitExamValidHours { get; set; } = 48;
+
         // Số ngày cần tính từ lúc DUYỆT đơn tới ngày pickup, với thời gian làm hồ sơ của tuyến (R-03)
         public int ApprovalLeadDaysFor(int clearanceDays) => DepositDays + clearanceDays + PlanningBufferDays;
 

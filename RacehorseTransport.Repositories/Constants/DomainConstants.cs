@@ -199,6 +199,13 @@ namespace RacehorseTransport.Repositories.Constants
         public static readonly string[] All = { Customer, Company };
     }
 
+    // Mã loại giấy code cần nhận biết riêng (khớp clearance.document_types.code)
+    public static class DocumentTypeCodes
+    {
+        // Khám lâm sàng đủ sức khỏe: khách nộp vào hồ sơ thú y của ngựa trong 48 giờ trước giờ xuất phát (BE-10)
+        public const string FitExam = "FIT_EXAM";
+    }
+
     public static class AssetTypes
     {
         public const string HorseTruckAirSuspension = "HorseTruck_AirSuspension";
