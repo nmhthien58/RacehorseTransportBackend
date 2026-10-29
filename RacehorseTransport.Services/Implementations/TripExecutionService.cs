@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RacehorseTransport.Repositories.Constants;
 using RacehorseTransport.Repositories.Entities;
 using RacehorseTransport.Repositories.Interfaces;
@@ -8,6 +9,7 @@ using RacehorseTransport.Services.Exceptions;
 using RacehorseTransport.Services.Extensions;
 using RacehorseTransport.Services.Interfaces;
 using RacehorseTransport.Services.Mappers;
+using RacehorseTransport.Services.Options;
 
 namespace RacehorseTransport.Services.Implementations
 {
@@ -15,6 +17,9 @@ namespace RacehorseTransport.Services.Implementations
     {
         // Chuyến đang trên đường (kể cả lúc đang nắn tuyến vì sự cố)
         private static readonly string[] OnTheRoadStatuses = { TripStatuses.InTransit, TripStatuses.EmergencyRerouting };
+
+        // Ngựa đã rời chuyến không còn tính vào kiểm tra xuất phát
+        private static readonly string[] LeftTripStatuses = { TripHorseStatuses.Offloaded, TripHorseStatuses.Deceased, TripHorseStatuses.Cancelled };
 
         private readonly IRepository<Trip> _tripRepo;
         private readonly IRepository<TripHorse> _tripHorseRepo;
@@ -27,6 +32,12 @@ namespace RacehorseTransport.Services.Implementations
         private readonly IRecipientService _recipientService;
         private readonly IRepository<DeliveryFailure> _deliveryFailureRepo;
         private readonly IFileStorageService _fileStorage;
+        private readonly IRepository<HorseDocument> _horseDocumentRepo;
+        private readonly IRepository<DocumentType> _docTypeRepo;
+        private readonly IRepository<RoutePlan> _routePlanRepo;
+        private readonly ITransitTimeEstimator _transitEstimator;
+        private readonly BookingOptions _bookingOptions;
+        private readonly TransitOptions _transitOptions;
         private readonly IUnitOfWork _unitOfWork;
 
         public TripExecutionService(
@@ -41,6 +52,12 @@ namespace RacehorseTransport.Services.Implementations
             IRecipientService recipientService,
             IRepository<DeliveryFailure> deliveryFailureRepo,
             IFileStorageService fileStorage,
+            IRepository<HorseDocument> horseDocumentRepo,
+            IRepository<DocumentType> docTypeRepo,
+            IRepository<RoutePlan> routePlanRepo,
+            ITransitTimeEstimator transitEstimator,
+            IOptions<BookingOptions> bookingOptions,
+            IOptions<TransitOptions> transitOptions,
             IUnitOfWork unitOfWork)
         {
             _tripRepo = tripRepo;
@@ -54,6 +71,12 @@ namespace RacehorseTransport.Services.Implementations
             _recipientService = recipientService;
             _deliveryFailureRepo = deliveryFailureRepo;
             _fileStorage = fileStorage;
+            _horseDocumentRepo = horseDocumentRepo;
+            _docTypeRepo = docTypeRepo;
+            _routePlanRepo = routePlanRepo;
+            _transitEstimator = transitEstimator;
+            _bookingOptions = bookingOptions.Value;
+            _transitOptions = transitOptions.Value;
             _unitOfWork = unitOfWork;
         }
 
@@ -70,39 +93,12 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Only a scheduled trip can depart (current status: {trip.OverallStatus}).");
             }
 
-            // Chặn cứng: mọi con ngựa trên chuyến phải có hồ sơ đã thông quan
-            var notCleared = await _tripHorseRepo.GetQueryable()
-                .Where(th => th.TripId == tripId
-                    && (th.BookingHorse!.Dossier == null || th.BookingHorse.Dossier.Status != DossierStatuses.Cleared))
-                .Select(th => th.BookingHorse!.Horse!.Name)
-                .ToListAsync();
-
-            if (notCleared.Count > 0)
+            // BE-10: kiểm mọi điều kiện tại giờ xuất phát thực tế, báo hết lỗi một lần
+            var now = DateTimeOffset.UtcNow;
+            var check = await BuildDepartureCheckAsync(trip, now);
+            if (!check.IsReady)
             {
-                throw new BusinessException($"The trip cannot depart: clearance is not complete for {string.Join(", ", notCleared)}.");
-            }
-
-            // R-02: phần còn lại của giá báo phải trả đủ trước khi xuất phát (đơn tạo trước khi có thanh toán thì bỏ qua)
-            var unpaidBookings = await _tripHorseRepo.GetQueryable()
-                .Where(th => th.TripId == tripId)
-                .Select(th => th.BookingHorse!.Booking!)
-                .Where(b => b.DepositPercent != null)
-                .Distinct()
-                .Select(b => new
-                {
-                    b.BookingCode,
-                    b.EstimatedCost,
-                    Paid = b.Payments
-                        .Where(p => p.Status == PaymentStatuses.Succeeded
-                            && (p.PaymentType == PaymentTypes.Deposit || p.PaymentType == PaymentTypes.Balance))
-                        .Sum(p => (decimal?)p.Amount) ?? 0
-                })
-                .ToListAsync();
-
-            var notPaid = unpaidBookings.Where(b => b.Paid < b.EstimatedCost).Select(b => b.BookingCode).ToList();
-            if (notPaid.Count > 0)
-            {
-                throw new BusinessException($"The trip cannot depart: the remaining balance is not paid for {string.Join(", ", notPaid)}.");
+                throw new BusinessException(DepartureCheckRules.ToBlockingMessage(check));
             }
 
             var origin = ActiveRoute(trip).FirstOrDefault();
@@ -112,7 +108,6 @@ namespace RacehorseTransport.Services.Implementations
             }
 
             var customerIds = await GetCustomerIdsAsync(tripId);
-            var now = DateTimeOffset.UtcNow;
 
             // R-05: ngựa của các đơn không có mốc PickUp riêng lên xe ở điểm xuất phát
             var bookingIdsWithPickup = ActiveRoute(trip)
@@ -456,6 +451,156 @@ namespace RacehorseTransport.Services.Implementations
             var result = logs.Select(l => l.ToBusinessModel()).ToList();
             await _fileStorage.ResolveViewUrlsAsync(result, l => l.PhotoUrl, (l, url) => l.PhotoUrl = url);
             return result;
+        }
+
+        // =============================================================================================
+        // Kiểm tra trước khi xuất phát (BE-10)
+        // =============================================================================================
+
+        public async Task<DepartureCheckModel> GetDepartureCheckAsync(int tripId, CurrentUser currentUser)
+        {
+            // Dùng lại quy tắc "ai được xem chuyến" của TripService (404 / 403)
+            await _tripService.GetTripByIdAsync(tripId, currentUser);
+
+            var trip = await _tripRepo.GetQueryable()
+                .AsNoTracking()
+                .Include(t => t.Crew)
+                .Include(t => t.Checkpoints)
+                .FirstAsync(t => t.TripId == tripId);
+
+            // Xem trước giờ dự kiến thì tính tại giờ dự kiến: không báo "sẵn sàng" cho giấy sẽ hết hạn trước lúc đi.
+            // Bấm xuất phát luôn tính tại giờ bấm, nên kết quả ở đây không bao giờ dễ hơn lúc bấm.
+            var now = DateTimeOffset.UtcNow;
+            var departureAt = trip.PlannedStartDate > now ? trip.PlannedStartDate : now;
+            return await BuildDepartureCheckAsync(trip, departureAt);
+        }
+
+        private async Task<DepartureCheckModel> BuildDepartureCheckAsync(Trip trip, DateTimeOffset departureAt)
+        {
+            int? fitExamTypeId = await _docTypeRepo.GetQueryable()
+                .Where(t => t.Code == DocumentTypeCodes.FitExam)
+                .Select(t => (int?)t.DocTypeId)
+                .FirstOrDefaultAsync();
+
+            var horses = await _tripHorseRepo.GetQueryable()
+                .AsNoTracking()
+                .Where(th => th.TripId == trip.TripId && !LeftTripStatuses.Contains(th.Status))
+                .Select(th => new
+                {
+                    th.BookingHorse!.HorseId,
+                    HorseName = th.BookingHorse.Horse!.Name,
+                    th.BookingHorse.Booking!.BookingCode,
+                    DossierStatus = th.BookingHorse.Dossier == null ? null : th.BookingHorse.Dossier.Status,
+                    Documents = th.BookingHorse.Dossier!.Documents
+                        .Where(d => d.Status != DocumentStatuses.Rejected)
+                        .Select(d => new { d.DocTypeId, d.DocumentType!.Name, d.Status, d.ExpiryDate, d.UploadedAt })
+                        .ToList()
+                })
+                .ToListAsync();
+
+            // Giấy khám thường có sau khi hồ sơ đã thông quan (hồ sơ đã khóa), nên khách nộp vào hồ sơ thú y của ngựa
+            var horseIds = horses.Select(h => h.HorseId).Distinct().ToList();
+            var fitExams = fitExamTypeId == null
+                ? new List<(int HorseId, DateOnly IssuedOn)>()
+                : (await _horseDocumentRepo.GetQueryable()
+                    .AsNoTracking()
+                    .Where(d => horseIds.Contains(d.HorseId) && d.DocTypeId == fitExamTypeId.Value)
+                    .Select(d => new { d.HorseId, d.IssueDate, d.UploadedAt })
+                    .ToListAsync())
+                    .Select(d => (d.HorseId, IssuedOn: d.IssueDate ?? DateOnly.FromDateTime(d.UploadedAt.UtcDateTime)))
+                    .ToList();
+
+            // R-02: đơn tạo trước khi có thanh toán (DepositPercent = null) không bắt trả tiền
+            var bookings = await _tripHorseRepo.GetQueryable()
+                .Where(th => th.TripId == trip.TripId && !LeftTripStatuses.Contains(th.Status))
+                .Select(th => th.BookingHorse!.Booking!)
+                .Where(b => b.DepositPercent != null)
+                .Distinct()
+                .Select(b => new DepartureBookingInput
+                {
+                    BookingCode = b.BookingCode,
+                    EstimatedCost = b.EstimatedCost,
+                    CurrencyCode = b.CurrencyCode,
+                    Paid = b.Payments
+                        .Where(p => p.Status == PaymentStatuses.Succeeded
+                            && (p.PaymentType == PaymentTypes.Deposit || p.PaymentType == PaymentTypes.Balance))
+                        .Sum(p => (decimal?)p.Amount) ?? 0
+                })
+                .ToListAsync();
+
+            var modes = await _tripHorseRepo.GetQueryable()
+                .Where(th => th.TripId == trip.TripId)
+                .Select(th => th.BookingHorse!.Booking!.TransportMode)
+                .Distinct()
+                .ToListAsync();
+            bool isGround = modes.Contains(TransportModes.Ground);
+            int driverCount = trip.Crew.Count(c => c.CrewRole == CrewRoles.Driver);
+
+            return DepartureCheckRules.Evaluate(new DepartureCheckInput
+            {
+                DepartureAt = departureAt,
+                PlannedArrivalAt = departureAt + (trip.PlannedEndDate - trip.PlannedStartDate),
+                TripStatus = trip.OverallStatus,
+                FitExamValidHours = _bookingOptions.FitExamValidHours,
+                FitExamTypeConfigured = fitExamTypeId != null,
+                Horses = horses.Select(h => new DepartureHorseInput
+                {
+                    HorseName = h.HorseName,
+                    BookingCode = h.BookingCode,
+                    DossierStatus = h.DossierStatus,
+                    Documents = h.Documents
+                        .Where(d => d.Status == DocumentStatuses.Approved && d.DocTypeId != fitExamTypeId)
+                        .Select(d => new DepartureDocumentInput { DocTypeName = d.Name, ExpiryDate = d.ExpiryDate })
+                        .ToList(),
+                    // Specialist có thể nộp hộ giấy khám vào hồ sơ của đơn: tính theo ngày tải lên
+                    FitExamIssueDates = fitExams.Where(f => f.HorseId == h.HorseId).Select(f => f.IssuedOn)
+                        .Concat(h.Documents.Where(d => d.DocTypeId == fitExamTypeId)
+                            .Select(d => DateOnly.FromDateTime(d.UploadedAt.UtcDateTime)))
+                        .ToList()
+                }).ToList(),
+                Bookings = bookings,
+                IsGround = isGround,
+                DrivingHours = isGround ? await EstimateDrivingHoursAsync(trip, driverCount) : null,
+                DriverCount = driverCount,
+                SingleDriverLimitHours = _transitOptions.MaxDrivingHoursPerDaySingleDriver
+            });
+        }
+
+        // Giờ lái ước tính như lúc duyệt chuyến (BE-07), nhưng không gọi bản đồ: km từng chặng đã lưu,
+        // thiếu thì lấy tuyến đã duyệt dài nhất của các đơn. Không có số liệu thì bỏ qua quy tắc.
+        private async Task<decimal?> EstimateDrivingHoursAsync(Trip trip, int driverCount)
+        {
+            var route = ActiveRoute(trip);
+            decimal distance;
+            if (route.Count > 1 && route.Skip(1).All(c => c.DistanceKmFromPrevious.HasValue))
+            {
+                distance = route.Skip(1).Sum(c => c.DistanceKmFromPrevious!.Value);
+            }
+            else
+            {
+                var bookingIds = await _tripHorseRepo.GetQueryable()
+                    .Where(th => th.TripId == trip.TripId)
+                    .Select(th => th.BookingHorse!.BookingId)
+                    .Distinct()
+                    .ToListAsync();
+                distance = await _routePlanRepo.GetQueryable()
+                    .Where(p => bookingIds.Contains(p.BookingId) && p.Status == RoutePlanStatuses.Approved)
+                    .MaxAsync(p => (decimal?)p.TotalDistanceKm) ?? 0;
+            }
+
+            if (distance <= 0)
+            {
+                return null;
+            }
+
+            var estimate = _transitEstimator.Estimate(new TransitEstimateInputModel
+            {
+                TransportMode = TransportModes.Ground,
+                DistanceKm = (int)Math.Ceiling(distance),
+                DriverCount = driverCount,
+                Stops = route.Count(c => c.CheckpointType == CheckpointTypes.PickUp || c.CheckpointType == CheckpointTypes.DropOff) + 2
+            });
+            return estimate.DrivingHours;
         }
 
         // =============================================================================================

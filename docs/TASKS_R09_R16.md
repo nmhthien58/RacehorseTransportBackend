@@ -221,7 +221,8 @@ Làm:
 - Giá trị ≥ `Insurance.ProofThresholdUsd` bắt buộc có tệp chứng từ (upload qua storage hiện có).
 - Manager chốt `agreed_value` từng con khi duyệt tuyến / trước khi gửi báo giá (mặc định = giá trị khai báo); báo giá dùng `agreed_value`.
 
-### [ ] BE-10 · Kiểm tra trước khi xuất phát (R-12, R-15)
+### [x] BE-10 · Kiểm tra trước khi xuất phát (R-12, R-15)
+Đã làm: loại giấy `FIT_EXAM` (khách nộp vào hồ sơ thú y của ngựa, `is_mandatory = false` để không lọt vào checklist hồ sơ; kiểm lúc xuất phát, hạn `Booking.FitExamValidHours = 48`). `DepartureCheckRules` (có unit test) dùng chung cho `GET /api/trips/{id}/departure-check` và `StartTripAsync`: hồ sơ `Cleared`, giấy đã duyệt hết hạn tại giờ xuất phát thực tế (cảnh báo nếu hết hạn trước ngày tới), `FIT_EXAM` trong 48 giờ, đơn trả đủ, số tài xế BE-07 (đường bộ, km chặng đã lưu hoặc tuyến đã duyệt). DB chưa có `FIT_EXAM` thì chỉ cảnh báo `FitExamTypeNotConfigured`. Script `03_update_fit_exam.sql`.
 Làm:
 - Loại giấy mới "Khám lâm sàng đủ sức khỏe" (`FIT_EXAM`), hạn 2 ngày, bắt buộc cho **mọi** ngựa ở mọi tuyến.
 - `StartTripAsync` kiểm tra và trả **một lỗi liệt kê tất cả vấn đề**: hồ sơ chưa `Cleared`; giấy hết hạn tính tại **giờ xuất phát thực tế**; thiếu `FIT_EXAM` trong 48 giờ; đơn chưa trả đủ phần còn lại; thiếu tài xế theo quy tắc BE-07.

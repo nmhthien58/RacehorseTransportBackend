@@ -1433,6 +1433,8 @@ Các trường gửi lên:
 | `expiryDate` | ngày | Không | Dạng `2026-11-04`, không được trước `issueDate` |
 | `notes` | chuỗi | Không | Ghi chú, tối đa 500 ký tự |
 
+**Giấy khám lâm sàng đủ sức khỏe (`FIT_EXAM`, BE-10):** mọi con ngựa phải có giấy này cấp trong **48 giờ trước giờ xuất phát**. Giấy có sau khi hồ sơ đơn đã thông quan nên khách nộp ở đây (không nộp vào hồ sơ của đơn), nhớ điền `issueDate`; không có `issueDate` thì tính theo ngày tải lên. Thiếu giấy thì chuyến không xuất phát được (xem `GET /api/trips/{id}/departure-check`).
+
 Ví dụ code:
 
 ```js
@@ -4557,7 +4559,7 @@ Trạng thái chuyến là trạng thái của **xe**. Mỗi con ngựa có tr�
 Thứ tự gọi thông thường của đoàn xe:
 
 1. `GET /api/trips` để xem các chuyến của mình, `GET /api/trips/{id}` để xem chi tiết.
-2. `POST /api/trips/{id}/start` khi xuất phát.
+2. `GET /api/trips/{id}/departure-check` để xem còn vấn đề gì, rồi `POST /api/trips/{id}/start` khi xuất phát.
 3. Với từng mốc theo thứ tự: `POST /api/checkpoints/{id}/arrive`, (cửa khẩu: `/clear`), `/depart`.
 4. Bất cứ lúc nào trên đường: `POST /api/trips/{id}/welfare-logs` để ghi nhật ký cho từng con ngựa.
 
@@ -4565,9 +4567,94 @@ Quyền: chỉ người **có tên trong đoàn xe của chuyến** (và `Admin`
 
 Các API xuất phát và check-in trả về **chi tiết chuyến** mới nhất (dạng của `GET /api/trips/{id}`, mục 9) và không cần body.
 
+### GET /api/trips/{id}/departure-check — Kiểm tra trước khi xuất phát
+
+Trả **mọi** vấn đề sẽ chặn `POST /api/trips/{id}/start` (`severity = "Error"`) và các điều chỉ cần nhắc (`"Warning"`), để app hiện trước khi tài xế bấm xuất phát. Dùng chung một hàm kiểm tra với `POST /api/trips/{id}/start`, nên `isReady = true` thì bấm xuất phát không bị các lỗi này.
+
+Các điều kiện (R-12, R-15):
+
+| `code` | `severity` | `category` | Khi nào |
+|---|---|---|---|
+| `TripNotScheduled` | Error | `Trip` | Chuyến chưa `Scheduled` (chưa duyệt, hoặc đã xuất phát) |
+| `DossierNotCleared` | Error | `Dossier` | Hồ sơ của con ngựa chưa `Cleared` |
+| `DocumentExpired` | Error | `Documents` | Giấy đã duyệt trong hồ sơ hết hạn trước ngày xuất phát (giấy hết hạn đúng ngày xuất phát vẫn dùng được) |
+| `DocumentExpiresBeforeArrival` | Warning | `Documents` | Giấy còn hạn lúc đi nhưng hết hạn trước ngày tới dự kiến (cửa khẩu có thể kiểm lại) |
+| `FitExamMissing` | Error | `Documents` | Con ngựa không có giấy `FIT_EXAM` cấp trong 48 giờ trước giờ xuất phát (`Booking.FitExamValidHours`) |
+| `FitExamTypeNotConfigured` | Warning | `Documents` | DB chưa có loại giấy `FIT_EXAM` (chưa chạy `database/03_update_fit_exam.sql`), nên chưa kiểm giấy khám |
+| `BalanceUnpaid` | Error | `Payment` | Đơn trên chuyến chưa trả đủ cọc + phần còn lại (mục 19) |
+| `NotEnoughDrivers` | Error | `Crew` | Chuyến đường bộ ước tính lái quá 9 giờ mà có dưới 2 tài xế (quy tắc BE-07) |
+
+Giờ dùng để tính hạn giấy (`departureAt`): giờ xuất phát dự kiến, hoặc lúc gọi API nếu đã quá giờ dự kiến. Khi bấm xuất phát, hệ thống tính lại tại **giờ bấm** (giờ xuất phát thực tế).
+
+- **Ai gọi được:** Đoàn xe của chuyến, FleetCoordinator, LogisticsManager, Admin
+- **Dữ liệu gửi lên:** không có
+
+Tham số trên đường dẫn:
+
+| Tham số | Mô tả |
+|---|---|
+| `id` | Mã chuyến |
+
+Ví dụ code:
+
+```js
+const res = await api.get(`/trips/${tripId}/departure-check`);
+const { isReady, issues } = res.data.data;
+const blocking = issues.filter((i) => i.severity === "Error");
+```
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Departure check completed",
+  "data": {
+    "isReady": false,
+    "departureAt": "2026-11-10T08:00:00+00:00",
+    "issues": [
+      {
+        "code": "FitExamMissing",
+        "message": "Silver Comet: no fit-to-travel exam within 48 hours",
+        "severity": "Error",
+        "category": "Documents",
+        "horseName": "Silver Comet",
+        "bookingCode": "BKG-2026-0012"
+      },
+      {
+        "code": "BalanceUnpaid",
+        "message": "BKG-2026-0012: the remaining balance is not paid (2100 USD outstanding).",
+        "severity": "Error",
+        "category": "Payment",
+        "horseName": null,
+        "bookingCode": "BKG-2026-0012"
+      }
+    ]
+  }
+}
+```
+
+| Trường | Kiểu | Mô tả |
+|---|---|---|
+| `isReady` | boolean | `true` khi không có vấn đề `Error` nào |
+| `departureAt` | thời gian | Giờ dùng để tính hạn giấy |
+| `issues[].code` | chuỗi | Mã vấn đề (bảng trên) |
+| `issues[].message` | chuỗi | Câu mô tả tiếng Anh, hiện thẳng cho người dùng |
+| `issues[].severity` | chuỗi | `Error` (chặn xuất phát) hoặc `Warning` (chỉ nhắc) |
+| `issues[].category` | chuỗi | `Trip`, `Dossier`, `Documents`, `Payment`, `Crew` |
+| `issues[].horseName` | chuỗi / null | Con ngựa liên quan (nếu có) |
+| `issues[].bookingCode` | chuỗi / null | Đơn liên quan (nếu có) |
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 403 | `You are not assigned to this trip.` | Tài xế / áp tải không thuộc đoàn xe của chuyến |
+| 404 | `Trip with ID 99 was not found.` | Sai mã chuyến |
+
 ### POST /api/trips/{id}/start — Xuất phát
 
-Bắt đầu chuyến: chuyến thành `InTransit`, mốc `Origin` được ghi là đã rời, ngựa của các đơn lên xe ở điểm xuất phát chuyển `InTransit`, khách và điều phối viên nhận thông báo. Bị chặn nếu còn con ngựa nào có hồ sơ chưa `Cleared`.
+Bắt đầu chuyến: chuyến thành `InTransit`, mốc `Origin` được ghi là đã rời, ngựa của các đơn lên xe ở điểm xuất phát chuyển `InTransit`, khách và điều phối viên nhận thông báo. Trước đó hệ thống chạy đúng bộ kiểm tra của `GET /api/trips/{id}/departure-check` **tại giờ bấm**; còn vấn đề `Error` nào thì trả **một** lỗi 400 liệt kê tất cả.
 
 - **Ai gọi được:** Đoàn xe của chuyến, Admin
 - **Dữ liệu gửi lên:** không có (không cần body)
@@ -4584,8 +4671,9 @@ Lỗi thường gặp:
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
-| 400 | `The trip cannot depart: clearance is not complete for Red Flash, Golden Pegasus.` | Còn ngựa chưa thông quan; `message` nêu tên từng con |
-| 400 | `The trip cannot depart: the remaining balance is not paid for BKG-2026-0007.` | Có đơn trên chuyến chưa trả đủ cọc + phần còn lại (mục 19) |
+| 400 | `The trip cannot depart: Red Flash: clearance is not complete (dossier status: Reviewing). Silver Comet: no fit-to-travel exam within 48 hours. BKG-2026-0007: the remaining balance is not paid (2100 USD outstanding).` | Còn vấn đề `Error` (bảng ở `GET /api/trips/{id}/departure-check`); `message` nối tất cả, mỗi vấn đề một câu |
+| 400 | `The trip cannot depart: Silver Comet: 'Giấy chứng nhận kiểm dịch xuất khẩu' expired on 2026-11-09, before departure. Ask the specialist and the customer to renew it.` | Giấy hết hạn tính tại giờ xuất phát thực tế (ví dụ chuyến bị lùi) |
+| 400 | `The trip cannot depart: A trip with 12 estimated driving hours needs at least 2 drivers; this trip has 1.` | Chuyến đường bộ dài thiếu tài xế (BE-07) |
 | 400 | `Only a scheduled trip can depart (current status: Draft).` | Chuyến chưa được duyệt, hoặc đã xuất phát rồi |
 | 403 | `Only the crew assigned to this trip can update its progress.` | Người gọi không thuộc đoàn xe |
 
@@ -9029,6 +9117,7 @@ Tổng cộng 139 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 
 | Method | Đường dẫn | Việc | Ai gọi được |
 |---|---|---|---|
+| GET | `/api/trips/{id}/departure-check` | Kiểm tra trước khi xuất phát | Đoàn xe của chuyến, FleetCoordinator, LogisticsManager, Admin |
 | POST | `/api/trips/{id}/start` | Xuất phát | Đoàn xe của chuyến, Admin |
 | POST | `/api/checkpoints/{id}/arrive` | Đã tới mốc | Đoàn xe của chuyến, Admin |
 | POST | `/api/checkpoints/{id}/clear` | Đã thông quan tại cửa khẩu | Đoàn xe của chuyến, Admin |

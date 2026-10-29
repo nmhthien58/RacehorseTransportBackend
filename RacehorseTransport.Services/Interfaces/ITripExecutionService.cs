@@ -7,6 +7,9 @@ namespace RacehorseTransport.Services.Interfaces
     {
         Task<TripDetailModel> StartTripAsync(int tripId, CurrentUser currentUser);
 
+        // BE-10: cùng danh sách kiểm tra mà StartTripAsync dùng để chặn xuất phát
+        Task<DepartureCheckModel> GetDepartureCheckAsync(int tripId, CurrentUser currentUser);
+
         Task<TripDetailModel> ArriveAtCheckpointAsync(int checkpointId, CurrentUser currentUser);
         Task<TripDetailModel> ClearCheckpointAsync(int checkpointId, CurrentUser currentUser);
         Task<TripDetailModel> DepartCheckpointAsync(int checkpointId, CurrentUser currentUser);

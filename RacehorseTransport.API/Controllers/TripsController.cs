@@ -277,7 +277,24 @@ namespace RacehorseTransport.API.Controllers
         // ---------------------------------------------------------------------------------------------
 
         /// <summary>
-        /// Depart: the trip becomes InTransit. Blocked while any horse on the trip has a dossier that is not Cleared.
+        /// Pre-departure check: every problem that would block POST /api/trips/{id}/start (Error) plus reminders (Warning).
+        /// Checked at the planned departure time, or now if that has passed.
+        /// </summary>
+        [HttpGet("{id:int}/departure-check")]
+        [Authorize(Roles = UserRoles.DriverEscort + "," + PlanningRoles)]
+        [ProducesResponseType(typeof(ApiResponse<DepartureCheckResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetDepartureCheck(int id)
+        {
+            var check = await _executionService.GetDepartureCheckAsync(id, User.ToCurrentUser());
+            return Ok(ApiResponse<DepartureCheckResponse>.SuccessResult(check.ToResponse(), "Departure check completed"));
+        }
+
+        /// <summary>
+        /// Depart: the trip becomes InTransit. Blocked (one 400 listing every problem) when a dossier is not Cleared,
+        /// a document has expired at the actual departure time, a horse has no fit-to-travel exam within 48 hours,
+        /// a booking's remaining balance is unpaid, or a long ground trip has fewer than 2 drivers.
         /// </summary>
         [HttpPost("{id:int}/start")]
         [Authorize(Roles = ExecutionRoles)]
