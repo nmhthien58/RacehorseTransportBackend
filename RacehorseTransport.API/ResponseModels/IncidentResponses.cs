@@ -66,5 +66,7 @@ namespace RacehorseTransport.API.ResponseModels
         public string Address { get; set; } = string.Empty;
         public DateTimeOffset PlannedTime { get; set; }
         public int MandatoryRestMinutes { get; set; }
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
     }
 }

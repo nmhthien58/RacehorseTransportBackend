@@ -105,7 +105,9 @@ namespace RacehorseTransport.API.Mappers
                         CheckpointType = c.CheckpointType,
                         Address = c.Address,
                         PlannedTime = c.PlannedTime,
-                        MandatoryRestMinutes = c.MandatoryRestMinutes
+                        MandatoryRestMinutes = c.MandatoryRestMinutes,
+                        Latitude = c.Latitude,
+                        Longitude = c.Longitude
                     }).ToList()
                 },
                 RevisedRouteNotes = model.RevisedRouteNotes,
