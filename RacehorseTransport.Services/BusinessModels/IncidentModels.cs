@@ -141,5 +141,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public string Address { get; set; } = string.Empty;
         public DateTimeOffset PlannedTime { get; set; }
         public int MandatoryRestMinutes { get; set; }
+        public decimal? Latitude { get; set; }   // để vẽ bản đồ và tính quãng đường khi áp tuyến
+        public decimal? Longitude { get; set; }
     }
 }

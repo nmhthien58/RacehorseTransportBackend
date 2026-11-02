@@ -759,6 +759,8 @@ namespace RacehorseTransport.Services.Implementations
                 Address = input.Address,
                 PlannedTime = input.PlannedTime,
                 MandatoryRestMinutes = input.MandatoryRestMinutes,
+                Latitude = input.Latitude,
+                Longitude = input.Longitude,
                 Status = CheckpointStatuses.Pending,
                 IsActive = true
             }).ToList();
@@ -804,7 +806,9 @@ namespace RacehorseTransport.Services.Implementations
                     CheckpointType = c.CheckpointType,
                     Address = c.Address,
                     PlannedTime = c.PlannedTime,
-                    MandatoryRestMinutes = c.MandatoryRestMinutes
+                    MandatoryRestMinutes = c.MandatoryRestMinutes,
+                    Latitude = c.Latitude,
+                    Longitude = c.Longitude
                 }).ToList()
             };
         }
@@ -821,7 +825,9 @@ namespace RacehorseTransport.Services.Implementations
                     CheckpointType = c.CheckpointType,
                     Address = c.Address,
                     PlannedTime = c.PlannedTime,
-                    MandatoryRestMinutes = c.MandatoryRestMinutes
+                    MandatoryRestMinutes = c.MandatoryRestMinutes,
+                    Latitude = c.Latitude,
+                    Longitude = c.Longitude
                 }).ToList()
             };
         }
