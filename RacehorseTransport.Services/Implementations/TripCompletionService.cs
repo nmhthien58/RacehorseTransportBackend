@@ -576,16 +576,21 @@ namespace RacehorseTransport.Services.Implementations
             void Add(int bookingId, decimal amount) =>
                 result[bookingId] = (result.TryGetValue(bookingId, out var current) ? current : 0) + amount;
 
-            // Chính sách 9.1: sự cố do lỗi công ty thì công ty chịu chi phí, không tính vào phát sinh của khách
-            foreach (var incident in acceptedIncidents.Where(i => i.AdditionalCost > 0 && i.FaultParty != FaultParties.Company))
+            foreach (var incident in acceptedIncidents)
             {
+                decimal charge = CustomerCharge(incident);
+                if (charge <= 0)
+                {
+                    continue;
+                }
+
                 var affected = incident.AffectedTripHorseId.HasValue
                     ? trip.TripHorses.FirstOrDefault(th => th.TripHorseId == incident.AffectedTripHorseId.Value)
                     : null;
 
                 if (affected != null)
                 {
-                    Add(affected.BookingHorse!.BookingId, incident.AdditionalCost);
+                    Add(affected.BookingHorse!.BookingId, charge);
                     continue;
                 }
 
@@ -609,8 +614,8 @@ namespace RacehorseTransport.Services.Implementations
                 for (int i = 0; i < horsesPerBooking.Count; i++)
                 {
                     var share = i == horsesPerBooking.Count - 1
-                        ? incident.AdditionalCost - allocated // phần lẻ dồn cho đơn cuối để tổng đúng bằng chi phí
-                        : Math.Round(incident.AdditionalCost * horsesPerBooking[i].Count / totalHorses, 2);
+                        ? charge - allocated // phần lẻ dồn cho đơn cuối để tổng đúng bằng chi phí
+                        : Math.Round(charge * horsesPerBooking[i].Count / totalHorses, 2);
                     allocated += share;
                     Add(horsesPerBooking[i].BookingId, share);
                 }
@@ -618,6 +623,21 @@ namespace RacehorseTransport.Services.Implementations
 
             return result;
         }
+
+        // Phương án mà khi bất khả kháng khách vẫn chịu chi phí (chuồng tạm, thú y)
+        private static readonly string[] CustomerBornActions = { IncidentResponseActions.HoldAtStable, IncidentResponseActions.VeterinaryCare };
+
+        // Phần khách trả của một sự cố (Chính sách 9.1, ai lỗi người đó chịu):
+        // - lỗi công ty: công ty chịu hết, khách không trả;
+        // - bất khả kháng: công ty chịu xe + người; khách trả phí đi vòng đã đồng ý, chuồng tạm và thú y;
+        // - lỗi khách: khách trả hết (chi phí phát sinh + phí đi vòng).
+        public static decimal CustomerCharge(TripIncident incident) => incident.FaultParty switch
+        {
+            FaultParties.Company => 0,
+            FaultParties.ForceMajeure => incident.ExtraCostForCustomer
+                + (CustomerBornActions.Contains(incident.ResponseAction) ? incident.AdditionalCost : 0),
+            _ => incident.AdditionalCost + incident.ExtraCostForCustomer
+        };
 
         // Con ngựa có ở trên xe lúc at không: đã được đón (chưa có giờ đón thì coi như lên xe từ đầu), chưa giao, chưa rớt lại
         private static bool WasOnBoard(TripHorse tripHorse, DateTimeOffset at)

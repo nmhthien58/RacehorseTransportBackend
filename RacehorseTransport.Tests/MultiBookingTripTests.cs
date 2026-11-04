@@ -270,7 +270,7 @@ public class ExtraChargeAllocationTests
     [Fact]
     public void IncidentAfterADropOff_IsChargedOnlyToBookingsStillOnBoard()
     {
-        var incident = new TripIncident { AdditionalCost = 300, ReportedAt = T0.AddHours(8) };
+        var incident = new TripIncident { AdditionalCost = 300, FaultParty = FaultParties.Customer, ReportedAt = T0.AddHours(8) };
 
         var extras = TripCompletionService.AllocateExtraCharges(TwoBookingTrip(), new List<TripIncident> { incident });
 
@@ -281,7 +281,7 @@ public class ExtraChargeAllocationTests
     [Fact]
     public void IncidentBeforeTheDropOff_IsSplitByHorses()
     {
-        var incident = new TripIncident { AdditionalCost = 300, ReportedAt = T0.AddHours(2) };
+        var incident = new TripIncident { AdditionalCost = 300, FaultParty = FaultParties.Customer, ReportedAt = T0.AddHours(2) };
 
         var extras = TripCompletionService.AllocateExtraCharges(TwoBookingTrip(), new List<TripIncident> { incident });
 
