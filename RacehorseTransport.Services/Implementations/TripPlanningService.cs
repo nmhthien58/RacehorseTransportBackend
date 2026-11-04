@@ -16,6 +16,7 @@ namespace RacehorseTransport.Services.Implementations
     {
         // Chuyến ở hai trạng thái này không còn giữ xe, người hay ngựa
         private static readonly string[] ReleasedTripStatuses = { TripStatuses.Completed, TripStatuses.Cancelled };
+        private static readonly string[] RunningTripStatuses = { TripStatuses.InTransit, TripStatuses.EmergencyRerouting, TripStatuses.ArrivedDestination };
 
         private readonly IRepository<BookingHorse> _bookingHorseRepo;
         private readonly IRepository<TransportAsset> _assetRepo;
@@ -180,13 +181,14 @@ namespace RacehorseTransport.Services.Implementations
             return crew.Select(u => u.ToBusinessModel()).ToList();
         }
 
-        // Các chuyến còn hiệu lực có thời gian kế hoạch giao với [from, to]
+        // Các chuyến còn hiệu lực có thời gian kế hoạch giao với [from, to].
+        // Chuyến đang chạy (chưa đóng) giữ xe và người tới khi đóng chuyến, kể cả khi đã quá giờ kết thúc kế hoạch.
         private IQueryable<Trip> OverlappingTrips(DateTimeOffset fromUtc, DateTimeOffset toUtc)
         {
             return _tripRepo.GetQueryable()
                 .Where(t => !ReleasedTripStatuses.Contains(t.OverallStatus)
                     && t.PlannedStartDate < toUtc
-                    && t.PlannedEndDate > fromUtc);
+                    && (t.PlannedEndDate > fromUtc || RunningTripStatuses.Contains(t.OverallStatus)));
         }
 
         private static (DateTimeOffset FromUtc, DateTimeOffset ToUtc) NormalizeWindow(DateTimeOffset from, DateTimeOffset to)

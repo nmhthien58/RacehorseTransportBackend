@@ -975,7 +975,8 @@ namespace RacehorseTransport.Services.Implementations
                     return;
                 }
 
-                // Mọi khách đồng ý -> áp tuyến đi vòng, tiền đi vòng thành chi phí phát sinh (chia theo số ngựa lúc đóng chuyến)
+                // Mọi khách đồng ý -> áp tuyến đi vòng; tiền đi vòng khách trả giữ ở ExtraCostForCustomer
+                // (thu khi đóng chuyến, chia theo số ngựa), không cộng vào chi phí vận hành AdditionalCost của công ty
                 var routeChange = IncidentMapper.ParseRouteChange(incident.RouteChange)
                     ?? throw new BusinessException("The detour route is missing; reject the plan so the coordinator can propose it again.");
                 RoutePlan plan;
@@ -995,7 +996,6 @@ namespace RacehorseTransport.Services.Implementations
                 }
                 routeChange.AppliedAt = now;
                 incident.RouteChange = IncidentMapper.SerializeRouteChange(routeChange);
-                incident.AdditionalCost += incident.ExtraCostForCustomer;
                 incident.Status = IncidentStatuses.Approved;
                 await _incidentRepo.UpdateAsync(incident);
                 await NotifyEveryoneAsync(trip, incident, $"Trip {trip.TripCode} takes the detour",
