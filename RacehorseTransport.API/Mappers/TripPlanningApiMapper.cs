@@ -1,6 +1,8 @@
 using RacehorseTransport.API.RequestModels;
 using RacehorseTransport.API.ResponseModels;
+using RacehorseTransport.Repositories.Constants;
 using RacehorseTransport.Services.BusinessModels;
+using RacehorseTransport.Services.Implementations;
 
 namespace RacehorseTransport.API.Mappers
 {
@@ -21,14 +23,28 @@ namespace RacehorseTransport.API.Mappers
                     IsLead = c.IsLead,
                     Duty = string.IsNullOrWhiteSpace(c.Duty) ? null : c.Duty.Trim()
                 }).ToList(),
-                Horses = request.Horses.Select(h => new TripHorseInputModel
-                {
-                    BookingHorseId = h.BookingHorseId,
-                    StallSlotNumber = h.StallSlotNumber,
-                    Notes = string.IsNullOrWhiteSpace(h.Notes) ? null : h.Notes.Trim(),
-                    EscortUserId = h.EscortUserId
-                }).ToList(),
+                Horses = request.Horses.Select(h => h.ToBusinessModel()).ToList(),
                 Checkpoints = request.Checkpoints?.Select(c => c.ToBusinessModel()).ToList()
+            };
+        }
+
+        // Ưu tiên CompartmentNo + PositionNo; request cũ chỉ gửi StallSlotNumber thì quy đổi sang khoang.
+        // Thiếu cả hai => 0, service báo lỗi rõ ràng.
+        public static TripHorseInputModel ToBusinessModel(this TripHorseRequest request)
+        {
+            var (compartmentNo, positionNo) = request.CompartmentNo.HasValue
+                ? (request.CompartmentNo.Value, request.PositionNo ?? 0)
+                : request.StallSlotNumber.HasValue
+                    ? CompartmentRules.FromStallSlot(request.StallSlotNumber.Value)
+                    : (0, 0);
+
+            return new TripHorseInputModel
+            {
+                BookingHorseId = request.BookingHorseId,
+                CompartmentNo = compartmentNo,
+                PositionNo = positionNo,
+                Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+                EscortUserId = request.EscortUserId
             };
         }
 
@@ -139,8 +155,11 @@ namespace RacehorseTransport.API.Mappers
                 AssetCode = model.AssetCode,
                 AssetType = model.AssetType,
                 CapacityHorses = model.CapacityHorses,
+                CompartmentCount = model.CompartmentCount,
+                PositionsPerCompartment = VehicleCompartments.PositionsPerCompartment,
                 HasClimateControl = model.HasClimateControl,
                 HasGpsTracker = model.HasGpsTracker,
+                Status = model.Status,
                 LastSanitizationDate = model.LastSanitizationDate
             };
         }
