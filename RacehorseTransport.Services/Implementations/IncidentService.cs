@@ -48,6 +48,7 @@ namespace RacehorseTransport.Services.Implementations
         private readonly ISystemSettingService _settingService;
         private readonly IContractService _contractService;
         private readonly IClaimService _claimService;
+        private readonly IRepository<IncidentDocument> _documentRepo;
         private readonly IUnitOfWork _unitOfWork;
 
         public IncidentService(
@@ -70,6 +71,7 @@ namespace RacehorseTransport.Services.Implementations
             ISystemSettingService settingService,
             IContractService contractService,
             IClaimService claimService,
+            IRepository<IncidentDocument> documentRepo,
             IUnitOfWork unitOfWork)
         {
             _incidentRepo = incidentRepo;
@@ -91,6 +93,7 @@ namespace RacehorseTransport.Services.Implementations
             _settingService = settingService;
             _contractService = contractService;
             _claimService = claimService;
+            _documentRepo = documentRepo;
             _unitOfWork = unitOfWork;
         }
 
@@ -246,6 +249,7 @@ namespace RacehorseTransport.Services.Implementations
                     ReportedByUserId = currentUser.UserId,
                     IncidentType = model.IncidentType,
                     Severity = model.Severity,
+                    InitialSeverity = model.Severity,
                     Location = model.Location,
                     Description = model.Description,
                     AffectedTripHorseId = model.AffectedTripHorseId,
@@ -364,7 +368,12 @@ namespace RacehorseTransport.Services.Implementations
             if (model.ResponseAction == IncidentResponseActions.OffloadHorse)
             {
                 offloadHorse = ResolveOffloadHorse(incident, model.AffectedTripHorseId);
-                OffloadRules.ValidatePlan(model.OffloadOutcome, incident.Severity, model.VetReportPath);
+                var docTypes = incident.Documents.Select(d => d.DocumentType).ToList();
+                if (!string.IsNullOrWhiteSpace(model.VetReportPath))
+                {
+                    docTypes.Add(IncidentDocumentTypes.VetReport);
+                }
+                OffloadRules.ValidatePlan(model.OffloadOutcome, docTypes);
                 if (!string.IsNullOrWhiteSpace(model.VetReportPath) && !_fileStorage.IsValidPath(model.VetReportPath.Trim(), FileCategories.Documents))
                 {
                     throw new BusinessException("VetReportPath is not a valid file path. Upload the report with POST /api/files (category 'documents') and send the returned path.");
@@ -539,6 +548,7 @@ namespace RacehorseTransport.Services.Implementations
                 }
                 if (offloadHorse != null)
                 {
+                    incident.Severity = IncidentSeverityRules.EffectiveSeverityOnApproval(incident.Severity, incident.OffloadOutcome);
                     await ApplyOffloadAsync(trip, incident, offloadHorse);
                 }
                 if (replacementPlan != null)
@@ -907,6 +917,53 @@ namespace RacehorseTransport.Services.Implementations
             return await GetIncidentByIdAsync(incidentId, currentUser);
         }
 
+        public async Task<IncidentDocumentModel> UploadDocumentAsync(int incidentId, UploadIncidentDocumentModel model, CurrentUser currentUser)
+        {
+            if (string.IsNullOrWhiteSpace(model.FilePath) || !_fileStorage.IsValidPath(model.FilePath.Trim(), FileCategories.Documents))
+            {
+                throw new BusinessException("FilePath is invalid. Upload the file with POST /api/files (category 'documents') and pass the returned path.");
+            }
+
+            if (!IncidentDocumentTypes.All.Contains(model.DocumentType))
+            {
+                throw new BusinessException($"DocumentType '{model.DocumentType}' is invalid. Allowed: {string.Join(", ", IncidentDocumentTypes.All)}.");
+            }
+
+            var incident = await GetTrackedIncidentAsync(incidentId);
+            bool canView = await ApplyVisibility(_incidentRepo.GetQueryable(), currentUser).AnyAsync(i => i.IncidentId == incidentId);
+            if (!canView)
+            {
+                throw new ForbiddenException("You cannot upload documents to this incident.");
+            }
+
+            var doc = new IncidentDocument
+            {
+                IncidentId = incident.IncidentId,
+                FilePath = model.FilePath.Trim(),
+                DocumentType = model.DocumentType.Trim(),
+                UploadedByUserId = currentUser.UserId,
+                UploadedAt = DateTimeOffset.UtcNow
+            };
+
+            await _documentRepo.AddAsync(doc);
+            await _documentRepo.SaveChangesAsync();
+
+            var user = await _userRepo.GetByIdAsync(currentUser.UserId);
+            var result = new IncidentDocumentModel
+            {
+                IncidentDocumentId = doc.IncidentDocumentId,
+                IncidentId = doc.IncidentId,
+                FilePath = doc.FilePath,
+                DocumentType = doc.DocumentType,
+                UploadedByUserId = doc.UploadedByUserId,
+                UploadedByName = user?.FullName,
+                UploadedAt = doc.UploadedAt
+            };
+
+            await _fileStorage.ResolveViewUrlsAsync(new[] { result }, d => d.FilePath, (d, url) => d.FileUrl = url);
+            return result;
+        }
+
         // =============================================================================================
         // Quay về nơi đi, hỏi ý khách khi đi đường vòng (R-14, BE-14b)
         // =============================================================================================
@@ -1240,6 +1297,8 @@ namespace RacehorseTransport.Services.Implementations
         private async Task ResolveVetReportUrlsAsync(IEnumerable<IncidentModel> models)
         {
             await _fileStorage.ResolveViewUrlsAsync(models, m => m.VetReportPath, (m, url) => m.VetReportUrl = url);
+            var docs = models.SelectMany(m => m.Documents).ToList();
+            await _fileStorage.ResolveViewUrlsAsync(docs, d => d.FilePath, (d, url) => d.FileUrl = url);
         }
 
         private static string Truncate(string value, int maxLength)
@@ -1446,7 +1505,8 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(i => i.ReportedBy)
                 .Include(i => i.ApprovedBy)
                 .Include(i => i.AffectedTripHorse!).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Horse)
-                .Include(i => i.Consents).ThenInclude(c => c.Booking);
+                .Include(i => i.Consents).ThenInclude(c => c.Booking)
+                .Include(i => i.Documents).ThenInclude(d => d.UploadedBy);
         }
 
         // Khách: sự cố trên chuyến có ngựa của mình. Tài xế / áp tải: chuyến mình có tên trong đoàn. Các role vận hành: tất cả.
@@ -1472,6 +1532,7 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(i => i.Trip!).ThenInclude(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Horse)
                 .Include(i => i.Trip!).ThenInclude(t => t.TripHorses).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Booking)
                 .Include(i => i.Consents)
+                .Include(i => i.Documents).ThenInclude(d => d.UploadedBy)
                 .AsSplitQuery()
                 .FirstOrDefaultAsync(i => i.IncidentId == incidentId);
 

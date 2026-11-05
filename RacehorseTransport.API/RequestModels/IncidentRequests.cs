@@ -122,4 +122,15 @@ namespace RacehorseTransport.API.RequestModels
         // Các mốc mới theo đúng thứ tự đi (Position bị bỏ qua)
         public List<CheckpointRequest> NewCheckpoints { get; set; } = new();
     }
+
+    public class UploadIncidentDocumentRequest
+    {
+        [Required(ErrorMessage = "FilePath is required.")]
+        [MaxLength(500, ErrorMessage = "FilePath cannot exceed 500 characters.")]
+        public string FilePath { get; set; } = string.Empty;
+
+        // ScenePhoto | VetReport | DeathCertificate | FitToTravel
+        [Required(ErrorMessage = "DocumentType is required.")]
+        public string DocumentType { get; set; } = string.Empty;
+    }
 }

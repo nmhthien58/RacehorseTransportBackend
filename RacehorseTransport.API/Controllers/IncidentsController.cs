@@ -178,5 +178,21 @@ namespace RacehorseTransport.API.Controllers
             var incident = await _incidentService.ResolveIncidentAsync(id, request.FaultParty.Trim(), request.FaultNote, User.ToCurrentUser());
             return Ok(ApiResponse<IncidentResponse>.SuccessResult(incident.ToResponse(), "Incident resolved successfully"));
         }
+
+        /// <summary>
+        /// Upload an incident document (scene photo, vet report, death certificate, fit to travel).
+        /// Allowed for staff (driver escort, fleet coordinator, logistics manager, admin).
+        /// Allowed even when the incident is resolved.
+        /// </summary>
+        [HttpPost("{id:int}/documents")]
+        [Authorize(Roles = UserRoles.Staff)]
+        [ProducesResponseType(typeof(ApiResponse<IncidentDocumentResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UploadDocument(int id, [FromBody] UploadIncidentDocumentRequest request)
+        {
+            var document = await _incidentService.UploadDocumentAsync(id, request.ToBusinessModel(), User.ToCurrentUser());
+            return Ok(ApiResponse<IncidentDocumentResponse>.SuccessResult(document.ToResponse(), "Document uploaded successfully"));
+        }
     }
 }

@@ -35,12 +35,12 @@ public class OffloadRulesTests
     }
 
     [Fact]
-    public void ValidatePlan_Deceased_RequiresCriticalIncident()
+    public void ValidatePlan_Deceased_AllowedOnNonCriticalIncident_WhenVetReportPresent()
     {
-        var ex = Assert.Throws<BusinessException>(() =>
-            OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, IncidentSeverities.Major, "documents/vet.pdf"));
-
-        Assert.Contains("Critical", ex.Message);
+        // Allowed now: incident severity will be upgraded to Critical upon approval
+        OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, IncidentSeverities.Major, "documents/vet.pdf");
+        OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, new[] { IncidentDocumentTypes.VetReport });
+        OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, new[] { IncidentDocumentTypes.DeathCertificate });
     }
 
     [Theory]
@@ -52,6 +52,15 @@ public class OffloadRulesTests
             OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, IncidentSeverities.Critical, vetReportPath));
 
         Assert.Contains("veterinary report", ex.Message);
+    }
+
+    [Fact]
+    public void ValidatePlan_Deceased_Blocked_WhenNoVetOrDeathDocument()
+    {
+        var ex = Assert.Throws<BusinessException>(() =>
+            OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, Array.Empty<string>()));
+
+        Assert.Contains("veterinary report or death certificate", ex.Message);
     }
 
     [Fact]

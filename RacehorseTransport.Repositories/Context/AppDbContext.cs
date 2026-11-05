@@ -38,6 +38,7 @@ namespace RacehorseTransport.Repositories.Context
         public virtual DbSet<RouteCheckpoint> RouteCheckpoints { get; set; } = null!;
         public virtual DbSet<HorseWelfareLog> HorseWelfareLogs { get; set; } = null!;
         public virtual DbSet<TripIncident> TripIncidents { get; set; } = null!;
+        public virtual DbSet<IncidentDocument> IncidentDocuments { get; set; } = null!;
         public virtual DbSet<HandoverAcceptance> HandoverAcceptances { get; set; } = null!;
         public virtual DbSet<SystemNotification> SystemNotifications { get; set; } = null!;
         public virtual DbSet<PriceItem> PriceItems { get; set; } = null!;
@@ -345,6 +346,18 @@ namespace RacehorseTransport.Repositories.Context
                 entity.HasOne(e => e.ReportedBy).WithMany().HasForeignKey(e => e.ReportedByUserId);
                 entity.HasOne(e => e.ApprovedBy).WithMany().HasForeignKey(e => e.ApprovedByUserId);
                 entity.HasOne(e => e.AffectedTripHorse).WithMany().HasForeignKey(e => e.AffectedTripHorseId);
+            });
+
+            modelBuilder.Entity<IncidentDocument>(entity =>
+            {
+                entity.ToTable("incident_documents", "incident");
+                entity.HasKey(e => e.IncidentDocumentId);
+                entity.HasOne(e => e.Incident)
+                      .WithMany(i => i.Documents)
+                      .HasForeignKey(e => e.IncidentId);
+                entity.HasOne(e => e.UploadedBy)
+                      .WithMany()
+                      .HasForeignKey(e => e.UploadedByUserId);
             });
 
             // ---------- acceptance ----------

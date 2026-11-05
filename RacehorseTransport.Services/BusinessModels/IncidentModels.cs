@@ -64,6 +64,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public string TripStatus { get; set; } = string.Empty;
         public string IncidentType { get; set; } = string.Empty;
         public string Severity { get; set; } = string.Empty;
+        public string? InitialSeverity { get; set; }
         public string Status { get; set; } = string.Empty;
         public string Location { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
@@ -93,6 +94,25 @@ namespace RacehorseTransport.Services.BusinessModels
         // R-14 (BE-14b)
         public decimal ExtraCostForCustomer { get; set; }
         public List<IncidentConsentModel> Consents { get; set; } = new();
+        public List<IncidentDocumentModel> Documents { get; set; } = new();
+    }
+
+    public class IncidentDocumentModel
+    {
+        public int IncidentDocumentId { get; set; }
+        public int IncidentId { get; set; }
+        public string FilePath { get; set; } = string.Empty;
+        public string? FileUrl { get; set; }
+        public string DocumentType { get; set; } = string.Empty;
+        public int UploadedByUserId { get; set; }
+        public string? UploadedByName { get; set; }
+        public DateTimeOffset UploadedAt { get; set; }
+    }
+
+    public class UploadIncidentDocumentModel
+    {
+        public string FilePath { get; set; } = string.Empty;
+        public string DocumentType { get; set; } = string.Empty;
     }
 
     public class IncidentActionPayloadModel

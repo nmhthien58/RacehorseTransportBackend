@@ -17,6 +17,7 @@ namespace RacehorseTransport.Services.Mappers
                 TripStatus = entity.Trip?.OverallStatus ?? string.Empty,
                 IncidentType = entity.IncidentType,
                 Severity = entity.Severity,
+                InitialSeverity = entity.InitialSeverity,
                 Status = entity.Status,
                 Location = entity.Location,
                 Description = entity.Description,
@@ -48,7 +49,17 @@ namespace RacehorseTransport.Services.Mappers
                     DecidedAt = c.DecidedAt
                 }).ToList(),
                 OffloadOutcome = entity.OffloadOutcome,
-                VetReportPath = entity.VetReportPath
+                VetReportPath = entity.VetReportPath,
+                Documents = entity.Documents.Select(d => new IncidentDocumentModel
+                {
+                    IncidentDocumentId = d.IncidentDocumentId,
+                    IncidentId = d.IncidentId,
+                    FilePath = d.FilePath,
+                    DocumentType = d.DocumentType,
+                    UploadedByUserId = d.UploadedByUserId,
+                    UploadedByName = d.UploadedBy?.FullName,
+                    UploadedAt = d.UploadedAt
+                }).ToList()
             };
         }
 
