@@ -19,6 +19,8 @@ namespace RacehorseTransport.API.ResponseModels
     public class TripDetailResponse : TripSummaryResponse
     {
         public int? VehicleCapacity { get; set; }
+        public int? VehicleCompartmentCount { get; set; }
+        public int PositionsPerCompartment { get; set; } // luôn 3: mỗi khoang 3 vị trí
         public int LiveDelayMinutes { get; set; }
         public decimal PlannedCost { get; set; }
         public decimal ActualCost { get; set; }
@@ -55,7 +57,9 @@ namespace RacehorseTransport.API.ResponseModels
     public class TripHorseResponse
     {
         public int TripHorseId { get; set; }
-        public int StallSlotNumber { get; set; }
+        public int CompartmentNo { get; set; }
+        public int PositionNo { get; set; }
+        public int StallSlotNumber { get; set; } // = (CompartmentNo - 1) * 3 + PositionNo
         public string? Notes { get; set; }
         public int BookingHorseId { get; set; }
         public int BookingId { get; set; }

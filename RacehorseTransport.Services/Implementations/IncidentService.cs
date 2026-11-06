@@ -1301,7 +1301,7 @@ namespace RacehorseTransport.Services.Implementations
                     ?? throw new BusinessException($"Replacement vehicle with ID {replacementId} was not found.");
                 var horsesToCarry = trip.TripHorses.Where(th => TripHorseStatuses.OnBoard.Contains(th.Status)).ToList();
                 bool requiresClimate = horsesToCarry.Any(th => th.BookingHorse?.Booking?.RequiresClimateControl == true);
-                IncidentReplacementRules.ValidateVehicle(current, replacement, horsesToCarry.Count, requiresClimate);
+                IncidentReplacementRules.ValidateVehicle(current, replacement, horsesToCarry.Select(StallClassOf).ToList(), requiresClimate);
 
                 string? conflictingTrip = await _tripRepo.GetQueryable()
                     .Where(t => t.TripId != trip.TripId
@@ -1356,6 +1356,8 @@ namespace RacehorseTransport.Services.Implementations
             return null;
         }
 
+        private static string StallClassOf(TripHorse tripHorse) => tripHorse.BookingHorse?.StallClass ?? StallClasses.Shared;
+
         private async Task ApplyReplacementAsync(Trip trip, TripIncident incident, ReplacementPlan plan)
         {
             if (plan.Vehicle != null)
@@ -1368,12 +1370,17 @@ namespace RacehorseTransport.Services.Implementations
                     .ThenBy(th => th.TripHorseId)
                     .ToList();
 
-                if (horsesToCarry.Any(th => th.StallSlotNumber > plan.Vehicle.CapacityHorses))
+                // Xe mới ít khoang hơn: xếp lại ngựa còn trên xe theo hạng chuồng từ khoang 1,
+                // ngựa đã rời xe xếp tiếp phía sau chỉ để giữ ô chuồng không trùng.
+                if (horsesToCarry.Any(th => th.CompartmentNo > plan.Vehicle.CompartmentCount))
                 {
                     var remaining = trip.TripHorses.Except(horsesToCarry)
                         .OrderBy(th => th.StallSlotNumber)
                         .ThenBy(th => th.TripHorseId)
                         .ToList();
+                    var onBoardPlaces = CompartmentRules.Pack(horsesToCarry.Select(StallClassOf).ToList());
+                    int nextCompartment = onBoardPlaces.Count == 0 ? 1 : onBoardPlaces.Max(p => p.CompartmentNo) + 1;
+                    var places = onBoardPlaces.Concat(CompartmentRules.Pack(remaining.Select(StallClassOf).ToList(), nextCompartment)).ToList();
                     var all = horsesToCarry.Concat(remaining).ToList();
                     foreach (var horse in all)
                     {
@@ -1382,7 +1389,9 @@ namespace RacehorseTransport.Services.Implementations
                     }
                     for (int i = 0; i < all.Count; i++)
                     {
-                        all[i].StallSlotNumber = i + 1;
+                        all[i].CompartmentNo = places[i].CompartmentNo;
+                        all[i].PositionNo = places[i].PositionNo;
+                        all[i].StallSlotNumber = CompartmentRules.ToStallSlot(places[i].CompartmentNo, places[i].PositionNo);
                         await _tripHorseRepo.UpdateAsync(all[i]);
                     }
                 }

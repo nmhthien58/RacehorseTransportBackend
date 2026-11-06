@@ -27,6 +27,7 @@ namespace RacehorseTransport.Services.BusinessModels
     public class TripDetailModel : TripSummaryModel
     {
         public int? VehicleCapacity { get; set; }
+        public int? VehicleCompartmentCount { get; set; }
 
         // Số phút đang trễ theo check-in thực tế (R-08); khác DelayMinutes là kết quả chốt khi đóng chuyến
         public int LiveDelayMinutes { get; set; }
@@ -72,6 +73,8 @@ namespace RacehorseTransport.Services.BusinessModels
     public class TripHorseModel
     {
         public int TripHorseId { get; set; }
+        public int CompartmentNo { get; set; }
+        public int PositionNo { get; set; }
         public int StallSlotNumber { get; set; }
         public string? Notes { get; set; }
         public int BookingHorseId { get; set; }
