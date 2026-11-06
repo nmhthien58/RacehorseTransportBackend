@@ -452,6 +452,16 @@ namespace RacehorseTransport.Repositories.Constants
         public static readonly string[] All = { Minor, Moderate, Major, Critical };
     }
 
+    public static class IncidentDocumentTypes
+    {
+        public const string ScenePhoto = "ScenePhoto";
+        public const string VetReport = "VetReport";
+        public const string DeathCertificate = "DeathCertificate";
+        public const string FitToTravel = "FitToTravel";
+
+        public static readonly string[] All = { ScenePhoto, VetReport, DeathCertificate, FitToTravel };
+    }
+
     public static class IncidentStatuses
     {
         public const string Reported = "Reported";

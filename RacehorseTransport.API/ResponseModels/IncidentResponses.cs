@@ -9,6 +9,7 @@ namespace RacehorseTransport.API.ResponseModels
         public string TripStatus { get; set; } = string.Empty;
         public string IncidentType { get; set; } = string.Empty;
         public string Severity { get; set; } = string.Empty;
+        public string? InitialSeverity { get; set; }
         public string Status { get; set; } = string.Empty;
         public string Location { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
@@ -35,6 +36,20 @@ namespace RacehorseTransport.API.ResponseModels
         public List<RacehorseTransport.Services.BusinessModels.IncidentConsentModel> Consents { get; set; } = new();
         public string? OffloadOutcome { get; set; }       // hướng xử lý tiếp của phương án OffloadHorse
         public string? VetReportUrl { get; set; }         // link xem biên bản thú y (có hạn)
+        public List<IncidentDocumentResponse> Documents { get; set; } = new();
+    }
+
+    public class IncidentDocumentResponse
+    {
+        public int IncidentDocumentId { get; set; }
+        public int IncidentId { get; set; }
+        public string FilePath { get; set; } = string.Empty;
+        public string? FileUrl { get; set; }
+        public string DocumentType { get; set; } = string.Empty;
+        public string? Note { get; set; }
+        public int UploadedByUserId { get; set; }
+        public string? UploadedByName { get; set; }
+        public DateTimeOffset UploadedAt { get; set; }
     }
 
     // Thay đổi tuyến của phương án. AppliedAt có giá trị khi tuyến đã được áp vào lộ trình (lúc Manager duyệt).

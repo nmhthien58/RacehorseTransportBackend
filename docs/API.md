@@ -5311,7 +5311,7 @@ Ai thấy sự cố nào: khách thấy sự cố trên chuyến có ngựa củ
 | `WaitRecover` | Chờ hồi phục rồi đi chuyến khác | Ngựa `Offloaded`, **quay về hàng chờ xếp chuyến** (`GET /api/trips/unplanned-horses`); người lập chuyến được báo |
 | `ReturnToOrigin` | Đưa ngựa về nơi đi | Ngựa `Offloaded`, **không** về hàng chờ; việc chở về do điều phối sắp xếp. Con ngựa được tính là đã xong với đơn |
 | `HandOverHere` | Khách nhận ngựa tại nơi dỡ | Ngựa `Offloaded`; đoàn xe ký e-POD tại chỗ (`POST /api/trips/{tripId}/handover` với `tripHorseId`) → `Delivered` |
-| `Deceased` | Ngựa chết | Ngựa `Deceased` (cả trên chuyến và trong đơn). Chỉ chọn được ở sự cố mức `Critical` và **bắt buộc biên bản thú y** |
+| `Deceased` | Ngựa chết | Ngựa `Deceased` (cả trên chuyến và trong đơn). **Bắt buộc sự cố đã có tài liệu `VetReport` hoặc `DeathCertificate`** (đính kèm bằng `POST /api/incidents/{id}/documents`). Sự cố ở mức nào cũng chọn được; khi duyệt, mức độ tự nâng lên `Critical`, mức ban đầu giữ ở `initialSeverity` |
 
 Mỗi trường hợp, khách của con ngựa nhận thông báo + email. Chuyến chỉ đóng được khi không còn con nào đang chờ phương án hoặc chờ ký e-POD tại chỗ. Ngựa chết hoặc rời chuyến vì sức khỏe thì hệ thống tự mở hồ sơ bồi thường bảo hiểm (mục 19c).
 
@@ -5346,7 +5346,21 @@ Một sự cố (`incident`) có dạng:
   "resolvedAt": null,
   "emergencyOffload": false,
   "offloadOutcome": null,
-  "vetReportUrl": null
+  "vetReportUrl": null,
+  "initialSeverity": "Major",
+  "documents": [
+    {
+      "incidentDocumentId": 3,
+      "incidentId": 2,
+      "filePath": "documents/2026/11/3aab3418...pdf",
+      "fileUrl": "https://...supabase.co/storage/v1/object/sign/...",
+      "documentType": "VetReport",
+      "note": "Bác sĩ trạm Bằng Tường khám lúc 14:20",
+      "uploadedByUserId": 4,
+      "uploadedByName": "Phạm Văn Đức",
+      "uploadedAt": "2026-11-06T07:25:00Z"
+    }
+  ]
 }
 ```
 
@@ -5354,7 +5368,8 @@ Một sự cố (`incident`) có dạng:
 |---|---|
 | `incidentId`, `incidentCode` | Mã sự cố (số) và mã hiển thị (`INC-2026-0002`) |
 | `tripId`, `tripCode`, `tripStatus` | Chuyến gặp sự cố và trạng thái hiện tại của chuyến |
-| `incidentType`, `severity` | Loại và mức độ (mục 3) |
+| `incidentType`, `severity` | Loại và mức độ hiện tại (mục 3). Khi quản lý duyệt phương án ngựa chết (`Deceased`), `severity` được nâng lên `Critical` |
+| `initialSeverity` | Mức độ tài xế báo lúc đầu, không bao giờ bị ghi đè (sự cố cũ có thể là `null`) |
 | `status` | Trạng thái sự cố (mục 3) |
 | `location`, `description` | Vị trí và mô tả do đoàn xe nhập |
 | `affectedTripHorseId`, `affectedHorseName` | Con ngựa bị ảnh hưởng; `null` nếu sự cố không gắn với con nào |
@@ -5367,7 +5382,8 @@ Một sự cố (`incident`) có dạng:
 | `faultParty`, `faultNote` | Nguyên nhân chọn khi đóng sự cố (`Company`, `Customer`, `ForceMajeure`) và giải thích; `null` khi sự cố chưa đóng |
 | `emergencyOffload` | `true` khi tài xế đã dỡ con ngựa `affectedTripHorseId` xuống ngay lúc báo sự cố |
 | `offloadOutcome` | Hướng xử lý tiếp của phương án `OffloadHorse` (`WaitRecover`, `ReturnToOrigin`, `HandOverHere`, `Deceased`); `null` với phương án khác |
-| `vetReportUrl` | Link xem biên bản thú y (có hạn, mục 2.5); có khi phương án kèm biên bản |
+| `vetReportUrl` | Link xem biên bản thú y gửi theo cách cũ (`vetReportPath`). Cách mới: xem `documents` |
+| `documents` | Tài liệu của sự cố (`POST /api/incidents/{id}/documents`): `documentType` là `ScenePhoto` (ảnh hiện trường), `VetReport` (biên bản thú y), `DeathCertificate` (giấy chứng tử), `FitToTravel` (giấy đủ sức đi tiếp); `fileUrl` là link xem có hạn |
 
 ### POST /api/trips/{tripId}/incidents — Báo sự cố
 
@@ -5488,6 +5504,54 @@ Tham số trên đường dẫn:
 
 Response `200`: `data` là mảng sự cố. Khách hàng không gọi API này mà dùng `GET /api/incidents?tripId=`.
 
+### POST /api/incidents/{id}/documents — Đính kèm tài liệu vào sự cố
+
+Đính kèm ảnh hiện trường, biên bản thú y, giấy chứng tử hoặc giấy đủ sức đi tiếp vào một sự cố. Tài xế dùng khi biên bản thú y có **sau** lúc báo SOS; điều phối viên dùng trước khi đề xuất phương án ngựa chết. Gọi được cả khi sự cố đã đóng (giấy tờ thường về muộn). Người lập chuyến (hoặc mọi điều phối viên nếu chuyến không có người lập) và các quản lý nhận thông báo.
+
+- **Ai gọi được:** Nhân sự (DriverEscort, FleetCoordinator, LogisticsManager, TransportSpecialist, Admin). Tài xế / áp tải chỉ đính kèm được vào sự cố của chuyến mình
+- **Dữ liệu gửi lên:** `multipart/form-data`
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `documentType` | chuỗi | Có | `ScenePhoto`, `VetReport`, `DeathCertificate` hoặc `FitToTravel` |
+| `note` | chuỗi | Không | Ghi chú, tối đa 500 ký tự |
+| `file` | file | Có | PDF, JPG hoặc PNG, tối đa 10 MB |
+
+Ví dụ:
+
+```js
+const form = new FormData();
+form.append("documentType", "ScenePhoto");
+form.append("note", "Ngựa bị trầy chân trái sau khi xe phanh gấp");
+form.append("file", photoFile);
+const res = await api.post(`/api/incidents/${incidentId}/documents`, form);
+```
+
+Response `201`: `data` là một tài liệu (dạng như phần tử của `documents` ở trên).
+
+Lỗi thường gặp:
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `DocumentType 'X' is invalid. Allowed values: ScenePhoto, VetReport, DeathCertificate, FitToTravel.` | Sai loại tài liệu |
+| 400 | Lỗi kiểu file / dung lượng | File không phải PDF / JPG / PNG hoặc lớn hơn 10 MB |
+| 403 | `You can only manage documents of incidents on your own trips.` | Tài xế / áp tải không thuộc chuyến của sự cố |
+| 404 | `Incident with ID 99 was not found.` | Không có sự cố |
+
+### DELETE /api/incidents/{id}/documents/{documentId} — Xóa tài liệu tải nhầm
+
+Chỉ người đã tải lên (hoặc LogisticsManager / Admin) mới xóa được, và chỉ khi sự cố chưa `Approved` / `Resolved`: phương án đã duyệt thì giữ nguyên bằng chứng.
+
+- **Ai gọi được:** Nhân sự (theo điều kiện trên)
+
+Response `200`: `data` là `null`.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Incident INC-2026-0001 is Resolved; its documents are kept as evidence and cannot be deleted.` | Sự cố đã duyệt / đã đóng |
+| 403 | `Only the person who uploaded this document (or a logistics manager) can delete it.` | Không phải người tải lên |
+| 404 | `Document with ID 9 was not found on incident INC-2026-0001.` | Tài liệu không thuộc sự cố |
+
 ### POST /api/incidents/{id}/propose — Đề xuất phương án xử lý
 
 Điều phối viên nhập phương án cho một sự cố đang `Reported`, hoặc đề xuất lại sau khi bị từ chối (`Rejected`). Sự cố chuyển sang `PlanProposed` và các quản lý nhận thông báo.
@@ -5519,7 +5583,7 @@ Các trường gửi lên:
 | `extraCostForCustomer` | số | Không | Chỉ với `Reroute`: tiền đi đường vòng khách phải trả thêm (tổng, chia cho các đơn theo số ngựa). > 0 thì sau khi quản lý duyệt, sự cố chuyển `AwaitingConsent` và tuyến **chưa** đổi cho tới khi mọi khách có ngựa trên xe đồng ý |
 | `affectedTripHorseId` | số | Không | Chỉ dùng với `OffloadHorse`: con ngựa rời chuyến. Bỏ trống = con ngựa đã chọn lúc báo sự cố. Sự cố dỡ khẩn cấp thì phải là đúng con đã dỡ |
 | `offloadOutcome` | chuỗi | Có khi `responseAction` là `OffloadHorse` | Hướng xử lý tiếp: `WaitRecover`, `ReturnToOrigin`, `HandOverHere`, `Deceased` (bảng ở đầu mục 11) |
-| `vetReportPath` | chuỗi | Có khi `offloadOutcome` là `Deceased` | Đường dẫn biên bản thú y: tải file lên trước bằng `POST /api/files` với `category = documents` (PDF hoặc ảnh), rồi gửi `path` nhận được |
+| `vetReportPath` | chuỗi | Không (cách cũ) | Đường dẫn biên bản thú y từ `POST /api/files`. Vẫn nhận để tương thích và được lưu thành tài liệu `VetReport` của sự cố. **Cách mới:** đính kèm biên bản bằng `POST /api/incidents/{id}/documents` trước khi đề xuất |
 
 Ví dụ request:
 
@@ -5545,21 +5609,20 @@ Ví dụ request:
 }
 ```
 
-Ví dụ phương án cho ngựa rời chuyến (ngựa chết, sự cố mức `Critical`):
+Ví dụ phương án cho ngựa rời chuyến (ngựa chết):
 
 ```js
-// 1. Tải biên bản thú y lên
-const file = new FormData();
-file.append("file", vetReportFile);       // PDF / JPG / PNG, tối đa 10 MB
-file.append("category", "documents");
-const uploaded = await api.post("/api/files", file);
+// 1. Đính kèm biên bản thú y vào sự cố (tài xế có thể đã làm bước này từ hiện trường)
+const form = new FormData();
+form.append("documentType", "VetReport");  // hoặc "DeathCertificate"
+form.append("file", vetReportFile);        // PDF / JPG / PNG, tối đa 10 MB
+await api.post(`/api/incidents/${incidentId}/documents`, form);
 
 // 2. Đề xuất phương án
 await api.post(`/api/incidents/${incidentId}/propose`, {
   responseAction: "OffloadHorse",
   proposedAction: "Ngựa chết tại trạm thú y Bằng Tường, lập biên bản và báo khách",
   offloadOutcome: "Deceased",
-  vetReportPath: uploaded.data.data.path,  // ví dụ "documents/2026/10/3f2a...e1.pdf"
 });
 ```
 
@@ -5620,8 +5683,7 @@ Lỗi thường gặp:
 | 400 | `OffloadOutcome is required for an OffloadHorse plan. Allowed values: WaitRecover, ReturnToOrigin, HandOverHere, Deceased.` | Chọn `OffloadHorse` mà không chọn hướng xử lý |
 | 400 | `Choose the horse that leaves the trip (AffectedTripHorseId).` | Sự cố không gắn con ngựa nào và request cũng không chọn |
 | 400 | `Sakura Wind cannot leave the trip (status: Delivered).` | Con ngựa đã giao, đã chết hoặc đã rời chuyến theo phương án khác |
-| 400 | `A horse can only be recorded as deceased on a Critical incident. Ask the crew to report a Critical incident for this horse.` | Chọn `Deceased` ở sự cố không phải mức `Critical` |
-| 400 | `A veterinary report is required when a horse is recorded as deceased. ...` | Chọn `Deceased` mà không gửi `vetReportPath` |
+| 400 | `A veterinary report or death certificate is required when a horse is recorded as deceased. ...` | Chọn `Deceased` khi sự cố chưa có tài liệu `VetReport` / `DeathCertificate` (và không gửi `vetReportPath`) |
 | 400 | `VetReportPath is not a valid file path. ...` | `vetReportPath` không phải đường dẫn do `POST /api/files` (category `documents`) trả về |
 | 400 | `A horse was offloaded in an emergency on this incident, so the plan must be OffloadHorse with the next step for that horse.` | Sự cố dỡ khẩn cấp mà đề xuất loại hành động khác |
 | 400 | `This incident is about the horse offloaded in an emergency; the plan must be for that horse.` | Sự cố dỡ khẩn cấp mà chọn con ngựa khác |
@@ -9413,6 +9475,8 @@ Tổng cộng 139 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | GET | `/api/incidents` | Danh sách sự cố | Mọi người đã đăng nhập |
 | GET | `/api/incidents/{id}` | Chi tiết sự cố | Mọi người đã đăng nhập (theo quyền xem) |
 | GET | `/api/trips/{tripId}/incidents` | Các sự cố của một chuyến | Mọi nhân sự; tài xế / áp tải chỉ xem được chuyến của mình |
+| POST | `/api/incidents/{id}/documents` | Đính kèm tài liệu (ảnh hiện trường, biên bản thú y, giấy chứng tử, giấy đủ sức đi tiếp) | Nhân sự; tài xế / áp tải chỉ chuyến của mình |
+| DELETE | `/api/incidents/{id}/documents/{documentId}` | Xóa tài liệu tải nhầm khi sự cố chưa duyệt | Người tải lên, LogisticsManager, Admin |
 | POST | `/api/incidents/{id}/propose` | Đề xuất phương án xử lý | FleetCoordinator, Admin |
 | POST | `/api/incidents/{id}/approve` | Duyệt phương án | LogisticsManager, Admin |
 | POST | `/api/incidents/{id}/reject` | Từ chối phương án | LogisticsManager, Admin |

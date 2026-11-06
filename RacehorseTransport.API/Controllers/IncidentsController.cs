@@ -5,6 +5,7 @@ using RacehorseTransport.API.Mappers;
 using RacehorseTransport.API.RequestModels;
 using RacehorseTransport.API.ResponseModels;
 using RacehorseTransport.Repositories.Constants;
+using RacehorseTransport.Services.Implementations;
 using RacehorseTransport.Services.Interfaces;
 
 namespace RacehorseTransport.API.Controllers
@@ -177,6 +178,45 @@ namespace RacehorseTransport.API.Controllers
         {
             var incident = await _incidentService.ResolveIncidentAsync(id, request.FaultParty.Trim(), request.FaultNote, User.ToCurrentUser());
             return Ok(ApiResponse<IncidentResponse>.SuccessResult(incident.ToResponse(), "Incident resolved successfully"));
+        }
+
+        /// <summary>
+        /// Attach a document to an incident: ScenePhoto, VetReport, DeathCertificate or FitToTravel.
+        /// multipart/form-data; the file (pdf, jpg, png; up to 10 MB) goes in the "file" field.
+        /// Staff only; the crew can only attach to incidents of their own trips. Works after the incident is resolved too
+        /// (a vet report often arrives later). The trip planner and logistics managers are notified.
+        /// A Deceased offload plan needs a VetReport or DeathCertificate attached here first.
+        /// </summary>
+        [HttpPost("{id:int}/documents")]
+        [Authorize(Roles = UserRoles.Staff)]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(SupabaseFileStorageService.MaxFileSizeBytes + 1024 * 1024)]
+        [ProducesResponseType(typeof(ApiResponse<IncidentDocumentResponse>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UploadDocument(int id, [FromForm] UploadIncidentDocumentRequest request)
+        {
+            using var file = request.File.ToUploadModel()!;
+            var document = await _incidentService.UploadDocumentAsync(id, request.ToBusinessModel(file), User.ToCurrentUser());
+            return StatusCode(StatusCodes.Status201Created,
+                ApiResponse<IncidentDocumentResponse>.SuccessResult(document.ToResponse(), "Incident document uploaded successfully"));
+        }
+
+        /// <summary>
+        /// Remove a document uploaded by mistake. Only the uploader (or a logistics manager / admin), and only while the incident
+        /// is still open (not Approved / Resolved): an approved plan keeps its evidence.
+        /// </summary>
+        [HttpDelete("{id:int}/documents/{documentId:int}")]
+        [Authorize(Roles = UserRoles.Staff)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DeleteDocument(int id, int documentId)
+        {
+            await _incidentService.DeleteDocumentAsync(id, documentId, User.ToCurrentUser());
+            return Ok(ApiResponse<object?>.SuccessResult(null, "Incident document deleted successfully"));
         }
     }
 }

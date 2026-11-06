@@ -24,12 +24,14 @@ namespace RacehorseTransport.Repositories.Entities
         public DateTimeOffset? ApprovedAt { get; set; }
         public DateTimeOffset ReportedAt { get; set; } = DateTimeOffset.UtcNow;
         public string Severity { get; set; } = IncidentSeverities.Moderate;
+        public string? InitialSeverity { get; set; }
         public int? AffectedTripHorseId { get; set; }
         public DateTimeOffset? ResolvedAt { get; set; }
 
         // Phương án OffloadHorse (R-12): hướng xử lý tiếp của con ngựa rời chuyến và biên bản thú y (bắt buộc khi Deceased)
         public string? OffloadOutcome { get; set; }
         public string? VetReportPath { get; set; }
+        public virtual ICollection<IncidentDocument> Documents { get; set; } = new List<IncidentDocument>();
 
         // Tài xế đã dỡ con ngựa ngay lúc báo sự cố (thú y yêu cầu); phương án OffloadHorse vẫn phải được duyệt sau
         public bool EmergencyOffload { get; set; }

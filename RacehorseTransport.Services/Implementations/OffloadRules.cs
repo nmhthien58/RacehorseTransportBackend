@@ -11,7 +11,7 @@ namespace RacehorseTransport.Services.Implementations
     public static class OffloadRules
     {
         // Kiểm tra phần riêng của phương án OffloadHorse lúc Coordinator đề xuất
-        public static void ValidatePlan(string? outcome, string incidentSeverity, string? vetReportPath)
+        public static void ValidatePlan(string? outcome, IEnumerable<string> incidentDocumentTypes)
         {
             if (string.IsNullOrWhiteSpace(outcome))
             {
@@ -23,13 +23,10 @@ namespace RacehorseTransport.Services.Implementations
             }
             if (outcome == OffloadOutcomes.Deceased)
             {
-                if (incidentSeverity != IncidentSeverities.Critical)
+                bool hasVetDoc = incidentDocumentTypes.Any(t => t == IncidentDocumentTypes.VetReport || t == IncidentDocumentTypes.DeathCertificate);
+                if (!hasVetDoc)
                 {
-                    throw new BusinessException("A horse can only be recorded as deceased on a Critical incident. Ask the crew to report a Critical incident for this horse.");
-                }
-                if (string.IsNullOrWhiteSpace(vetReportPath))
-                {
-                    throw new BusinessException("A veterinary report is required when a horse is recorded as deceased. Upload it with POST /api/files and send its path as VetReportPath.");
+                    throw new BusinessException("A veterinary report or death certificate is required when a horse is recorded as deceased. Upload it with POST /api/incidents/{id}/documents.");
                 }
             }
         }

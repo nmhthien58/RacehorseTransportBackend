@@ -21,5 +21,9 @@ namespace RacehorseTransport.Services.Interfaces
         Task<IncidentModel> RecordCustomerConsentAsync(int incidentId, bool accept, CurrentUser currentUser);
 
         Task<IncidentModel> ResolveIncidentAsync(int incidentId, string faultParty, string? faultNote, CurrentUser currentUser);
+
+        Task<IncidentDocumentModel> UploadDocumentAsync(int incidentId, UploadIncidentDocumentModel model, CurrentUser currentUser);
+
+        Task DeleteDocumentAsync(int incidentId, int documentId, CurrentUser currentUser);
     }
 }

@@ -74,6 +74,7 @@ namespace RacehorseTransport.API.Mappers
                 TripStatus = model.TripStatus,
                 IncidentType = model.IncidentType,
                 Severity = model.Severity,
+                InitialSeverity = model.InitialSeverity,
                 Status = model.Status,
                 Location = model.Location,
                 Description = model.Description,
@@ -123,7 +124,35 @@ namespace RacehorseTransport.API.Mappers
                 ExtraCostForCustomer = model.ExtraCostForCustomer,
                 Consents = model.Consents,
                 OffloadOutcome = model.OffloadOutcome,
-                VetReportUrl = model.VetReportUrl
+                VetReportUrl = model.VetReportUrl,
+                Documents = model.Documents.Select(d => d.ToResponse()).ToList()
+            };
+        }
+
+        // Stream của file do controller giữ và giải phóng (request.File.ToUploadModel())
+        public static UploadIncidentDocumentModel ToBusinessModel(this UploadIncidentDocumentRequest request, FileUploadModel file)
+        {
+            return new UploadIncidentDocumentModel
+            {
+                DocumentType = request.DocumentType.Trim(),
+                Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(),
+                File = file
+            };
+        }
+
+        public static IncidentDocumentResponse ToResponse(this IncidentDocumentModel model)
+        {
+            return new IncidentDocumentResponse
+            {
+                IncidentDocumentId = model.IncidentDocumentId,
+                IncidentId = model.IncidentId,
+                FilePath = model.FilePath,
+                FileUrl = model.FileUrl,
+                DocumentType = model.DocumentType,
+                Note = model.Note,
+                UploadedByUserId = model.UploadedByUserId,
+                UploadedByName = model.UploadedByName,
+                UploadedAt = model.UploadedAt
             };
         }
     }
