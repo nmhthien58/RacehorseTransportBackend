@@ -50,6 +50,11 @@ namespace RacehorseTransport.Services.BusinessModels
     public class TripHorseInputModel
     {
         public int BookingHorseId { get; set; }
+
+        // Khoang (1-based) và vị trí trong khoang (1-3); 0 = chưa chọn.
+        // StallSlotNumber được tính lại từ hai số này khi lưu kế hoạch.
+        public int CompartmentNo { get; set; }
+        public int PositionNo { get; set; }
         public int StallSlotNumber { get; set; }
         public string? Notes { get; set; }
 
@@ -81,8 +86,10 @@ namespace RacehorseTransport.Services.BusinessModels
         public string AssetCode { get; set; } = string.Empty;
         public string AssetType { get; set; } = string.Empty;
         public int CapacityHorses { get; set; }
+        public int CompartmentCount { get; set; }
         public bool HasClimateControl { get; set; }
         public bool HasGpsTracker { get; set; }
+        public string Status { get; set; } = string.Empty;
         public DateTimeOffset? LastSanitizationDate { get; set; }
     }
 }

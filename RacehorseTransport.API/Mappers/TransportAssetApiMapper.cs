@@ -1,5 +1,6 @@
 using RacehorseTransport.API.RequestModels;
 using RacehorseTransport.API.ResponseModels;
+using RacehorseTransport.Repositories.Constants;
 using RacehorseTransport.Services.BusinessModels;
 
 namespace RacehorseTransport.API.Mappers
@@ -26,6 +27,7 @@ namespace RacehorseTransport.API.Mappers
                 AssetCode = request.AssetCode.Trim().ToUpperInvariant(),
                 AssetType = request.AssetType.Trim(),
                 CapacityHorses = request.CapacityHorses,
+                CompartmentCount = request.CompartmentCount ?? 0,
                 HasClimateControl = request.HasClimateControl,
                 HasGpsTracker = request.HasGpsTracker,
                 Status = request.Status.Trim(),
@@ -41,6 +43,7 @@ namespace RacehorseTransport.API.Mappers
                 AssetCode = request.AssetCode.Trim().ToUpperInvariant(),
                 AssetType = request.AssetType.Trim(),
                 CapacityHorses = request.CapacityHorses,
+                CompartmentCount = request.CompartmentCount ?? 0,
                 HasClimateControl = request.HasClimateControl,
                 HasGpsTracker = request.HasGpsTracker,
                 Status = request.Status.Trim(),
@@ -56,6 +59,8 @@ namespace RacehorseTransport.API.Mappers
                 AssetCode = model.AssetCode,
                 AssetType = model.AssetType,
                 CapacityHorses = model.CapacityHorses,
+                CompartmentCount = model.CompartmentCount,
+                PositionsPerCompartment = VehicleCompartments.PositionsPerCompartment,
                 HasClimateControl = model.HasClimateControl,
                 HasGpsTracker = model.HasGpsTracker,
                 Status = model.Status,
