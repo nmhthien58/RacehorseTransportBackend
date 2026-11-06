@@ -213,12 +213,12 @@ INSERT INTO pricing.price_items (category, item_code, item_name, transport_mode,
 ('Insurance', 'INS_TRANSIT', 'Bảo hiểm hành trình (% giá trị khai báo)', NULL, NULL, 'Percent', 1, NULL);
 
 -- ---------- A.4 Phương tiện ----------
-INSERT INTO fleet.transport_assets (asset_id, asset_code, asset_type, capacity_horses, has_climate_control, has_gps_tracker, status, last_sanitization_date) VALUES
-(1, '29B-888.99',       'HorseTruck_AirSuspension', 6, true,  true,  'Available',   now()),
-(2, '51C-246.80',       'HorseVan',                 2, false, true,  'Available',   '2026-09-25 08:00:00+07'),
-(3, 'AIR-STALL-SGN-01', 'AirStall',                 3, true,  true,  'Available',   '2026-09-27 14:00:00+07'),
-(4, '30H-567.89',       'HorseTruck_AirSuspension', 8, true,  true,  'Maintenance', '2026-09-10 09:00:00+07'),
-(5, 'AIR-STALL-HAN-02', 'AirStall',                 2, true,  false, 'Available',   '2026-09-29 10:30:00+07');
+INSERT INTO fleet.transport_assets (asset_id, asset_code, asset_type, capacity_horses, compartment_count, has_climate_control, has_gps_tracker, status, last_sanitization_date) VALUES
+(1, '29B-888.99',       'HorseTruck_AirSuspension', 6, 2, true,  true,  'Available',   now()),
+(2, '51C-246.80',       'HorseVan',                 2, 1, false, true,  'Available',   '2026-09-25 08:00:00+07'),
+(3, 'AIR-STALL-SGN-01', 'AirStall',                 3, 1, true,  true,  'Available',   '2026-09-27 14:00:00+07'),
+(4, '30H-567.89',       'HorseTruck_AirSuspension', 8, 3, true,  true,  'Maintenance', '2026-09-10 09:00:00+07'),
+(5, 'AIR-STALL-HAN-02', 'AirStall',                 2, 1, true,  false, 'Available',   '2026-09-29 10:30:00+07');
 
 -- ---------- B.1 Tài khoản môi trường phát triển (cùng một mật khẩu, đã băm bằng BCrypt) ----------
 INSERT INTO identity.users (user_id, full_name, email, password_hash, phone_number, role) VALUES
@@ -319,9 +319,9 @@ INSERT INTO fleet.trip_crew (trip_id, user_id, crew_role, is_lead) VALUES
 (1, 4, 'Escort', true);
 
 -- Phạm Văn Đức vừa lái chính vừa là escort phụ trách cả 2 con (R-06)
-INSERT INTO fleet.trip_horses (trip_horse_id, trip_id, booking_horse_id, stall_slot_number, notes, escort_user_id, status, picked_up_at) VALUES
-(1, 1, 1, 1, 'Red Flash - Chuồng số 1',      4, 'InTransit', '2026-10-01 06:30:00+07'),
-(2, 1, 2, 2, 'Golden Pegasus - Chuồng số 2', 4, 'InTransit', '2026-10-01 06:30:00+07');
+INSERT INTO fleet.trip_horses (trip_horse_id, trip_id, booking_horse_id, compartment_no, position_no, stall_slot_number, notes, escort_user_id, status, picked_up_at) VALUES
+(1, 1, 1, 1, 1, 1, 'Red Flash - Chuồng số 1',      4, 'InTransit', '2026-10-01 06:30:00+07'),
+(2, 1, 2, 1, 2, 2, 'Golden Pegasus - Chuồng số 2', 4, 'InTransit', '2026-10-01 06:30:00+07');
 
 -- Luồng 4 + 5: mốc Hữu Nghị (2) bị hủy do tắc biên, thay bằng mốc Tân Thanh (5)
 INSERT INTO fleet.route_checkpoints (checkpoint_id, trip_id, sequence_order, checkpoint_name, checkpoint_type, address, planned_time, mandatory_rest_minutes,

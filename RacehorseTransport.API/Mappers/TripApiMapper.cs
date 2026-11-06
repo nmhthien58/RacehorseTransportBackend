@@ -1,5 +1,6 @@
 using RacehorseTransport.API.RequestModels;
 using RacehorseTransport.API.ResponseModels;
+using RacehorseTransport.Repositories.Constants;
 using RacehorseTransport.Services.BusinessModels;
 
 namespace RacehorseTransport.API.Mappers
@@ -32,6 +33,8 @@ namespace RacehorseTransport.API.Mappers
             var response = new TripDetailResponse
             {
                 VehicleCapacity = model.VehicleCapacity,
+                VehicleCompartmentCount = model.VehicleCompartmentCount,
+                PositionsPerCompartment = VehicleCompartments.PositionsPerCompartment,
                 LiveDelayMinutes = model.LiveDelayMinutes,
                 PlannedCost = model.PlannedCost,
                 ActualCost = model.ActualCost,

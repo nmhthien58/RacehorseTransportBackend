@@ -160,8 +160,10 @@ namespace RacehorseTransport.Services.Implementations
                     AssetCode = a.AssetCode,
                     AssetType = a.AssetType,
                     CapacityHorses = a.CapacityHorses,
+                    CompartmentCount = a.CompartmentCount,
                     HasClimateControl = a.HasClimateControl,
                     HasGpsTracker = a.HasGpsTracker,
+                    Status = a.Status,
                     LastSanitizationDate = a.LastSanitizationDate
                 })
                 .ToListAsync();

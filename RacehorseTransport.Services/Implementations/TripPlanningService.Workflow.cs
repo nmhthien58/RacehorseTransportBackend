@@ -517,19 +517,22 @@ namespace RacehorseTransport.Services.Implementations
                     : "Ground bookings must be planned on a truck or van, not an air stall.");
             }
 
-            if (plan.Horses.Count > vehicle.CapacityHorses)
+            // Xe chia khoang: mỗi khoang một hạng chuồng, không quá số con của hạng đó
+            var missingPlace = plan.Horses.FirstOrDefault(h => h.CompartmentNo < 1 || h.PositionNo < 1);
+            if (missingPlace != null)
             {
-                throw new BusinessException($"Vehicle {vehicle.AssetCode} carries at most {vehicle.CapacityHorses} horse(s); this plan has {plan.Horses.Count}.");
+                string name = bookingHorses.First(bh => bh.BookingHorseId == missingPlace.BookingHorseId).Horse!.Name;
+                throw new BusinessException($"Choose a compartment and a position for {name} (CompartmentNo and PositionNo).");
             }
-
-            var slots = plan.Horses.Select(h => h.StallSlotNumber).ToList();
-            if (slots.Any(s => s < 1 || s > vehicle.CapacityHorses))
+            var placements = plan.Horses.Select(h =>
             {
-                throw new BusinessException($"StallSlotNumber must be between 1 and {vehicle.CapacityHorses} for vehicle {vehicle.AssetCode}.");
-            }
-            if (slots.Count != slots.Distinct().Count())
+                var bookingHorse = bookingHorses.First(bh => bh.BookingHorseId == h.BookingHorseId);
+                return new CompartmentPlacement(bookingHorse.Horse!.Name, bookingHorse.StallClass, h.CompartmentNo, h.PositionNo);
+            }).ToList();
+            CompartmentRules.Validate(vehicle, placements);
+            foreach (var horse in plan.Horses)
             {
-                throw new BusinessException("Two horses cannot share the same stall slot.");
+                horse.StallSlotNumber = CompartmentRules.ToStallSlot(horse.CompartmentNo, horse.PositionNo);
             }
 
             var otherTrips = OverlappingTrips(startUtc, endUtc).Where(t => t.TripId != excludeTripId);
@@ -909,6 +912,8 @@ namespace RacehorseTransport.Services.Implementations
             return horses.Select(h => new TripHorse
             {
                 BookingHorseId = h.BookingHorseId,
+                CompartmentNo = h.CompartmentNo,
+                PositionNo = h.PositionNo,
                 StallSlotNumber = h.StallSlotNumber,
                 Notes = h.Notes,
                 EscortUserId = h.EscortUserId
@@ -957,7 +962,7 @@ namespace RacehorseTransport.Services.Implementations
                 PlannedEndDate = trip.PlannedEndDate,
                 PlannedCost = trip.PlannedCost,
                 Crew = trip.Crew.Select(c => new TripCrewInputModel { UserId = c.UserId, CrewRole = c.CrewRole, IsLead = c.IsLead, Duty = c.Duty }).ToList(),
-                Horses = trip.TripHorses.Select(h => new TripHorseInputModel { BookingHorseId = h.BookingHorseId, StallSlotNumber = h.StallSlotNumber, Notes = h.Notes, EscortUserId = h.EscortUserId }).ToList()
+                Horses = trip.TripHorses.Select(h => new TripHorseInputModel { BookingHorseId = h.BookingHorseId, CompartmentNo = h.CompartmentNo, PositionNo = h.PositionNo, StallSlotNumber = h.StallSlotNumber, Notes = h.Notes, EscortUserId = h.EscortUserId }).ToList()
             };
         }
     }

@@ -3668,14 +3668,35 @@ Response `200` — phần `data`:
     "assetCode": "29B-888.99",
     "assetType": "HorseTruck_AirSuspension",
     "capacityHorses": 6,
+    "compartmentCount": 2,
+    "positionsPerCompartment": 3,
     "hasClimateControl": true,
     "hasGpsTracker": true,
+    "status": "Available",
     "lastSanitizationDate": "2026-10-08T07:24:28+00:00"
   }
 ]
 ```
 
-`assetId` là giá trị gửi vào `vehicleId` khi tạo chuyến. `capacityHorses` là số ngựa tối đa xe chở được.
+| Trường | Ý nghĩa |
+|---|---|
+| `assetId` | Giá trị gửi vào `vehicleId` khi tạo chuyến |
+| `capacityHorses` | Số ngựa tối đa xe chở được |
+| `compartmentCount` | Số khoang của xe (1–4). Vẽ sơ đồ chuồng theo số này |
+| `positionsPerCompartment` | Số vị trí trong một khoang, luôn là 3 |
+| `status` | `Available` hoặc `InTransit` (xe bảo trì không bao giờ có trong danh sách này) |
+
+**Xe đủ khoang cho các con đã chọn hay không — frontend tự tính**, endpoint này không lọc. Một khoang chỉ chứa ngựa cùng hạng chuồng (`stallClass` ở hàng chờ): `Shared` tối đa 3 con, `Comfort` 2 con, `Private` 1 con. Số khoang cần:
+
+```js
+// horses: các con đã chọn trong unplanned-horses
+const count = (cls) => horses.filter((h) => h.stallClass === cls).length;
+const requiredCompartments =
+  Math.ceil(count('Shared') / 3) + Math.ceil(count('Comfort') / 2) + count('Private');
+const fits = (v) => v.compartmentCount >= requiredCompartments && v.capacityHorses >= horses.length;
+```
+
+Ví dụ: 2 con `Comfort` + 2 con `Private` cần 1 + 2 = 3 khoang, nên xe 6 chỗ (2 khoang) không chở được dù đủ 6 chỗ.
 
 ### GET /api/trips/available-crew — Tài xế và áp tải còn rảnh
 
@@ -3924,9 +3945,21 @@ Mỗi phần tử của `horses`:
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
 | `bookingHorseId` | số | Có | Lấy từ hàng chờ `unplanned-horses` |
-| `stallSlotNumber` | số | Có | Số ô chuồng trên xe, từ 1 đến sức chứa của xe; mỗi ô một con |
+| `compartmentNo` | số | Có | Khoang trên xe, từ 1 đến `compartmentCount` của xe |
+| `positionNo` | số | Có | Vị trí trong khoang, từ 1 đến 3 |
+| `stallSlotNumber` | số | Không | Cách cũ, vẫn nhận: chỉ dùng khi **không** gửi `compartmentNo`. Ô `n` được hiểu là khoang `ceil(n / 3)`, vị trí `(n - 1) % 3 + 1` (ô 1–3 = khoang 1, ô 4–6 = khoang 2...) |
 | `escortUserId` | số | Không | Người áp tải phụ trách con này: `userId` của một người trong `crew` có `crewRole` = `Escort`. Mỗi người áp tải phụ trách tối đa 3 con. Bỏ trống = hệ thống tự phân (xem bên dưới) |
 | `notes` | chuỗi | Không | Ghi chú, tối đa 200 ký tự |
+
+**Xếp ngựa vào khoang:** xe chia thành `compartmentCount` khoang, mỗi khoang 3 vị trí. Hạng chuồng khách đã mua (`stallClass`) quyết định một khoang chứa được mấy con:
+
+| `stallClass` | Tên trên giao diện | Số con tối đa / khoang |
+|---|---|---|
+| `Shared` | Ghép | 3 |
+| `Comfort` | Rưỡi | 2 |
+| `Private` | Riêng | 1 |
+
+Quy tắc server kiểm tra khi tạo, sửa và trình chuyến: một khoang chỉ chứa ngựa **cùng một hạng**; không quá số con của hạng đó; hai con không cùng (khoang, vị trí); `compartmentNo` không vượt số khoang của xe; tổng số ngựa không vượt `capacityHorses`. Server tự tính `stallSlotNumber = (compartmentNo - 1) * 3 + positionNo` và trả về cùng hai số kia.
 
 **Phân công áp tải theo chuồng (tự phân):** con nào không gửi `escortUserId` thì hệ thống xếp các con đó theo số ô chuồng và giao cho người áp tải đầu tiên còn chỗ (trưởng nhóm áp tải trước, rồi theo thứ tự trong `crew`). Nghĩa là ô 1–3 cho người thứ nhất, ô 4–6 cho người thứ hai... Kết quả nằm trong `horses[].escortUserId` của response. Người áp tải chỉ ghi được nhật ký thể trạng cho ngựa mình phụ trách (trưởng nhóm áp tải ghi được cho mọi con).
 
@@ -3966,11 +3999,13 @@ Ví dụ request:
   "horses": [
     {
       "bookingHorseId": 3,
-      "stallSlotNumber": 1
+      "compartmentNo": 1,
+      "positionNo": 1
     },
     {
       "bookingHorseId": 4,
-      "stallSlotNumber": 2,
+      "compartmentNo": 2,
+      "positionNo": 1,
       "escortUserId": 9,
       "notes": "Chuồng riêng"
     }
@@ -4023,7 +4058,13 @@ Lỗi thường gặp:
 | 400 | `Ground and air bookings cannot be combined on the same trip.` | Trộn ngựa của đơn đường bộ và đơn hàng không |
 | 400 | `Vehicle 29B-888.99 carries at most 6 horse(s); this plan has 7.` | Quá sức chứa của xe |
 | 400 | `Vehicle ... is already booked on trip ... during this period.` | Xe trùng lịch |
-| 400 | `Two horses cannot share the same stall slot.` | Hai con ngựa cùng một ô chuồng |
+| 400 | `Choose a compartment and a position for Kim Ngưu (CompartmentNo and PositionNo).` | Một con không có `compartmentNo` / `positionNo` (và cũng không có `stallSlotNumber`) |
+| 400 | `PositionNo must be between 1 and 3.` | `positionNo` ngoài 1–3 (`compartmentNo` ngoài 1–4 báo tương tự) |
+| 400 | `Vehicle 29H-112.45 has 3 compartment(s) but these horses need 4 (a Shared compartment takes 3 horses, Comfort 2, Private 1). Choose a larger vehicle or move some horses to another trip.` | Xe không đủ khoang cho các hạng chuồng đã chọn |
+| 400 | `Kim Ngưu is placed in compartment 4, but vehicle 29H-112.45 has compartments 1 to 3.` | `compartmentNo` lớn hơn số khoang của xe |
+| 400 | `Hắc Long and Kim Ngưu cannot share position 1 of compartment 1.` | Hai con cùng một vị trí |
+| 400 | `Compartment 2 holds Comfort horses; Kim Ngưu (Private) cannot share it.` | Trộn hai hạng chuồng trong một khoang (hạng của khoang = hạng của con đứng ở vị trí nhỏ nhất) |
+| 400 | `Compartment 1 has 3 Comfort horses, but a Comfort compartment takes at most 2.` | Quá số con của hạng trong một khoang |
 | 400 | `A trip needs at least one driver.` | Đoàn xe không có ai là `Driver` |
 | 400 | `4 horse(s) need at least 2 escort(s) (one per 3 horses); this plan has 1.` | Thiếu người áp tải: cứ 3 con ngựa cần 1 `Escort` |
 | 400 | `User(s) with ID 18 are not escorts on this trip, so they cannot be put in charge of a horse.` | `escortUserId` không phải người có vai trò `Escort` trong `crew` của chuyến |
@@ -4408,6 +4449,8 @@ Response `200` — phần `data`:
     }
   ],
   "vehicleCapacity": 6,
+  "vehicleCompartmentCount": 2,
+  "positionsPerCompartment": 3,
   "plannedCost": 4500,
   "actualCost": 0,
   "plannedByUserId": 3,
@@ -4427,6 +4470,8 @@ Response `200` — phần `data`:
   "horses": [
     {
       "tripHorseId": 7,
+      "compartmentNo": 1,
+      "positionNo": 1,
       "stallSlotNumber": 1,
       "notes": null,
       "bookingHorseId": 3,
@@ -4492,6 +4537,7 @@ Response `200` — phần `data`:
 |---|---|
 | `overallStatus` | Trạng thái chuyến (mục 3) |
 | `vehicleCode`, `vehicleType`, `vehicleCapacity` | Biển số, loại xe, sức chứa |
+| `vehicleCompartmentCount`, `positionsPerCompartment` | Số khoang của xe và số vị trí mỗi khoang (luôn 3); dùng để vẽ sơ đồ chuồng |
 | `plannedStartDate`, `plannedEndDate` | Kế hoạch |
 | `actualStartDate`, `actualEndDate` | Thực tế; `null` khi chưa xảy ra |
 | `plannedCost`, `actualCost` | Chi phí dự kiến và thực tế |
@@ -4503,7 +4549,9 @@ Response `200` — phần `data`:
 | `crew[].assignedHorseCount` | Với dòng `Escort`: số ngựa người này đang phụ trách trên chuyến (tối đa 3). Với dòng `Driver`: `null` |
 | `horses[]` | Ngựa trên chuyến |
 | `horses[].tripHorseId` | Mã "ngựa trên chuyến", dùng khi ghi nhật ký và báo sự cố |
-| `horses[].stallSlotNumber` | Ô chuồng |
+| `horses[].compartmentNo`, `horses[].positionNo` | Khoang và vị trí trong khoang (1–3) |
+| `horses[].stallSlotNumber` | Ô chuồng, luôn bằng `(compartmentNo - 1) * 3 + positionNo` (giữ cho màn hình cũ) |
+| `horses[].stallClass` | Hạng chuồng khách mua: `Shared` (3 con / khoang), `Comfort` (2), `Private` (1) |
 | `horses[].escortUserId`, `escortName` | Người áp tải phụ trách con ngựa. Dùng để vẽ sơ đồ chuồng (tô màu ô theo người áp tải) và để màn của áp tải chỉ hiện ngựa của mình |
 | `horses[].specialCareRequirements`, `photoUrl` | Yêu cầu chăm sóc và ảnh, để tài xế nhận diện |
 | `horses[].dossierStatus` | Trạng thái hồ sơ; chuyến chỉ xuất phát được khi mọi con đều `Cleared` |
@@ -5541,7 +5589,7 @@ Các trường gửi lên:
 |---|---|---|---|
 | `responseAction` | chuỗi | Có | Loại hành động: `WaitAndContinue`, `RepairAndContinue`, `Reroute`, `VeterinaryCare`, `OffloadHorse`, `ReplaceVehicle` (đổi xe), `ReplaceCrew` (đổi tài xế / áp tải), `ReturnToOrigin`, `HoldAtStable`, `Other` |
 | `proposedAction` | chuỗi | Có | Chỉ đạo cho đoàn xe, tối đa 255 ký tự |
-| `replacementVehicleId` | số | Có khi `responseAction` là `ReplaceVehicle` | Xe thay thế. Phải khác xe hiện tại, cùng loại tài sản, đang `Available`, không trùng lịch, đủ chuồng cho số ngựa còn phải chở và có điều hòa nếu một đơn trên xe yêu cầu |
+| `replacementVehicleId` | số | Có khi `responseAction` là `ReplaceVehicle` | Xe thay thế. Phải khác xe hiện tại, cùng loại tài sản, đang `Available`, không trùng lịch, đủ chuồng và đủ khoang (theo hạng chuồng, xem `POST /api/trips`) cho số ngựa còn phải chở và có điều hòa nếu một đơn trên xe yêu cầu |
 | `removeUserId` | số | Có khi `responseAction` là `ReplaceCrew` | Thành viên hiện tại cần thay; phải đang giữ đúng `crewRole` trên chuyến |
 | `addUserId` | số | Có khi `responseAction` là `ReplaceCrew` | Người thay thế; phải là tài khoản `DriverEscort` đang hoạt động và không bận chuyến khác trùng thời gian |
 | `crewRole` | chuỗi | Có khi `responseAction` là `ReplaceCrew` | Vai trò cần thay: `Driver` hoặc `Escort` |
@@ -5658,6 +5706,7 @@ Lỗi thường gặp:
 | 400 | `A horse was offloaded in an emergency on this incident, so the plan must be OffloadHorse with the next step for that horse.` | Sự cố dỡ khẩn cấp mà đề xuất loại hành động khác |
 | 400 | `This incident is about the horse offloaded in an emergency; the plan must be for that horse.` | Sự cố dỡ khẩn cấp mà chọn con ngựa khác |
 | 400 | `Replacement vehicle TRK-009 has only 2 stall(s), but 3 horse(s) still need transport.` | Xe thay thế không đủ chỗ |
+| 400 | `Replacement vehicle TRK-009 has 2 compartment(s) but the horses still on board need 3 (a Shared compartment takes 3 horses, Comfort 2, Private 1).` | Xe thay thế không đủ khoang cho các hạng chuồng còn trên xe |
 | 400 | `Replacement vehicle TRK-009 must have climate control because an onboard booking requires it.` | Đơn trên xe yêu cầu điều hòa nhưng xe thay không có |
 | 400 | `Replacement crew member ... is already assigned to trip ... during this period.` | Người thay thế đang bận chuyến khác trùng thời gian |
 
@@ -5678,7 +5727,7 @@ Phương án `ReturnToOrigin`: tuyến về được dựng và áp ngay (xem đ
 
 Phương án `OffloadHorse`: con ngựa `affectedTripHorseId` đổi trạng thái theo `offloadOutcome` (bảng ở đầu mục 11): `Deceased` → ngựa `Deceased` cả trên chuyến và trong đơn; các hướng khác → `Offloaded` kèm `offloadOutcome`. Khách của con ngựa nhận thông báo + email; với `WaitRecover`, người lập chuyến được báo để xếp chuyến khác.
 
-Phương án `ReplaceVehicle`: server kiểm tra lại điều kiện tại thời điểm duyệt, chuyển `trip.vehicleId` sang xe mới, đặt xe mới `InTransit` và xe cũ `Maintenance`. Số chuồng được giữ nguyên nếu còn nằm trong sức chứa xe mới; nếu không, các ngựa còn phải chở được đánh lại số theo thứ tự hiện tại.
+Phương án `ReplaceVehicle`: server kiểm tra lại điều kiện tại thời điểm duyệt, chuyển `trip.vehicleId` sang xe mới, đặt xe mới `InTransit` và xe cũ `Maintenance`. Khoang và vị trí của ngựa được giữ nguyên nếu xe mới có đủ số khoang đó; nếu không, các ngựa còn phải chở được xếp lại từ khoang 1, mỗi hạng chuồng vào khoang riêng của mình (giữ thứ tự hiện tại).
 
 Phương án `ReplaceCrew`: server kiểm tra lại người thay thế chưa bận chuyến khác, thay dòng `trip_crew` và giữ nguyên cờ trưởng đoàn / nhiệm vụ. Nếu thay `Escort`, mọi ngựa người cũ phụ trách được chuyển sang người mới. Cả người cũ và người mới đều nhận thông báo.
 
@@ -6889,6 +6938,8 @@ Một phương tiện có dạng:
   "assetCode": "51C-246.80",
   "assetType": "HorseVan",
   "capacityHorses": 2,
+  "compartmentCount": 1,
+  "positionsPerCompartment": 3,
   "hasClimateControl": false,
   "hasGpsTracker": true,
   "status": "Available",
@@ -6902,6 +6953,8 @@ Một phương tiện có dạng:
 | `assetCode` | Biển số xe hoặc mã chuồng bay; luôn được lưu **chữ in hoa**, không trùng |
 | `assetType` | Loại: `HorseTruck_AirSuspension` xe tải chở ngựa có giảm xóc khí · `HorseVan` xe van chở ngựa · `AirStall` chuồng dùng cho đường hàng không |
 | `capacityHorses` | Chở tối đa bao nhiêu con ngựa (1–12) |
+| `compartmentCount` | Số khoang của xe (1–4). Mỗi khoang 3 vị trí; một khoang chỉ chứa ngựa cùng hạng chuồng (`Shared` 3 con, `Comfort` 2, `Private` 1) |
+| `positionsPerCompartment` | Số vị trí mỗi khoang, luôn là 3 (chỉ có trong response) |
 | `hasClimateControl` | Có điều hòa hay không |
 | `hasGpsTracker` | Có thiết bị định vị hay không |
 | `status` | Tình trạng: `Available` sẵn sàng · `InTransit` đang chạy chuyến · `Maintenance` đang bảo dưỡng |
@@ -6936,6 +6989,8 @@ Response `200`:
       "assetCode": "51C-246.80",
       "assetType": "HorseVan",
       "capacityHorses": 2,
+      "compartmentCount": 1,
+      "positionsPerCompartment": 3,
       "hasClimateControl": false,
       "hasGpsTracker": true,
       "status": "Available",
@@ -6990,6 +7045,7 @@ Các trường gửi lên:
 | `assetCode` | chuỗi | Có | Biển số / mã, tối đa 30 ký tự, không trùng. Gõ chữ thường cũng được, server tự đổi sang in hoa |
 | `assetType` | chuỗi | Có | `HorseTruck_AirSuspension`, `HorseVan` hoặc `AirStall` |
 | `capacityHorses` | số | Có | Sức chứa, từ 1 đến 12 |
+| `compartmentCount` | số | Không | Số khoang, từ 1 đến 4; `compartmentCount × 3` phải ≥ `capacityHorses`. Bỏ trống = `ceil(capacityHorses / 3)` (2 chỗ → 1, 6 → 2, 8 → 3, 12 → 4) |
 | `hasClimateControl` | true / false | Không | Mặc định `true` |
 | `hasGpsTracker` | true / false | Không | Mặc định `true` |
 | `status` | chuỗi | Có | `Available`, `InTransit` hoặc `Maintenance`. Xe mới thường là `Available` |
@@ -7002,6 +7058,7 @@ Ví dụ request:
   "assetCode": "51c-999.01",
   "assetType": "HorseVan",
   "capacityHorses": 2,
+  "compartmentCount": 1,
   "hasClimateControl": true,
   "hasGpsTracker": true,
   "status": "Available",
@@ -7020,6 +7077,8 @@ Response `201`:
     "assetCode": "51C-999.01",
     "assetType": "HorseVan",
     "capacityHorses": 2,
+    "compartmentCount": 1,
+    "positionsPerCompartment": 3,
     "hasClimateControl": true,
     "hasGpsTracker": true,
     "status": "Available",
@@ -7036,6 +7095,8 @@ Lỗi thường gặp:
 | 400 | `Transport asset code '51C-999.01' already exists.` | Trùng biển số (không phân biệt hoa thường) |
 | 400 | `AssetType 'Truck' is invalid. Allowed values: HorseTruck_AirSuspension, HorseVan, AirStall.` | Loại phương tiện sai |
 | 400 | `CapacityHorses must be between 1 and 12.` | Sức chứa ngoài khoảng 1–12 |
+| 400 | `CompartmentCount must be between 1 and 4.` | Số khoang ngoài khoảng 1–4 |
+| 400 | `2 compartment(s) hold at most 6 horses; increase CompartmentCount or lower CapacityHorses.` | Số khoang không đủ chỗ cho sức chứa |
 | 403 | `You do not have permission to perform this action.` | Người gọi không phải FleetCoordinator / Admin |
 
 ```js
@@ -7073,6 +7134,7 @@ Ví dụ request (đưa xe vào bảo dưỡng):
   "assetCode": "51C-999.01",
   "assetType": "HorseVan",
   "capacityHorses": 2,
+  "compartmentCount": 1,
   "hasClimateControl": true,
   "hasGpsTracker": true,
   "status": "Maintenance",
