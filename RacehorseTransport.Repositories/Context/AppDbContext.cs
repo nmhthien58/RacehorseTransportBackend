@@ -361,6 +361,18 @@ namespace RacehorseTransport.Repositories.Context
                       .HasForeignKey(e => e.UploadedByUserId);
             });
 
+            modelBuilder.Entity<IncidentDocument>(entity =>
+            {
+                entity.ToTable("incident_documents", "incident");
+                entity.HasKey(e => e.IncidentDocumentId);
+                entity.HasOne(e => e.Incident)
+                      .WithMany(i => i.Documents)
+                      .HasForeignKey(e => e.IncidentId);
+                entity.HasOne(e => e.UploadedBy)
+                      .WithMany()
+                      .HasForeignKey(e => e.UploadedByUserId);
+            });
+
             // ---------- acceptance ----------
             modelBuilder.Entity<DelayCompensation>(entity =>
             {

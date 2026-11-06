@@ -106,6 +106,7 @@ namespace RacehorseTransport.Services.Implementations
             existing.AssetCode = model.AssetCode;
             existing.AssetType = model.AssetType;
             existing.CapacityHorses = model.CapacityHorses;
+            existing.CompartmentCount = model.CompartmentCount;
             existing.HasClimateControl = model.HasClimateControl;
             existing.HasGpsTracker = model.HasGpsTracker;
             existing.Status = model.Status;
@@ -163,6 +164,21 @@ namespace RacehorseTransport.Services.Implementations
             if (model.CapacityHorses is < 1 or > 12)
             {
                 throw new BusinessException("CapacityHorses must be between 1 and 12.");
+            }
+
+            // Mỗi khoang 3 vị trí: số khoang phải đủ chỗ cho sức chứa của xe
+            if (model.CompartmentCount == 0)
+            {
+                model.CompartmentCount = CompartmentRules.DefaultCompartmentCount(model.CapacityHorses);
+            }
+            if (model.CompartmentCount < 1 || model.CompartmentCount > VehicleCompartments.MaxCompartments)
+            {
+                throw new BusinessException($"CompartmentCount must be between 1 and {VehicleCompartments.MaxCompartments}.");
+            }
+            if (model.CompartmentCount * VehicleCompartments.PositionsPerCompartment < model.CapacityHorses)
+            {
+                throw new BusinessException(
+                    $"{model.CompartmentCount} compartment(s) hold at most {model.CompartmentCount * VehicleCompartments.PositionsPerCompartment} horses; increase CompartmentCount or lower CapacityHorses.");
             }
         }
 
