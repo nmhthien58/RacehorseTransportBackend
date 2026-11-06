@@ -47,6 +47,9 @@ namespace RacehorseTransport.Services.BusinessModels
 
         // OffloadHorse + Deceased khi ngựa còn sống: chờ chủ ngựa đồng ý an tử sau khi Manager duyệt
         public bool RequiresEuthanasiaConsent { get; set; }
+
+        // OffloadHorse + WaitRecover: bắt buộc phòng khám (tên, địa chỉ)
+        public VetClinicModel? VetClinic { get; set; }
     }
 
     // Nắn tuyến: bỏ các mốc chưa tới và chèn các mốc mới vào lộ trình
@@ -135,6 +138,33 @@ namespace RacehorseTransport.Services.BusinessModels
         public int? RemoveUserId { get; set; }
         public int? AddUserId { get; set; }
         public string? CrewRole { get; set; }
+
+        // OffloadHorse + WaitRecover: phòng khám nơi con ngựa ở lại (chép vào trip_horses khi duyệt)
+        public VetClinicModel? VetClinic { get; set; }
+    }
+
+    public class VetClinicModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+        public string? AttendingVetName { get; set; }
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
+    }
+
+    // Ghi viện phí của con ngựa ở lại phòng khám
+    public class RecordVetExpenseModel
+    {
+        public decimal Amount { get; set; }
+        public string? Note { get; set; }
+    }
+
+    // Ngựa đang điều trị tại phòng khám thì chết: kèm giấy chứng tử
+    public class PostOffloadDeathModel
+    {
+        public string? Note { get; set; }
+        public FileUploadModel DeathCertificate { get; set; } = null!;
     }
 
     public class IncidentConsentModel

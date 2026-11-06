@@ -117,7 +117,7 @@ public class OffloadRulesTests
     [InlineData(TripHorseStatuses.Delivered, null, true)]
     [InlineData(TripHorseStatuses.Deceased, OffloadOutcomes.Deceased, true)]
     [InlineData(TripHorseStatuses.Offloaded, OffloadOutcomes.ReturnToOrigin, true)]
-    [InlineData(TripHorseStatuses.Offloaded, OffloadOutcomes.WaitRecover, false)]  // còn phải đi chuyến sau
+    [InlineData(TripHorseStatuses.Offloaded, OffloadOutcomes.WaitRecover, true)]   // đơn kết thúc tại phòng khám, đi tiếp bằng đơn nối tiếp
     [InlineData(TripHorseStatuses.Offloaded, OffloadOutcomes.HandOverHere, false)] // chưa ký e-POD tại chỗ
     [InlineData(TripHorseStatuses.Offloaded, null, false)]                         // dỡ khẩn cấp, chưa có phương án
     [InlineData(TripHorseStatuses.InTransit, null, false)]

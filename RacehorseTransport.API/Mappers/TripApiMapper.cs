@@ -52,34 +52,7 @@ namespace RacehorseTransport.API.Mappers
                 ClosedAt = model.ClosedAt,
                 ExecutiveRemarks = model.ExecutiveRemarks,
                 CreatedAt = model.CreatedAt,
-                Horses = model.Horses.Select(h => new TripHorseResponse
-                {
-                    TripHorseId = h.TripHorseId,
-                    CompartmentNo = h.CompartmentNo,
-                    PositionNo = h.PositionNo,
-                    StallSlotNumber = h.StallSlotNumber,
-                    Notes = h.Notes,
-                    BookingHorseId = h.BookingHorseId,
-                    BookingId = h.BookingId,
-                    BookingCode = h.BookingCode,
-                    HorseId = h.HorseId,
-                    HorseName = h.HorseName,
-                    MicrochipNumber = h.MicrochipNumber,
-                    Gender = h.Gender,
-                    Color = h.Color,
-                    SpecialCareRequirements = h.SpecialCareRequirements,
-                    PhotoUrl = h.PhotoUrl,
-                    StallClass = h.StallClass,
-                    DossierStatus = h.DossierStatus,
-                    EscortUserId = h.EscortUserId,
-                    EscortName = h.EscortName,
-                    Status = h.Status,
-                    PickedUpAt = h.PickedUpAt,
-                    DeliveredAt = h.DeliveredAt,
-                    OffloadedAt = h.OffloadedAt,
-                    OffloadReason = h.OffloadReason,
-                    OffloadOutcome = h.OffloadOutcome
-                }).ToList(),
+                Horses = model.Horses.Select(h => h.ToResponse()).ToList(),
                 Checkpoints = model.Checkpoints.Select(c => new TripCheckpointResponse
                 {
                     CheckpointId = c.CheckpointId,
@@ -147,6 +120,42 @@ namespace RacehorseTransport.API.Mappers
                 Duty = c.Duty,
                 AssignedHorseCount = c.AssignedHorseCount
             }).ToList();
+        }
+
+        public static TripHorseResponse ToResponse(this TripHorseModel h)
+        {
+            return new TripHorseResponse
+            {
+                TripHorseId = h.TripHorseId,
+                CompartmentNo = h.CompartmentNo,
+                PositionNo = h.PositionNo,
+                StallSlotNumber = h.StallSlotNumber,
+                Notes = h.Notes,
+                BookingHorseId = h.BookingHorseId,
+                BookingId = h.BookingId,
+                BookingCode = h.BookingCode,
+                HorseId = h.HorseId,
+                HorseName = h.HorseName,
+                MicrochipNumber = h.MicrochipNumber,
+                Gender = h.Gender,
+                Color = h.Color,
+                SpecialCareRequirements = h.SpecialCareRequirements,
+                PhotoUrl = h.PhotoUrl,
+                StallClass = h.StallClass,
+                DossierStatus = h.DossierStatus,
+                EscortUserId = h.EscortUserId,
+                EscortName = h.EscortName,
+                Status = h.Status,
+                PickedUpAt = h.PickedUpAt,
+                DeliveredAt = h.DeliveredAt,
+                OffloadedAt = h.OffloadedAt,
+                OffloadReason = h.OffloadReason,
+                OffloadOutcome = h.OffloadOutcome,
+                VetClinic = h.VetClinic,
+                VetExpenseAmount = h.VetExpenseAmount,
+                VetExpenseBearer = h.VetExpenseBearer,
+                VetExpenseNote = h.VetExpenseNote
+            };
         }
     }
 }

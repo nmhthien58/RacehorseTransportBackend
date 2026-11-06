@@ -732,7 +732,7 @@ namespace RacehorseTransport.Services.Implementations
                 .Where(th => bookingHorseIds.Contains(th.BookingHorseId)
                     && th.Trip!.OverallStatus != TripStatuses.Cancelled
                     && (TripHorseStatuses.Holding.Contains(th.Status)
-                        || (th.Status == TripHorseStatuses.Offloaded && th.OffloadOutcome != OffloadOutcomes.WaitRecover)))
+                        || th.Status == TripHorseStatuses.Offloaded))
                 .Select(th => th.Trip!.TripCode)
                 .FirstOrDefaultAsync();
             if (onTrip != null)

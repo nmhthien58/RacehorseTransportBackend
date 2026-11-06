@@ -385,6 +385,11 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"A horse was offloaded in an emergency on this incident, so the plan must be {IncidentResponseActions.OffloadHorse} with the next step for that horse.");
             }
             EuthanasiaConsentRules.ValidatePlan(model.ResponseAction, model.OffloadOutcome, model.RequiresEuthanasiaConsent);
+            OffloadRules.ValidateVetClinic(offloadHorse == null ? null : model.OffloadOutcome, model.VetClinic);
+            if (offloadHorse != null && model.VetClinic != null)
+            {
+                actionPayload = new IncidentActionPayloadModel { VetClinic = model.VetClinic };
+            }
 
             // R-14: quay về nơi đi -> tuyến về do hệ thống dựng lúc duyệt, không kèm thay đổi tuyến tự nhập
             bool hasRouteInput = model.RouteChange != null && (model.RouteChange.DeactivateCheckpointIds.Count > 0 || model.RouteChange.NewCheckpoints.Count > 0);
@@ -952,9 +957,9 @@ namespace RacehorseTransport.Services.Implementations
             {
                 await RefundReturnedBookingsAsync(incident, faultParty, currentUser);
             }
-            // R-12 / R-14: một con ngựa rời chuyến (không phải chờ hồi phục) -> hoàn phần cước chưa đi của con đó
-            else if (incident.ResponseAction == IncidentResponseActions.OffloadHorse
-                && incident.OffloadOutcome != null && incident.OffloadOutcome != OffloadOutcomes.WaitRecover)
+            // R-12 / R-14: một con ngựa rời chuyến -> hoàn phần cước chưa đi của con đó (theo nguyên nhân).
+            // WaitRecover cũng vậy: đơn của con ngựa kết thúc tại phòng khám, khỏi bệnh thì đi tiếp bằng đơn nối tiếp
+            else if (incident.ResponseAction == IncidentResponseActions.OffloadHorse && incident.OffloadOutcome != null)
             {
                 await RefundOffloadedHorseAsync(trip, incident, faultParty, currentUser);
             }
@@ -1283,6 +1288,93 @@ namespace RacehorseTransport.Services.Implementations
             return await GetIncidentByIdAsync(incidentId, currentUser);
         }
 
+        // Ngựa đang điều trị tại phòng khám (WaitRecover) thì chết: ghi nhận tử vong, lưu giấy chứng tử vào sự cố gốc,
+        // tự mở hồ sơ bảo hiểm tử vong (bổ sung nếu đã có hồ sơ thương tích đã duyệt)
+        public async Task<TripHorseModel> RecordPostOffloadDeathAsync(int tripId, int tripHorseId, PostOffloadDeathModel model, CurrentUser currentUser)
+        {
+            var (incident, tripHorse) = await FindClinicHorseAsync(tripId, tripHorseId);
+            if (tripHorse.Status != TripHorseStatuses.Offloaded)
+            {
+                throw new BusinessException($"{tripHorse.BookingHorse!.Horse!.Name} is {tripHorse.Status}; only a horse recovering at a vet clinic can be recorded here.");
+            }
+            var trip = incident.Trip!;
+            var bookingHorse = tripHorse.BookingHorse!;
+            string horseName = bookingHorse.Horse!.Name;
+
+            var stored = await _fileStorage.UploadAsync(model.DeathCertificate.Content, model.DeathCertificate.FileName, model.DeathCertificate.SizeBytes, FileCategories.Documents);
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                await AddDocumentAsync(incident, stored.Path, IncidentDocumentTypes.DeathCertificate, model.Note, currentUser.UserId);
+                tripHorse.Status = TripHorseStatuses.Deceased;
+                bookingHorse.Status = BookingHorseStatuses.Deceased;
+                await _tripRepo.SaveChangesAsync();
+
+                await _claimService.OpenAutomaticallyAsync(bookingHorse.BookingHorseId, ClaimTypes.Death,
+                    $"{horseName} died at {tripHorse.VetClinicName ?? "the vet clinic"} after leaving trip {trip.TripCode} ({incident.IncidentCode}).", incident.IncidentId);
+
+                await _notificationService.SendAsync(bookingHorse.Booking!.CustomerUserId,
+                    $"We are deeply sorry: {horseName} has died",
+                    $"{horseName} died while under veterinary care at {tripHorse.VetClinicName ?? "the vet clinic"}. The death certificate is in the app and our team will contact you about the insurance claim.",
+                    NotificationReferenceTypes.Booking, bookingHorse.BookingId, emailCustomers: true);
+                await NotifyStaffAsync(trip, incident, $"{horseName} died at the vet clinic",
+                    $"Incident {incident.IncidentCode}: the death certificate was recorded and a death claim was opened.");
+            });
+
+            await _trackingService.InvalidateTripAsync(trip.TripId);
+            return tripHorse.ToBusinessModel();
+        }
+
+        // Viện phí của con ngựa ở lại phòng khám; ai chịu theo nguyên nhân đã chốt khi đóng sự cố (Chính sách 9.6)
+        public async Task<TripHorseModel> RecordVetExpenseAsync(int tripId, int tripHorseId, RecordVetExpenseModel model, CurrentUser currentUser)
+        {
+            var (incident, tripHorse) = await FindClinicHorseAsync(tripId, tripHorseId);
+            if (incident.Status != IncidentStatuses.Resolved || incident.FaultParty == null)
+            {
+                throw new BusinessException($"Resolve incident {incident.IncidentCode} first (choose the cause): it decides who bears the vet costs.");
+            }
+            var bookingHorse = tripHorse.BookingHorse!;
+            bool euthanasiaDeclined = await _consentRepo.GetQueryable().AnyAsync(c =>
+                c.BookingId == bookingHorse.BookingId && c.ConsentType == ConsentTypes.Euthanasia && !c.Accepted
+                && c.Incident!.AffectedTripHorseId == tripHorse.TripHorseId);
+            string bearer = VetExpenseRules.Bearer(incident.FaultParty, euthanasiaDeclined);
+
+            tripHorse.VetExpenseAmount = model.Amount;
+            tripHorse.VetExpenseBearer = bearer;
+            tripHorse.VetExpenseNote = string.IsNullOrWhiteSpace(model.Note) ? null : model.Note.Trim();
+            await _tripRepo.SaveChangesAsync();
+
+            string horseName = bookingHorse.Horse!.Name;
+            string who = bearer == VetExpenseBearers.Company
+                ? "The incident was our fault, so the company covers this bill."
+                : euthanasiaDeclined
+                    ? "You declined the vet's euthanasia advice, so treatment costs are yours (service policy 9.6). Please settle the bill with the clinic."
+                    : "The incident was not our fault, so treatment costs are yours (service policy 9.6). Please settle the bill with the clinic.";
+            await _notificationService.SendAsync(bookingHorse.Booking!.CustomerUserId,
+                $"Vet bill for {horseName}: {model.Amount:N2} USD",
+                $"{tripHorse.VetClinicName ?? "The vet clinic"} billed {model.Amount:N2} USD for {horseName}. {who}",
+                NotificationReferenceTypes.Booking, bookingHorse.BookingId, emailCustomers: true);
+            return tripHorse.ToBusinessModel();
+        }
+
+        // Con ngựa của chuyến đã rời chuyến để ở lại phòng khám, kèm sự cố gốc
+        private async Task<(TripIncident Incident, TripHorse TripHorse)> FindClinicHorseAsync(int tripId, int tripHorseId)
+        {
+            int? incidentId = await _incidentRepo.GetQueryable()
+                .Where(i => i.TripId == tripId && i.AffectedTripHorseId == tripHorseId
+                    && i.ResponseAction == IncidentResponseActions.OffloadHorse && i.OffloadOutcome == OffloadOutcomes.WaitRecover
+                    && (i.Status == IncidentStatuses.Approved || i.Status == IncidentStatuses.Resolved))
+                .OrderByDescending(i => i.IncidentId)
+                .Select(i => (int?)i.IncidentId)
+                .FirstOrDefaultAsync();
+            if (incidentId == null)
+            {
+                throw new BusinessException($"Trip horse {tripHorseId} did not stay at a vet clinic on trip {tripId} (no approved WaitRecover plan).");
+            }
+            var incident = await GetTrackedIncidentAsync(incidentId.Value);
+            var tripHorse = incident.Trip!.TripHorses.First(th => th.TripHorseId == tripHorseId);
+            return (incident, tripHorse);
+        }
+
         // Đoàn xe, người lập chuyến và quản lý (không gửi khách)
         private async Task NotifyStaffAsync(Trip trip, TripIncident incident, string title, string message)
         {
@@ -1457,6 +1549,16 @@ namespace RacehorseTransport.Services.Implementations
             tripHorse.OffloadOutcome = outcome;
             tripHorse.OffloadedAt ??= DateTimeOffset.UtcNow;
             tripHorse.OffloadReason ??= Truncate($"{incident.IncidentCode}: {incident.Description}", OffloadReasonMaxLength);
+            var clinic = IncidentMapper.ParseActionPayload(incident.ActionPayload)?.VetClinic;
+            if (outcome == OffloadOutcomes.WaitRecover && clinic != null)
+            {
+                tripHorse.VetClinicName = clinic.Name;
+                tripHorse.VetClinicAddress = clinic.Address;
+                tripHorse.VetClinicPhone = clinic.Phone;
+                tripHorse.AttendingVetName = clinic.AttendingVetName;
+                tripHorse.VetClinicLat = clinic.Latitude;
+                tripHorse.VetClinicLng = clinic.Longitude;
+            }
             if (outcome == OffloadOutcomes.Deceased)
             {
                 bookingHorse.Status = BookingHorseStatuses.Deceased;
@@ -1472,13 +1574,15 @@ namespace RacehorseTransport.Services.Implementations
                 await _claimService.OpenAutomaticallyAsync(bookingHorse.BookingHorseId, ClaimTypes.Injury,
                     $"{horseName} left trip {trip.TripCode} for health reasons ({incident.IncidentCode}): {incident.Description}", incident.IncidentId);
             }
-            // R-14: phần cước chưa đi của con ngựa được hoàn khi đóng sự cố (biết nguyên nhân), trừ WaitRecover vì con ngựa còn đi chuyến sau
+            // R-14: phần cước chưa đi của con ngựa được hoàn khi đóng sự cố (biết nguyên nhân)
 
             var (title, message) = outcome switch
             {
                 OffloadOutcomes.WaitRecover => (
                     $"{horseName} left trip {trip.TripCode} to recover",
-                    $"The horse stays near {incident.Location} under veterinary care and will travel on a later trip once it has recovered. Costs follow section 9.1 of the service policy."),
+                    $"The horse stays under veterinary care at {(clinic == null ? incident.Location : $"{clinic.Name}, {clinic.Address}{(clinic.Phone == null ? string.Empty : $" (phone {clinic.Phone})")}{(clinic.AttendingVetName == null ? string.Empty : $", vet {clinic.AttendingVetName}")}")}. "
+                    + "Booking " + booking.BookingCode + " ends for this horse at the clinic and the unused part of the fare is refunded according to the cause (service policy 9.6). "
+                    + "Once the horse is fit to travel, our coordinator creates a continuation booking from the clinic to the destination (free of charge if the incident was our fault), or you may collect the horse at the clinic."),
                 OffloadOutcomes.ReturnToOrigin => (
                     $"{horseName} will be returned to the pickup point",
                     $"The horse left trip {trip.TripCode} at {incident.Location} and our team will bring it back to {booking.PickupAddress}. Refunds and costs follow section 9.1 of the service policy."),
@@ -1502,8 +1606,8 @@ namespace RacehorseTransport.Services.Implementations
 
             if (outcome == OffloadOutcomes.WaitRecover)
             {
-                string planTitle = $"{horseName} is back in the planning queue";
-                string planMessage = $"Booking {booking.BookingCode}: the horse left trip {trip.TripCode} to recover. Plan another trip once it is fit to travel.";
+                string planTitle = $"{horseName} stays at a vet clinic";
+                string planMessage = $"Booking {booking.BookingCode}: the horse left trip {trip.TripCode} to recover at {clinic?.Name ?? incident.Location}. Create a continuation booking once it is fit to travel (attach the FitToTravel certificate to the incident).";
                 if (trip.PlannedByUserId.HasValue)
                 {
                     await _notificationService.SendAsync(trip.PlannedByUserId.Value, planTitle, planMessage, NotificationReferenceTypes.Trip, trip.TripId);
@@ -1636,7 +1740,8 @@ namespace RacehorseTransport.Services.Implementations
                 return new ReplacementPlan(payload, null, removed, replacement);
             }
 
-            if (payload != null)
+            // Payload chỉ chứa phòng khám (OffloadHorse + WaitRecover) thì không phải phương án đổi xe / đổi người
+            if (payload != null && (payload.ReplacementVehicleId.HasValue || payload.RemoveUserId.HasValue || payload.AddUserId.HasValue || payload.CrewRole != null))
             {
                 throw new BusinessException("This incident action must not contain an action payload. Propose the plan again.");
             }

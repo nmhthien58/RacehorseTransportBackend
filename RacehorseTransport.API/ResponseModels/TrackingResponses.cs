@@ -114,6 +114,9 @@ namespace RacehorseTransport.API.ResponseModels
         public DateTimeOffset? OffloadedAt { get; set; }
         public string? OffloadReason { get; set; }
         public string? OffloadOutcome { get; set; }
+        public RacehorseTransport.Services.BusinessModels.VetClinicModel? VetClinic { get; set; }
+        public decimal? VetExpenseAmount { get; set; }
+        public string? VetExpenseBearer { get; set; }
         public WelfareLogResponse? LatestLog { get; set; }
         public List<WelfareLogResponse> Logs { get; set; } = new();
     }

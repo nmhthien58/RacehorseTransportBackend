@@ -439,6 +439,17 @@ CREATE TABLE fleet.trip_horses (
     -- Chỉ WaitRecover đưa con ngựa về hàng chờ xếp chuyến.
     offload_outcome    varchar(20)
         CONSTRAINT ck_trip_horses_offload_outcome CHECK (offload_outcome IN ('WaitRecover', 'ReturnToOrigin', 'HandOverHere', 'Deceased')),
+    -- WaitRecover (Chính sách 9.6): phòng khám nơi ngựa ở lại + viện phí và ai chịu
+    vet_clinic_name    varchar(150),
+    vet_clinic_address varchar(255),
+    vet_clinic_phone   varchar(30),
+    attending_vet_name varchar(100),
+    vet_clinic_lat     numeric(9,6),
+    vet_clinic_lng     numeric(9,6),
+    vet_expense_amount numeric(18,2) CONSTRAINT ck_trip_horses_vet_expense_amount CHECK (vet_expense_amount >= 0),
+    vet_expense_bearer varchar(15)
+        CONSTRAINT ck_trip_horses_vet_expense_bearer CHECK (vet_expense_bearer IN ('Company', 'Customer')),
+    vet_expense_note   varchar(500),
     CONSTRAINT uq_trip_horses UNIQUE (trip_id, booking_horse_id),
     CONSTRAINT uq_trip_horses_stall UNIQUE (trip_id, stall_slot_number) -- Hai ngựa không chung một ô chuồng
 );

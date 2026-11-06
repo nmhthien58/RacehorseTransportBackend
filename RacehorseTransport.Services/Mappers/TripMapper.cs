@@ -140,7 +140,24 @@ namespace RacehorseTransport.Services.Mappers
                 DeliveredAt = entity.DeliveredAt,
                 OffloadedAt = entity.OffloadedAt,
                 OffloadReason = entity.OffloadReason,
-                OffloadOutcome = entity.OffloadOutcome
+                OffloadOutcome = entity.OffloadOutcome,
+                VetClinic = entity.ToVetClinic(),
+                VetExpenseAmount = entity.VetExpenseAmount,
+                VetExpenseBearer = entity.VetExpenseBearer,
+                VetExpenseNote = entity.VetExpenseNote
+            };
+        }
+
+        public static VetClinicModel? ToVetClinic(this TripHorse entity)
+        {
+            return entity.VetClinicName == null ? null : new VetClinicModel
+            {
+                Name = entity.VetClinicName,
+                Address = entity.VetClinicAddress ?? string.Empty,
+                Phone = entity.VetClinicPhone,
+                AttendingVetName = entity.AttendingVetName,
+                Latitude = entity.VetClinicLat,
+                Longitude = entity.VetClinicLng
             };
         }
 
