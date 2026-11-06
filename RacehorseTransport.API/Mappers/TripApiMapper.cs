@@ -127,6 +127,8 @@ namespace RacehorseTransport.API.Mappers
             return new TripHorseResponse
             {
                 TripHorseId = h.TripHorseId,
+                CompartmentNo = h.CompartmentNo,
+                PositionNo = h.PositionNo,
                 StallSlotNumber = h.StallSlotNumber,
                 Notes = h.Notes,
                 BookingHorseId = h.BookingHorseId,
