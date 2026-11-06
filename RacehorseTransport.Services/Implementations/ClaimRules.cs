@@ -30,7 +30,19 @@ namespace RacehorseTransport.Services.Implementations
             };
         }
 
-        public static void EnsureApprovable(string plan, string claimType, decimal? agreedValue, string? faultParty, decimal amount, PolicySettingsModel policy)
+        // Chết / mất: tổng tiền đã duyệt cho cùng con ngựa (vd. hồ sơ thương tích trước đó) không vượt trần chết / mất,
+        // nên hồ sơ tử vong bổ sung chỉ còn phần chênh lệch. Thương tích giữ trần riêng.
+        public static decimal RemainingCap(decimal cap, string claimType, decimal priorApprovedForHorse) =>
+            claimType == ClaimTypes.Injury ? cap : Math.Max(0m, cap - priorApprovedForHorse);
+
+        // Hồ sơ đã có của con ngựa trong cùng sự cố, khi ngựa chết: còn chờ quyết định thì nâng thành tử vong;
+        // thương tích đã duyệt / đã chi thì mở hồ sơ tử vong bổ sung
+        public static bool NeedsSupplementaryDeathClaim(string newClaimType, string existingClaimType, string existingStatus) =>
+            newClaimType == ClaimTypes.Death && existingClaimType == ClaimTypes.Injury
+            && (existingStatus == ClaimStatuses.Approved || existingStatus == ClaimStatuses.Paid);
+
+        public static void EnsureApprovable(string plan, string claimType, decimal? agreedValue, string? faultParty, decimal amount, PolicySettingsModel policy,
+            decimal priorApprovedForHorse = 0m)
         {
             if (amount <= 0)
             {
@@ -40,10 +52,13 @@ namespace RacehorseTransport.Services.Implementations
             {
                 throw new BusinessException("This horse has no insurance: compensation is only paid when the company is at fault (FaultParty = Company).");
             }
-            decimal cap = Cap(plan, claimType, agreedValue, faultParty, policy);
+            decimal cap = RemainingCap(Cap(plan, claimType, agreedValue, faultParty, policy), claimType, priorApprovedForHorse);
             if (amount > cap)
             {
-                throw new BusinessException($"The approved amount {amount:N2} USD is above the cap of {cap:N2} USD for a {claimType} claim with plan {plan}.");
+                string prior = claimType != ClaimTypes.Injury && priorApprovedForHorse > 0
+                    ? $" ({priorApprovedForHorse:N2} USD was already approved for this horse)"
+                    : string.Empty;
+                throw new BusinessException($"The approved amount {amount:N2} USD is above the cap of {cap:N2} USD for a {claimType} claim with plan {plan}{prior}.");
             }
         }
 

@@ -62,4 +62,43 @@ public class ClaimRulesTests
         Assert.False(ClaimRules.WithinCustomerWindow(Delivered, Delivered.AddHours(24).AddMinutes(1)));
         Assert.False(ClaimRules.WithinCustomerWindow(null, Delivered));
     }
+
+    // ---------- Hồ sơ tử vong bổ sung ----------
+
+    [Fact]
+    public void SupplementaryDeathClaim_NonePackage_DoesNotExceed5000Total()
+    {
+        // Không mua bảo hiểm, lỗi công ty: thương tích đã duyệt 1.000 -> tử vong bổ sung tối đa 4.000
+        decimal cap = ClaimRules.RemainingCap(ClaimRules.Cap(InsurancePlans.None, ClaimTypes.Death, 200000m, FaultParties.Company, Policy), ClaimTypes.Death, 1000m);
+        Assert.Equal(4000m, cap);
+
+        ClaimRules.EnsureApprovable(InsurancePlans.None, ClaimTypes.Death, 200000m, FaultParties.Company, 4000m, Policy, 1000m);
+        var ex = Assert.Throws<BusinessException>(() =>
+            ClaimRules.EnsureApprovable(InsurancePlans.None, ClaimTypes.Death, 200000m, FaultParties.Company, 4000.01m, Policy, 1000m));
+        Assert.Contains("already approved", ex.Message);
+    }
+
+    [Fact]
+    public void SupplementaryDeathClaim_FullPackage_PaysAgreedValueMinusInjury()
+    {
+        Assert.Equal(190000m, ClaimRules.RemainingCap(200000m, ClaimTypes.Death, 10000m));
+    }
+
+    [Fact]
+    public void RemainingCap_InjuryKeepsItsOwnCap_AndNeverNegative()
+    {
+        Assert.Equal(1000m, ClaimRules.RemainingCap(1000m, ClaimTypes.Injury, 5000m));
+        Assert.Equal(0m, ClaimRules.RemainingCap(5000m, ClaimTypes.Death, 6000m));
+    }
+
+    [Theory]
+    [InlineData(ClaimTypes.Death, ClaimTypes.Injury, ClaimStatuses.Approved, true)]
+    [InlineData(ClaimTypes.Death, ClaimTypes.Injury, ClaimStatuses.Paid, true)]
+    [InlineData(ClaimTypes.Death, ClaimTypes.Injury, ClaimStatuses.Open, false)]       // còn chờ: nâng hồ sơ cũ thành tử vong
+    [InlineData(ClaimTypes.Death, ClaimTypes.Injury, ClaimStatuses.UnderReview, false)]
+    [InlineData(ClaimTypes.Injury, ClaimTypes.Injury, ClaimStatuses.Paid, false)]
+    public void NeedsSupplementaryDeathClaim_OnlyAfterInjuryDecided(string newType, string existingType, string status, bool expected)
+    {
+        Assert.Equal(expected, ClaimRules.NeedsSupplementaryDeathClaim(newType, existingType, status));
+    }
 }
