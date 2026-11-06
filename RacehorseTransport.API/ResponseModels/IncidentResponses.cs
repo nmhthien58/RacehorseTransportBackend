@@ -33,6 +33,9 @@ namespace RacehorseTransport.API.ResponseModels
         public DateTimeOffset? ResolvedAt { get; set; }
         public bool EmergencyOffload { get; set; }        // tài xế đã dỡ con ngựa ngay lúc báo sự cố
         public decimal ExtraCostForCustomer { get; set; } // R-14: tiền đi đường vòng khách trả thêm (phải được khách đồng ý)
+        public decimal? MyExtraCostShare { get; set; }   // khách xem: phần của mình = phí × ngựa của mình / ngựa trên xe
+        public int? MyHorsesOnBoard { get; set; }
+        public int? HorsesOnBoard { get; set; }
         public List<RacehorseTransport.Services.BusinessModels.IncidentConsentModel> Consents { get; set; } = new();
         public string? OffloadOutcome { get; set; }       // hướng xử lý tiếp của phương án OffloadHorse
         public string? VetReportUrl { get; set; }         // link xem biên bản thú y (có hạn)

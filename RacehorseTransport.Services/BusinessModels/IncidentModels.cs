@@ -99,6 +99,10 @@ namespace RacehorseTransport.Services.BusinessModels
 
         // R-14 (BE-14b)
         public decimal ExtraCostForCustomer { get; set; }
+        // Chỉ điền khi khách xem: phần phí đi vòng của khách (chia theo số ngựa còn trên xe)
+        public decimal? MyExtraCostShare { get; set; }
+        public int? MyHorsesOnBoard { get; set; }
+        public int? HorsesOnBoard { get; set; }
         public List<IncidentConsentModel> Consents { get; set; } = new();
         public List<IncidentDocumentModel> Documents { get; set; } = new();
 
