@@ -50,6 +50,7 @@ namespace RacehorseTransport.Services.Implementations
         public const string DeliveryMaxWaitingHoursKey = "Delivery.MaxWaitingHours";
         public const string DeliveryDecisionHoursKey = "Delivery.DecisionHours";
         public const string DeliveryDeadlineBufferDaysKey = "Delivery.DeadlineBufferDays";
+        public const string EuthanasiaConsentMinutesKey = "Incident.EuthanasiaConsentMinutes";
 
         // Mỗi khóa chính sách: mô tả + cách đọc / ghi vào model (giá trị lưu dạng chuỗi, số theo InvariantCulture)
         private sealed record PolicyKey(string Key, string Description, Func<PolicySettingsModel, string> Get, Action<PolicySettingsModel, string> Set);
@@ -107,6 +108,8 @@ namespace RacehorseTransport.Services.Implementations
                 m => Num(m.DeliveryDecisionHours), (m, v) => m.DeliveryDecisionHours = ParseInt(v, m.DeliveryDecisionHours)),
             new(DeliveryDeadlineBufferDaysKey, "Số ngày dự phòng cộng vào hạn giao sớm nhất khách được chọn",
                 m => Num(m.DeliveryDeadlineBufferDays), (m, v) => m.DeliveryDeadlineBufferDays = ParseInt(v, m.DeliveryDeadlineBufferDays)),
+            new(EuthanasiaConsentMinutesKey, "Số phút chờ chủ ngựa trả lời khuyến nghị an tử trước khi được áp dụng ủy quyền khẩn cấp",
+                m => Num(m.EuthanasiaConsentMinutes), (m, v) => m.EuthanasiaConsentMinutes = ParseInt(v, m.EuthanasiaConsentMinutes)),
         };
 
         private readonly IRepository<SystemSetting> _settingRepo;
@@ -352,6 +355,7 @@ namespace RacehorseTransport.Services.Implementations
             Between(model.DeliveryMaxWaitingHours, 1, 168, DeliveryMaxWaitingHoursKey);
             Between(model.DeliveryDecisionHours, 1, 168, DeliveryDecisionHoursKey);
             Between(model.DeliveryDeadlineBufferDays, 0, 30, DeliveryDeadlineBufferDaysKey);
+            Between(model.EuthanasiaConsentMinutes, 5, 1440, EuthanasiaConsentMinutesKey);
 
             if (errors.Count > 0)
             {

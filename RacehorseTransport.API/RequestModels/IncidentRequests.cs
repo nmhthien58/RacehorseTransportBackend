@@ -85,6 +85,9 @@ namespace RacehorseTransport.API.RequestModels
         // Đường dẫn biên bản thú y đã tải lên qua POST /api/files (category documents); bắt buộc khi Deceased
         [MaxLength(500, ErrorMessage = "VetReportPath cannot exceed 500 characters.")]
         public string? VetReportPath { get; set; }
+
+        // Chỉ với OffloadHorse + Deceased khi ngựa còn sống và bác sĩ khuyến nghị an tử: duyệt xong chờ chủ ngựa đồng ý
+        public bool RequiresEuthanasiaConsent { get; set; }
     }
 
     // R-14 (BE-14b): khách đồng ý / từ chối đi đường vòng tốn thêm tiền
@@ -92,6 +95,14 @@ namespace RacehorseTransport.API.RequestModels
     {
         [Required(ErrorMessage = "Accept is required.")]
         public bool? Accept { get; set; }
+    }
+
+    // Quá hạn chờ chủ ngựa trả lời khuyến nghị an tử: áp dụng điều khoản ủy quyền khẩn cấp
+    public class EmergencyAuthorizeRequest
+    {
+        [Required(ErrorMessage = "Note is required.")]
+        [MaxLength(500, ErrorMessage = "Note cannot exceed 500 characters.")]
+        public string Note { get; set; } = string.Empty;
     }
 
     // R-09: đóng sự cố phải chọn nguyên nhân

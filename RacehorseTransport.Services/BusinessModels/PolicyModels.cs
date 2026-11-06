@@ -32,6 +32,8 @@ namespace RacehorseTransport.Services.BusinessModels
         public int DeliveryDecisionHours { get; set; } = 24;           // Delivery.DecisionHours
         public int DeliveryDeadlineBufferDays { get; set; } = 2;       // Delivery.DeadlineBufferDays (dự phòng cho hạn giao sớm nhất)
 
+        public int EuthanasiaConsentMinutes { get; set; } = 60;        // Incident.EuthanasiaConsentMinutes (chờ chủ ngựa trả lời trước khi ủy quyền khẩn cấp)
+
         public DateTimeOffset? UpdatedAt { get; set; }
         public string? UpdatedByName { get; set; }
     }

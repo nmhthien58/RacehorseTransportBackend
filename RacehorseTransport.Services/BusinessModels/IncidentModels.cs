@@ -44,6 +44,9 @@ namespace RacehorseTransport.Services.BusinessModels
         public int? AffectedTripHorseId { get; set; }
         public string? OffloadOutcome { get; set; }
         public string? VetReportPath { get; set; }
+
+        // OffloadHorse + Deceased khi ngựa còn sống: chờ chủ ngựa đồng ý an tử sau khi Manager duyệt
+        public bool RequiresEuthanasiaConsent { get; set; }
     }
 
     // Nắn tuyến: bỏ các mốc chưa tới và chèn các mốc mới vào lộ trình
@@ -95,6 +98,15 @@ namespace RacehorseTransport.Services.BusinessModels
         public decimal ExtraCostForCustomer { get; set; }
         public List<IncidentConsentModel> Consents { get; set; } = new();
         public List<IncidentDocumentModel> Documents { get; set; } = new();
+
+        // An tử: chờ chủ ngựa đồng ý; quá ConsentDeadline thì được ủy quyền khẩn cấp
+        public bool RequiresEuthanasiaConsent { get; set; }
+        public string? PendingConsentType { get; set; }
+        public DateTimeOffset? ConsentRequestedAt { get; set; }
+        public DateTimeOffset? ConsentDeadline { get; set; }
+        public DateTimeOffset? EmergencyAuthorizedAt { get; set; }
+        public string? EmergencyAuthorizedByName { get; set; }
+        public string? EmergencyAuthorizationNote { get; set; }
     }
 
     public class IncidentDocumentModel
@@ -127,6 +139,7 @@ namespace RacehorseTransport.Services.BusinessModels
 
     public class IncidentConsentModel
     {
+        public string ConsentType { get; set; } = string.Empty; // Detour | Euthanasia
         public int BookingId { get; set; }
         public string BookingCode { get; set; } = string.Empty;
         public bool Accepted { get; set; }

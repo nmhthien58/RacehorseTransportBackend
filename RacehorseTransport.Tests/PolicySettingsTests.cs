@@ -35,6 +35,7 @@ public class PolicySettingsTests
         Assert.Equal(24, m.DeliveryMaxWaitingHours);
         Assert.Equal(24, m.DeliveryDecisionHours);
         Assert.Equal(2, m.DeliveryDeadlineBufferDays);
+        Assert.Equal(60, m.EuthanasiaConsentMinutes);
     }
 
     [Fact]
@@ -79,6 +80,8 @@ public class PolicySettingsTests
         yield return Case("Delivery.DecisionHours", m => m.DeliveryDecisionHours = 169);
         yield return Case("Delivery.DeadlineBufferDays", m => m.DeliveryDeadlineBufferDays = -1);
         yield return Case("Delivery.DeadlineBufferDays", m => m.DeliveryDeadlineBufferDays = 31);
+        yield return Case("Incident.EuthanasiaConsentMinutes", m => m.EuthanasiaConsentMinutes = 4);
+        yield return Case("Incident.EuthanasiaConsentMinutes", m => m.EuthanasiaConsentMinutes = 1441);
     }
 
     private static object[] Case(string key, Action<PolicySettingsModel> change) => new object[] { key, change };

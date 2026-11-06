@@ -37,6 +37,15 @@ namespace RacehorseTransport.API.ResponseModels
         public string? OffloadOutcome { get; set; }       // hướng xử lý tiếp của phương án OffloadHorse
         public string? VetReportUrl { get; set; }         // link xem biên bản thú y (có hạn)
         public List<IncidentDocumentResponse> Documents { get; set; } = new();
+
+        // An tử (chờ chủ ngựa đồng ý, ủy quyền khẩn cấp khi quá hạn)
+        public bool RequiresEuthanasiaConsent { get; set; }
+        public string? PendingConsentType { get; set; }        // Detour | Euthanasia khi status = AwaitingConsent
+        public DateTimeOffset? ConsentRequestedAt { get; set; }
+        public DateTimeOffset? ConsentDeadline { get; set; }   // an tử: quá mốc này mới được ủy quyền khẩn cấp
+        public DateTimeOffset? EmergencyAuthorizedAt { get; set; }
+        public string? EmergencyAuthorizedByName { get; set; }
+        public string? EmergencyAuthorizationNote { get; set; }
     }
 
     public class IncidentDocumentResponse

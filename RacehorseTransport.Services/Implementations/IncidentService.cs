@@ -384,6 +384,7 @@ namespace RacehorseTransport.Services.Implementations
             {
                 throw new BusinessException($"A horse was offloaded in an emergency on this incident, so the plan must be {IncidentResponseActions.OffloadHorse} with the next step for that horse.");
             }
+            EuthanasiaConsentRules.ValidatePlan(model.ResponseAction, model.OffloadOutcome, model.RequiresEuthanasiaConsent);
 
             // R-14: quay về nơi đi -> tuyến về do hệ thống dựng lúc duyệt, không kèm thay đổi tuyến tự nhập
             bool hasRouteInput = model.RouteChange != null && (model.RouteChange.DeactivateCheckpointIds.Count > 0 || model.RouteChange.NewCheckpoints.Count > 0);
@@ -439,13 +440,16 @@ namespace RacehorseTransport.Services.Implementations
                 {
                     incident.AffectedTripHorseId = offloadHorse.TripHorseId;
                 }
+                incident.RequiresEuthanasiaConsent = offloadHorse != null && model.RequiresEuthanasiaConsent;
+                incident.PendingConsentType = null;
+                incident.ConsentRequestedAt = null;
                 incident.Status = IncidentStatuses.PlanProposed;
                 await _incidentRepo.UpdateAsync(incident);
 
                 string routeText = plan == null ? string.Empty : $" Route change: {DescribeRouteChange(plan.Removed, plan.Added)}";
                 string offloadText = offloadHorse == null
                     ? string.Empty
-                    : $" {offloadHorse.BookingHorse!.Horse!.Name} leaves the trip ({incident.OffloadOutcome}).";
+                    : $" {offloadHorse.BookingHorse!.Horse!.Name} leaves the trip ({incident.OffloadOutcome}).{(incident.RequiresEuthanasiaConsent ? " The vet recommends euthanasia: the owner is asked to agree after approval." : string.Empty)}";
                 await _notificationService.SendToRoleAsync(
                     UserRoles.LogisticsManager,
                     $"Plan for incident {incident.IncidentCode} needs approval",
@@ -500,12 +504,48 @@ namespace RacehorseTransport.Services.Implementations
                 }
             }
 
+            // An tử theo khuyến nghị thú y: chưa đổi trạng thái con ngựa, chờ chủ ngựa đồng ý (Chính sách 9.6)
+            if (offloadHorse != null && incident.RequiresEuthanasiaConsent)
+            {
+                var policy = await _settingService.GetPolicySettingsAsync();
+                var owner = offloadHorse.BookingHorse!.Booking!;
+                string horseName = offloadHorse.BookingHorse.Horse!.Name;
+                await _unitOfWork.ExecuteInTransactionAsync(async () =>
+                {
+                    incident.Status = IncidentStatuses.AwaitingConsent;
+                    incident.PendingConsentType = ConsentTypes.Euthanasia;
+                    incident.ConsentRequestedAt = DateTimeOffset.UtcNow;
+                    incident.RejectionReason = null;
+                    incident.ApprovedByUserId = currentUser.UserId;
+                    incident.ApprovedAt = DateTimeOffset.UtcNow;
+                    await _incidentRepo.UpdateAsync(incident);
+
+                    await _notificationService.SendAsync(
+                        owner.CustomerUserId,
+                        $"Your decision is needed about {horseName}",
+                        $"Incident {incident.IncidentCode} on trip {trip.TripCode}: the veterinarian recommends humane euthanasia for {horseName}. Please read the vet report in the app and agree or decline within {policy.EuthanasiaConsentMinutes} minutes. If we cannot reach you in time, the emergency authorisation clause (service policy 9.6) lets us follow the vet's advice to spare the horse further suffering. If you decline, further treatment costs are yours.",
+                        NotificationReferenceTypes.Incident,
+                        incident.IncidentId,
+                        emailCustomers: true);
+                    await _notificationService.SendToUsersAsync(
+                        WithPlanner(CrewIds(trip), trip),
+                        $"Incident {incident.IncidentCode} waits for the owner's decision",
+                        $"{horseName}: euthanasia is recommended. The owner has {policy.EuthanasiaConsentMinutes} minutes to answer; keep the horse comfortable under the vet's care until then.",
+                        NotificationReferenceTypes.Incident,
+                        incident.IncidentId);
+                });
+                await _trackingService.InvalidateTripAsync(trip.TripId);
+                return await GetIncidentByIdAsync(incidentId, currentUser);
+            }
+
             // R-14: đi đường vòng tốn thêm tiền -> chưa áp tuyến, chờ các khách có ngựa trên xe đồng ý
             if (plan != null && incident.ExtraCostForCustomer > 0)
             {
                 await _unitOfWork.ExecuteInTransactionAsync(async () =>
                 {
                     incident.Status = IncidentStatuses.AwaitingConsent;
+                    incident.PendingConsentType = ConsentTypes.Detour;
+                    incident.ConsentRequestedAt = DateTimeOffset.UtcNow;
                     incident.RejectionReason = null;
                     incident.ApprovedByUserId = currentUser.UserId;
                     incident.ApprovedAt = DateTimeOffset.UtcNow;
@@ -1031,6 +1071,10 @@ namespace RacehorseTransport.Services.Implementations
             {
                 throw new BusinessException($"This incident is not waiting for your agreement (status: {incident.Status}).");
             }
+            if (EuthanasiaConsentRules.PendingType(incident) == ConsentTypes.Euthanasia)
+            {
+                return await RecordEuthanasiaConsentAsync(incident, accept, currentUser);
+            }
 
             var myBookingIds = trip.TripHorses
                 .Where(th => TripHorseStatuses.OnBoard.Contains(th.Status) && th.BookingHorse!.Booking!.CustomerUserId == currentUser.UserId)
@@ -1042,7 +1086,7 @@ namespace RacehorseTransport.Services.Implementations
                 throw new ForbiddenException("Only customers with horses on this trip can answer.");
             }
 
-            var existing = await _consentRepo.GetQueryable().Where(c => c.IncidentId == incidentId).ToListAsync();
+            var existing = await _consentRepo.GetQueryable().Where(c => c.IncidentId == incidentId && c.ConsentType == ConsentTypes.Detour).ToListAsync();
             var now = DateTimeOffset.UtcNow;
             await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
@@ -1051,7 +1095,7 @@ namespace RacehorseTransport.Services.Implementations
                     var consent = existing.FirstOrDefault(c => c.BookingId == bookingId);
                     if (consent == null)
                     {
-                        consent = new IncidentConsent { IncidentId = incidentId, BookingId = bookingId, CustomerUserId = currentUser.UserId };
+                        consent = new IncidentConsent { IncidentId = incidentId, ConsentType = ConsentTypes.Detour, BookingId = bookingId, CustomerUserId = currentUser.UserId };
                         await _consentRepo.AddAsync(consent);
                         existing.Add(consent);
                     }
@@ -1074,6 +1118,7 @@ namespace RacehorseTransport.Services.Implementations
                     incident.RouteChange = null;
                     incident.ExtraCostForCustomer = 0;
                     incident.Status = IncidentStatuses.Approved;
+                    incident.PendingConsentType = null;
                     await ApplyReturnToOriginAsync(trip, incident);
                     await _incidentRepo.UpdateAsync(incident);
                     await NotifyEveryoneAsync(trip, incident, $"Trip {trip.TripCode} returns to the origin",
@@ -1109,6 +1154,7 @@ namespace RacehorseTransport.Services.Implementations
                 routeChange.AppliedAt = now;
                 incident.RouteChange = IncidentMapper.SerializeRouteChange(routeChange);
                 incident.Status = IncidentStatuses.Approved;
+                incident.PendingConsentType = null;
                 await _incidentRepo.UpdateAsync(incident);
                 await NotifyEveryoneAsync(trip, incident, $"Trip {trip.TripCode} takes the detour",
                     $"Every customer agreed. Route changed: {DescribeRouteChange(plan.Removed, plan.Added)}");
@@ -1134,6 +1180,118 @@ namespace RacehorseTransport.Services.Implementations
 
             await _trackingService.InvalidateTripAsync(trip.TripId);
             return await GetIncidentByIdAsync(incidentId, currentUser);
+        }
+
+        // Chủ của con ngựa trả lời khuyến nghị an tử. Đồng ý -> áp phương án Deceased. Từ chối -> phương án bị trả về để điều phối
+        // lập phương án khác (thường là WaitRecover tại phòng khám); đoàn xe đi tiếp, không quay về. Chi phí điều trị từ đó do chủ ngựa chịu.
+        private async Task<IncidentModel> RecordEuthanasiaConsentAsync(TripIncident incident, bool accept, CurrentUser currentUser)
+        {
+            var trip = incident.Trip!;
+            var horse = trip.TripHorses.FirstOrDefault(th => th.TripHorseId == incident.AffectedTripHorseId)
+                ?? throw new BusinessException("The horse of this euthanasia request is no longer on the trip; the logistics team will review the incident.");
+            var booking = horse.BookingHorse!.Booking!;
+            string horseName = horse.BookingHorse.Horse!.Name;
+            if (booking.CustomerUserId != currentUser.UserId)
+            {
+                throw new ForbiddenException($"Only the owner of {horseName} can answer this euthanasia request.");
+            }
+            if (accept && !OffloadRules.CanBeOffloaded(horse, incident))
+            {
+                throw new BusinessException($"{horseName} is {horse.Status}; the plan can no longer be applied. The logistics team will review the incident.");
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                var consent = await _consentRepo.GetQueryable().FirstOrDefaultAsync(c =>
+                    c.IncidentId == incident.IncidentId && c.BookingId == booking.BookingId && c.ConsentType == ConsentTypes.Euthanasia);
+                if (consent == null)
+                {
+                    consent = new IncidentConsent
+                    {
+                        IncidentId = incident.IncidentId,
+                        ConsentType = ConsentTypes.Euthanasia,
+                        BookingId = booking.BookingId,
+                        CustomerUserId = currentUser.UserId
+                    };
+                    await _consentRepo.AddAsync(consent);
+                }
+                consent.Accepted = accept;
+                consent.DecidedAt = now;
+                await _consentRepo.SaveChangesAsync();
+
+                incident.PendingConsentType = null;
+                if (accept)
+                {
+                    incident.Status = IncidentStatuses.Approved;
+                    incident.Severity = IncidentSeverityRules.EffectiveSeverityOnApproval(incident.Severity, incident.OffloadOutcome);
+                    await ApplyOffloadAsync(trip, incident, horse);
+                    await _incidentRepo.UpdateAsync(incident);
+                    await NotifyStaffAsync(trip, incident, $"The owner agreed to euthanasia for {horseName}",
+                        $"Incident {incident.IncidentCode}: carry out the vet's advice and attach the death certificate to the incident.");
+                    return;
+                }
+
+                incident.Status = IncidentStatuses.Rejected;
+                incident.RequiresEuthanasiaConsent = false;
+                incident.ApprovedByUserId = null;
+                incident.ApprovedAt = null;
+                incident.RejectionReason = $"The owner declined euthanasia for {horseName}. Propose another plan (for example OffloadHorse with WaitRecover at a vet clinic); further treatment costs are borne by the owner (service policy 9.6).";
+                await _incidentRepo.UpdateAsync(incident);
+                await NotifyStaffAsync(trip, incident, $"The owner declined euthanasia for {horseName}", incident.RejectionReason);
+                await _notificationService.SendAsync(booking.CustomerUserId,
+                    $"We recorded your decision about {horseName}",
+                    $"You declined euthanasia. {horseName} stays under veterinary treatment and our coordinator will tell you the next step. As set out in service policy 9.6, treatment costs from now on are yours.",
+                    NotificationReferenceTypes.Incident, incident.IncidentId, emailCustomers: true);
+            });
+
+            await _trackingService.InvalidateTripAsync(trip.TripId);
+            return await GetIncidentByIdAsync(incident.IncidentId, currentUser);
+        }
+
+        // Quá hạn mà chủ ngựa chưa trả lời: áp dụng điều khoản ủy quyền khẩn cấp (Chính sách 9.6), cần biên bản thú y
+        public async Task<IncidentModel> EmergencyAuthorizeAsync(int incidentId, string note, CurrentUser currentUser)
+        {
+            var incident = await GetTrackedIncidentAsync(incidentId);
+            var policy = await _settingService.GetPolicySettingsAsync();
+            var now = DateTimeOffset.UtcNow;
+            EuthanasiaConsentRules.EnsureCanEmergencyAuthorize(incident, now, policy.EuthanasiaConsentMinutes);
+
+            var trip = incident.Trip!;
+            var horse = trip.TripHorses.FirstOrDefault(th => th.TripHorseId == incident.AffectedTripHorseId);
+            if (horse == null || !OffloadRules.CanBeOffloaded(horse, incident))
+            {
+                throw new BusinessException("The horse can no longer be recorded on this plan. Reject the plan so the coordinator can propose a new one.");
+            }
+            string horseName = horse.BookingHorse!.Horse!.Name;
+
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                incident.EmergencyAuthorizedAt = now;
+                incident.EmergencyAuthorizedByUserId = currentUser.UserId;
+                incident.EmergencyAuthorizationNote = note.Trim();
+                incident.PendingConsentType = null;
+                incident.Status = IncidentStatuses.Approved;
+                incident.Severity = IncidentSeverityRules.EffectiveSeverityOnApproval(incident.Severity, incident.OffloadOutcome);
+                await ApplyOffloadAsync(trip, incident, horse);
+                await _incidentRepo.UpdateAsync(incident);
+                await NotifyStaffAsync(trip, incident, $"Emergency authorisation applied for {horseName}",
+                    $"Incident {incident.IncidentCode}: the owner did not answer within {policy.EuthanasiaConsentMinutes} minutes. Note: {incident.EmergencyAuthorizationNote}");
+            });
+
+            await _trackingService.InvalidateTripAsync(trip.TripId);
+            return await GetIncidentByIdAsync(incidentId, currentUser);
+        }
+
+        // Đoàn xe, người lập chuyến và quản lý (không gửi khách)
+        private async Task NotifyStaffAsync(Trip trip, TripIncident incident, string title, string message)
+        {
+            await _notificationService.SendToUsersAsync(WithPlanner(CrewIds(trip), trip), title, message, NotificationReferenceTypes.Incident, incident.IncidentId);
+            if (!trip.PlannedByUserId.HasValue)
+            {
+                await _notificationService.SendToRoleAsync(UserRoles.FleetCoordinator, title, message, NotificationReferenceTypes.Incident, incident.IncidentId);
+            }
+            await _notificationService.SendToRoleAsync(UserRoles.LogisticsManager, title, message, NotificationReferenceTypes.Incident, incident.IncidentId);
         }
 
         // Dựng tuyến về (gọi trong transaction): bỏ mọi mốc chưa tới, thêm các mốc đã đi theo chiều ngược, kết thúc ở điểm xuất phát
@@ -1327,6 +1485,14 @@ namespace RacehorseTransport.Services.Implementations
                 OffloadOutcomes.HandOverHere => (
                     $"{horseName} can be collected at {incident.Location}",
                     "Please send the recipient there to sign the handover (e-POD) with our crew. The unused part of the fare follows section 9.1 of the service policy."),
+                _ when incident.EmergencyAuthorizedAt != null => (
+                    $"We are deeply sorry: {horseName} has died",
+                    $"We could not reach you in time, so under the emergency authorisation clause (service policy 9.6) {horseName} was put down on the veterinarian's advice to spare it further suffering (trip {trip.TripCode}). The vet report is in the app and our team will contact you about the insurance claim.")
+                ,
+                _ when incident.RequiresEuthanasiaConsent => (
+                    $"We are deeply sorry: {horseName} has died",
+                    $"As you agreed, {horseName} was put down on the veterinarian's advice (trip {trip.TripCode}). The vet report is in the app and our team will contact you about the insurance claim.")
+                ,
                 _ => (
                     $"We are deeply sorry: {horseName} has died",
                     $"The horse died during trip {trip.TripCode}. A veterinary report has been recorded and our team will contact you about the insurance claim.")
@@ -1351,6 +1517,13 @@ namespace RacehorseTransport.Services.Implementations
 
         private async Task ResolveVetReportUrlsAsync(IEnumerable<IncidentModel> models)
         {
+            // An tử: hạn chờ chủ ngựa trả lời (sau mốc này mới được ủy quyền khẩn cấp)
+            var waiting = models.Where(m => m.PendingConsentType == ConsentTypes.Euthanasia && m.ConsentRequestedAt.HasValue).ToList();
+            if (waiting.Count > 0)
+            {
+                int minutes = (await _settingService.GetPolicySettingsAsync()).EuthanasiaConsentMinutes;
+                waiting.ForEach(m => m.ConsentDeadline = EuthanasiaConsentRules.Deadline(m.ConsentRequestedAt!.Value, minutes));
+            }
             await _fileStorage.ResolveViewUrlsAsync(models, m => m.VetReportPath, (m, url) => m.VetReportUrl = url);
             var docs = models.SelectMany(m => m.Documents).ToList();
             await _fileStorage.ResolveViewUrlsAsync(docs, d => d.FilePath, (d, url) => d.FileUrl = url);
@@ -1559,6 +1732,7 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(i => i.Trip)
                 .Include(i => i.ReportedBy)
                 .Include(i => i.ApprovedBy)
+                .Include(i => i.EmergencyAuthorizedBy)
                 .Include(i => i.AffectedTripHorse!).ThenInclude(th => th.BookingHorse!).ThenInclude(bh => bh.Horse)
                 .Include(i => i.Consents).ThenInclude(c => c.Booking)
                 .Include(i => i.Documents).ThenInclude(d => d.UploadedBy);
