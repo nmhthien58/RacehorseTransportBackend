@@ -247,6 +247,7 @@ Content-Type: application/json
   "assetCode": "DEMO-TU-01",
   "assetType": "HorseVan",
   "capacityHorses": 3,
+  "compartmentCount": 1,
   "hasClimateControl": true,
   "hasGpsTracker": true,
   "status": "Maintenance",
@@ -1305,7 +1306,28 @@ Content-Type: application/json
     { "userId": 10, "crewRole": "Escort", "isLead": true }
   ],
   "horses": [
-    { "bookingHorseId": 1, "stallSlotNumber": 1, "escortUserId": 10 }
+    { "bookingHorseId": 1, "compartmentNo": 1, "positionNo": 1, "escortUserId": 10 }
+  ]
+}
+
+### [SAI - 400] Xe chia khoang: hai hạng chuồng khác nhau trong cùng một khoang
+# Thay bookingHorseId bằng hai con khác hạng (Comfort + Private) lấy từ /api/trips/unplanned-horses.
+# Lỗi mong đợi: "Compartment 1 holds Comfort horses; ... (Private) cannot share it."
+POST {{baseUrl}}/api/trips
+Authorization: Bearer {{coordinatorToken}}
+Content-Type: application/json
+
+{
+  "vehicleId": 1,
+  "plannedStartDate": "2026-12-01T06:00:00+07:00",
+  "plannedEndDate": "2026-12-05T18:00:00+07:00",
+  "crew": [
+    { "userId": 4, "crewRole": "Driver", "isLead": true },
+    { "userId": 10, "crewRole": "Escort", "isLead": true }
+  ],
+  "horses": [
+    { "bookingHorseId": 10, "compartmentNo": 1, "positionNo": 1 },
+    { "bookingHorseId": 8, "compartmentNo": 1, "positionNo": 2 }
   ]
 }
 

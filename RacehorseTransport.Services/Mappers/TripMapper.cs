@@ -30,6 +30,7 @@ namespace RacehorseTransport.Services.Mappers
             var model = new TripDetailModel
             {
                 VehicleCapacity = entity.Vehicle?.CapacityHorses,
+                VehicleCompartmentCount = entity.Vehicle?.CompartmentCount,
                 LiveDelayMinutes = eta.DelayMinutes,
                 PlannedCost = entity.PlannedCost,
                 ActualCost = entity.ActualCost,
@@ -117,6 +118,8 @@ namespace RacehorseTransport.Services.Mappers
             return new TripHorseModel
             {
                 TripHorseId = entity.TripHorseId,
+                CompartmentNo = entity.CompartmentNo,
+                PositionNo = entity.PositionNo,
                 StallSlotNumber = entity.StallSlotNumber,
                 Notes = entity.Notes,
                 BookingHorseId = entity.BookingHorseId,

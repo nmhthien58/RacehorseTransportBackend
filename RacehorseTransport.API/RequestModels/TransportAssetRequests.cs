@@ -27,6 +27,10 @@ namespace RacehorseTransport.API.RequestModels
         [Range(1, 12, ErrorMessage = "CapacityHorses must be between 1 and 12.")]
         public int CapacityHorses { get; set; }
 
+        // Số khoang (1-4), mỗi khoang 3 vị trí. Bỏ trống = ceil(CapacityHorses / 3).
+        [Range(1, 4, ErrorMessage = "CompartmentCount must be between 1 and 4.")]
+        public int? CompartmentCount { get; set; }
+
         public bool HasClimateControl { get; set; } = true;
         public bool HasGpsTracker { get; set; } = true;
 
@@ -49,6 +53,10 @@ namespace RacehorseTransport.API.RequestModels
 
         [Range(1, 12, ErrorMessage = "CapacityHorses must be between 1 and 12.")]
         public int CapacityHorses { get; set; }
+
+        // Số khoang (1-4), mỗi khoang 3 vị trí. Bỏ trống = ceil(CapacityHorses / 3).
+        [Range(1, 4, ErrorMessage = "CompartmentCount must be between 1 and 4.")]
+        public int? CompartmentCount { get; set; }
 
         public bool HasClimateControl { get; set; }
         public bool HasGpsTracker { get; set; }

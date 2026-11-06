@@ -8,6 +8,10 @@ namespace RacehorseTransport.Repositories.Entities
         public int TripHorseId { get; set; }
         public int TripId { get; set; }
         public int BookingHorseId { get; set; }
+        // Vị trí trên xe: khoang (1-based) và vị trí trong khoang (1-3).
+        // StallSlotNumber = (CompartmentNo - 1) * 3 + PositionNo, giữ lại cho code / màn hình cũ.
+        public int CompartmentNo { get; set; }
+        public int PositionNo { get; set; }
         public int StallSlotNumber { get; set; }
         public string? Notes { get; set; }
 
