@@ -13,7 +13,7 @@ public class PolicySettingsTests
         // Giá trị trong ngoặc vuông của docs/CHINH_SACH_DICH_VU.md
         var m = new PolicySettingsModel();
 
-        Assert.Equal("1.1", m.PolicyVersion);
+        Assert.Equal("1.2", m.PolicyVersion);
         Assert.Equal(3, m.QuoteAcceptDays);
         Assert.Equal(7, m.DossierSubmitDays);
         Assert.Equal(50, m.StableFeePerHorsePerDayUsd);

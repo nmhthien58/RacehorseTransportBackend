@@ -88,6 +88,9 @@ namespace RacehorseTransport.API.ResponseModels
         public decimal? QuoteMax { get; set; }
         public string CurrencyCode { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        public int? ParentBookingId { get; set; }      // đơn nối tiếp: đơn gốc
+        public string? ParentBookingCode { get; set; }
+        public bool IsFreeOfCharge { get; set; }        // đơn nối tiếp miễn cước (sự cố do lỗi công ty)
         public string CustomerStage { get; set; } = string.Empty; // giai đoạn theo góc nhìn khách (R-07)
         public int? AssignedSpecialistId { get; set; }
         public string? AssignedSpecialistName { get; set; }

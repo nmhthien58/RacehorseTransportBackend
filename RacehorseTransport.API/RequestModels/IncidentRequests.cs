@@ -126,6 +126,27 @@ namespace RacehorseTransport.API.RequestModels
         public string? Note { get; set; }
     }
 
+    // Đơn nối tiếp từ phòng khám tới đích cũ (cùng khách, người nhận, hạng chuồng, giá trị, gói bảo hiểm)
+    public class CreateContinuationBookingRequest
+    {
+        // Nước của phòng khám (ISO 3166-1 alpha-2), ví dụ VN, CN
+        [Required(ErrorMessage = "PickupCountryCode is required.")]
+        [RegularExpression("^[A-Za-z]{2}$", ErrorMessage = "PickupCountryCode must be a 2-letter country code.")]
+        public string PickupCountryCode { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "PickupWindowStart is required.")]
+        public DateTimeOffset? PickupWindowStart { get; set; }
+
+        [Required(ErrorMessage = "PickupWindowEnd is required.")]
+        public DateTimeOffset? PickupWindowEnd { get; set; }
+
+        [Required(ErrorMessage = "DeliveryDeadline is required.")]
+        public DateTimeOffset? DeliveryDeadline { get; set; }
+
+        [MaxLength(1000, ErrorMessage = "SpecialInstructions cannot exceed 1000 characters.")]
+        public string? SpecialInstructions { get; set; }
+    }
+
     // multipart/form-data: ngựa đang điều trị tại phòng khám thì chết
     public class PostOffloadDeathRequest
     {

@@ -107,6 +107,7 @@ namespace RacehorseTransport.Services.Implementations
         {
             var query = ApplyVisibility(_bookingRepo.GetQueryable().AsNoTracking(), currentUser)
                 .Include(b => b.Customer)
+                .Include(b => b.ParentBooking)
                 .Include(b => b.AssignedSpecialist)
                 .Include(b => b.TransitCountries)
                 .AsQueryable();
@@ -211,6 +212,7 @@ namespace RacehorseTransport.Services.Implementations
                 .AsNoTracking()
                 .AsSplitQuery()
                 .Include(b => b.Customer)
+                .Include(b => b.ParentBooking)
                 .Include(b => b.AssignedSpecialist)
                 .Include(b => b.ReviewedBy)
                 .Include(b => b.TransitCountries)

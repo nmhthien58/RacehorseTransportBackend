@@ -96,6 +96,10 @@ namespace RacehorseTransport.Services.BusinessModels
         public decimal? QuoteMax { get; set; }
         public string CurrencyCode { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        // Đơn nối tiếp từ phòng khám (ngựa ở lại điều trị ở chuyến trước); IsFreeOfCharge = miễn cước vì lỗi công ty
+        public int? ParentBookingId { get; set; }
+        public string? ParentBookingCode { get; set; }
+        public bool IsFreeOfCharge { get; set; }
         public string CustomerStage { get; set; } = string.Empty; // xem CustomerStages (R-07)
         public int? AssignedSpecialistId { get; set; }
         public string? AssignedSpecialistName { get; set; }
@@ -223,5 +227,15 @@ namespace RacehorseTransport.Services.BusinessModels
         public DateTimeOffset? AlternateRecipientApprovedAt { get; set; }
         public DateTimeOffset? NotifiedWindowStart { get; set; }
         public DateTimeOffset? NotifiedWindowEnd { get; set; }
+    }
+
+    // Tạo đơn nối tiếp cho con ngựa ở lại phòng khám
+    public class CreateContinuationBookingModel
+    {
+        public string PickupCountryCode { get; set; } = string.Empty;
+        public DateTimeOffset PickupWindowStart { get; set; }
+        public DateTimeOffset PickupWindowEnd { get; set; }
+        public DateTimeOffset DeliveryDeadline { get; set; }
+        public string? SpecialInstructions { get; set; }
     }
 }
