@@ -25,10 +25,12 @@ namespace RacehorseTransport.API.Controllers
         private const string EmergencyRoles = UserRoles.FleetCoordinator + "," + UserRoles.LogisticsManager + "," + UserRoles.Admin;
 
         private readonly IIncidentService _incidentService;
+        private readonly IBookingService _bookingService;
 
-        public IncidentsController(IIncidentService incidentService)
+        public IncidentsController(IIncidentService incidentService, IBookingService bookingService)
         {
             _incidentService = incidentService;
+            _bookingService = bookingService;
         }
 
         /// <summary>
@@ -191,6 +193,32 @@ namespace RacehorseTransport.API.Controllers
                 new RecordVetExpenseModel { Amount = request.Amount!.Value, Note = request.Note },
                 User.ToCurrentUser());
             return Ok(ApiResponse<TripHorseResponse>.SuccessResult(horse.ToResponse(), "Vet expense recorded"));
+        }
+
+        /// <summary>
+        /// Create a continuation booking for a horse that recovered at a vet clinic (WaitRecover): from the clinic to the original
+        /// destination, same customer, recipient, stall class, value and insurance plan. Needs the incident resolved and a FitToTravel
+        /// document attached to it. Company fault -> free of charge (final quote 0). The booking then follows the normal flow
+        /// (review, route plan, final quote, clearance, trip planning). Returns the new booking.
+        /// </summary>
+        [HttpPost("~/api/trips/{tripId:int}/horses/{tripHorseId:int}/continuation-booking")]
+        [Authorize(Roles = EmergencyRoles)]
+        [ProducesResponseType(typeof(ApiResponse<BookingDetailResponse>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> CreateContinuationBooking(int tripId, int tripHorseId, [FromBody] CreateContinuationBookingRequest request)
+        {
+            var currentUser = User.ToCurrentUser();
+            int bookingId = await _incidentService.CreateContinuationBookingAsync(tripId, tripHorseId, new CreateContinuationBookingModel
+            {
+                PickupCountryCode = request.PickupCountryCode.Trim().ToUpperInvariant(),
+                PickupWindowStart = request.PickupWindowStart!.Value,
+                PickupWindowEnd = request.PickupWindowEnd!.Value,
+                DeliveryDeadline = request.DeliveryDeadline!.Value,
+                SpecialInstructions = string.IsNullOrWhiteSpace(request.SpecialInstructions) ? null : request.SpecialInstructions.Trim()
+            }, currentUser);
+            var booking = await _bookingService.GetBookingByIdAsync(bookingId, currentUser);
+            return StatusCode(StatusCodes.Status201Created,
+                ApiResponse<BookingDetailResponse>.SuccessResult(booking.ToResponse(), "Continuation booking created"));
         }
 
         /// <summary>

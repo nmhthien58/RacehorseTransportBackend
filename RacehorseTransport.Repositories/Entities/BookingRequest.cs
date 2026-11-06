@@ -8,6 +8,12 @@ namespace RacehorseTransport.Repositories.Entities
         public int BookingId { get; set; }
         public string BookingCode { get; set; } = string.Empty;
         public int CustomerUserId { get; set; }
+        // Đơn nối tiếp (Chính sách 9.6): ngựa ở lại phòng khám khỏi bệnh, đi tiếp từ phòng khám tới đích cũ.
+        // IsFreeOfCharge = sự cố do lỗi công ty: báo giá chốt bằng 0
+        public int? ParentBookingId { get; set; }
+        public bool IsFreeOfCharge { get; set; }
+        public virtual BookingRequest? ParentBooking { get; set; }
+
         public string PickupAddress { get; set; } = string.Empty;
         public string PickupCountryCode { get; set; } = string.Empty;
         public decimal? PickupLat { get; set; }

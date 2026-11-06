@@ -95,6 +95,7 @@ namespace RacehorseTransport.Repositories.Context
             {
                 entity.ToTable("booking_requests", "booking");
                 entity.HasKey(e => e.BookingId);
+                entity.HasOne(e => e.ParentBooking).WithMany().HasForeignKey(e => e.ParentBookingId);
                 entity.Property(e => e.EstimatedCost).HasPrecision(18, 2);
                 entity.Property(e => e.DeclaredValue).HasPrecision(18, 2);
                 entity.Property(e => e.EstimatedTransitHours).HasPrecision(7, 1);

@@ -122,6 +122,9 @@ namespace RacehorseTransport.Services.Mappers
             model.QuoteMax = entity.QuoteMax;
             model.CurrencyCode = entity.CurrencyCode;
             model.Status = entity.Status;
+            model.ParentBookingId = entity.ParentBookingId;
+            model.ParentBookingCode = entity.ParentBooking?.BookingCode;
+            model.IsFreeOfCharge = entity.IsFreeOfCharge;
             model.AssignedSpecialistId = entity.AssignedSpecialistId;
             model.AssignedSpecialistName = entity.AssignedSpecialist?.FullName;
             model.CreatedAt = entity.CreatedAt;

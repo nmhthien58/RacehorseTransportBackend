@@ -296,6 +296,9 @@ namespace RacehorseTransport.API.Mappers
             response.QuoteMax = model.QuoteMax;
             response.CurrencyCode = model.CurrencyCode;
             response.Status = model.Status;
+            response.ParentBookingId = model.ParentBookingId;
+            response.ParentBookingCode = model.ParentBookingCode;
+            response.IsFreeOfCharge = model.IsFreeOfCharge;
             response.CustomerStage = model.CustomerStage;
             response.AssignedSpecialistId = model.AssignedSpecialistId;
             response.AssignedSpecialistName = model.AssignedSpecialistName;

@@ -119,6 +119,19 @@ namespace RacehorseTransport.Services.Implementations
             quote.Lines.AddRange(QuoteRules.InsuranceLines(
                 horses.Select(bh => new QuoteRules.InsuredHorse(bh.Horse?.Name ?? $"#{bh.HorseId}", bh.InsurancePlan, bh.AgreedValue, bh.DeclaredValue)),
                 insurancePremiumPercent));
+            // Đơn nối tiếp do lỗi công ty (Chính sách 9.6): miễn toàn bộ, cọc 0 nên chấp nhận là đơn chạy ngay
+            if (booking.IsFreeOfCharge)
+            {
+                decimal subtotal = quote.Lines.Sum(l => l.Amount);
+                quote.Lines.Add(new QuoteLineModel
+                {
+                    Code = "CONTINUATION_WAIVER",
+                    Name = "Continuation booking waived (incident was the company's fault)",
+                    Quantity = 1,
+                    UnitPrice = -subtotal,
+                    Amount = -subtotal
+                });
+            }
             quote.Total = quote.Lines.Sum(l => l.Amount);
             return quote;
         }

@@ -26,6 +26,9 @@ namespace RacehorseTransport.Services.Interfaces
 
         Task<TripHorseModel> RecordVetExpenseAsync(int tripId, int tripHorseId, RecordVetExpenseModel model, CurrentUser currentUser);
 
+        // Trả về mã đơn nối tiếp vừa tạo
+        Task<int> CreateContinuationBookingAsync(int tripId, int tripHorseId, CreateContinuationBookingModel model, CurrentUser currentUser);
+
         Task<IncidentModel> ResolveIncidentAsync(int incidentId, string faultParty, string? faultNote, CurrentUser currentUser);
 
         Task<IncidentDocumentModel> UploadDocumentAsync(int incidentId, UploadIncidentDocumentModel model, CurrentUser currentUser);

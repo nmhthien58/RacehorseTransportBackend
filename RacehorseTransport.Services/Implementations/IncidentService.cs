@@ -1356,6 +1356,123 @@ namespace RacehorseTransport.Services.Implementations
             return tripHorse.ToBusinessModel();
         }
 
+        // Ngựa ở lại phòng khám đã khỏe (có giấy FitToTravel): tạo đơn nối tiếp từ phòng khám tới đích cũ, cùng khách, cùng người nhận.
+        // Đơn đi theo luồng thường (duyệt, lập tuyến, báo giá, hồ sơ, xếp chuyến); lỗi công ty thì báo giá chốt bằng 0.
+        public async Task<int> CreateContinuationBookingAsync(int tripId, int tripHorseId, CreateContinuationBookingModel model, CurrentUser currentUser)
+        {
+            var (incident, tripHorse) = await FindClinicHorseAsync(tripId, tripHorseId);
+            var bookingHorse = tripHorse.BookingHorse!;
+            string horseName = bookingHorse.Horse!.Name;
+            ContinuationRules.EnsureCanContinue(incident, tripHorse);
+
+            bool exists = await _bookingRepo.GetQueryable().AnyAsync(b =>
+                b.ParentBookingId == bookingHorse.BookingId
+                && b.Status != BookingStatuses.Cancelled && b.Status != BookingStatuses.Rejected
+                && b.Status != BookingStatuses.Expired && b.Status != BookingStatuses.QuoteExpired
+                && b.BookingHorses.Any(bh => bh.HorseId == bookingHorse.HorseId && bh.Status != BookingHorseStatuses.Cancelled));
+            if (exists)
+            {
+                throw new BusinessException($"{horseName} already has a continuation booking.");
+            }
+
+            var parent = await _bookingRepo.GetQueryable().AsNoTracking().FirstAsync(b => b.BookingId == bookingHorse.BookingId);
+            bool free = ContinuationRules.IsFree(incident.FaultParty);
+            var quote = await _pricingService.CalculateQuoteRangeAsync(new QuoteInputModel
+            {
+                TransportMode = parent.TransportMode,
+                PickupCountryCode = model.PickupCountryCode,
+                PickupAddress = tripHorse.VetClinicAddress,
+                DropoffCountryCode = parent.DropoffCountryCode,
+                DropoffAddress = parent.DropoffAddress,
+                RequiresClimateControl = parent.RequiresClimateControl,
+                DeclaredValue = bookingHorse.DeclaredValue,
+                PickupWindowStart = model.PickupWindowStart,
+                PickupWindowEnd = model.PickupWindowEnd,
+                DeliveryDeadline = model.DeliveryDeadline,
+                PickupLat = tripHorse.VetClinicLat,
+                PickupLng = tripHorse.VetClinicLng,
+                DropoffLat = parent.DropoffLat,
+                DropoffLng = parent.DropoffLng,
+                StallClasses = new List<string> { bookingHorse.StallClass }
+            });
+
+            var policy = await _settingService.GetPolicySettingsAsync();
+            int bookingId = await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                var booking = new BookingRequest
+                {
+                    BookingCode = await _codeGenerator.NextAsync(CodePrefixes.Booking),
+                    ParentBookingId = parent.BookingId,
+                    IsFreeOfCharge = free,
+                    CustomerUserId = parent.CustomerUserId,
+                    PickupAddress = $"{tripHorse.VetClinicName}, {tripHorse.VetClinicAddress}",
+                    PickupCountryCode = model.PickupCountryCode,
+                    PickupLat = tripHorse.VetClinicLat,
+                    PickupLng = tripHorse.VetClinicLng,
+                    DropoffAddress = parent.DropoffAddress,
+                    DropoffCountryCode = parent.DropoffCountryCode,
+                    DropoffLat = parent.DropoffLat,
+                    DropoffLng = parent.DropoffLng,
+                    PickupWindowStart = model.PickupWindowStart,
+                    PickupWindowEnd = model.PickupWindowEnd,
+                    DeliveryDeadline = model.DeliveryDeadline,
+                    EstimatedTransitHours = quote.EstimatedHours,
+                    TotalHorses = 1,
+                    SpecialInstructions = model.SpecialInstructions
+                        ?? $"Continuation of {parent.BookingCode}: {horseName} recovered at {tripHorse.VetClinicName} ({incident.IncidentCode}).",
+                    TransportMode = parent.TransportMode,
+                    DistanceKm = quote.DistanceKm,
+                    IsExpress = quote.IsExpress,
+                    RequiresClimateControl = parent.RequiresClimateControl,
+                    DeclaredValue = bookingHorse.DeclaredValue,
+                    QuoteMin = free ? 0 : quote.QuoteMin,
+                    QuoteMax = free ? 0 : quote.QuoteMax,
+                    EstimatedCost = 0,
+                    // Khách đã đồng ý chính sách ở đơn gốc (điều khoản 9.6 về đơn nối tiếp)
+                    PolicyVersion = policy.PolicyVersion,
+                    PolicyAcceptedAt = parent.PolicyAcceptedAt ?? DateTimeOffset.UtcNow,
+                    CurrencyCode = quote.CurrencyCode,
+                    QuoteBreakdown = _pricingService.SerializeLines(quote.Lines),
+                    Status = BookingStatuses.Submitted,
+                    RecipientName = parent.RecipientName,
+                    RecipientPhone = parent.RecipientPhone,
+                    RecipientEmail = parent.RecipientEmail,
+                    RecipientIdNumber = parent.RecipientIdNumber,
+                    RecipientIsCustomer = parent.RecipientIsCustomer,
+                    TransitCountries = quote.TransitCountryCodes.Select((code, i) => new BookingTransitCountry { CountryCode = code, SequenceOrder = i + 1 }).ToList(),
+                    BookingHorses = new List<BookingHorse>
+                    {
+                        new()
+                        {
+                            HorseId = bookingHorse.HorseId,
+                            StallClass = bookingHorse.StallClass,
+                            Notes = bookingHorse.Notes,
+                            Status = BookingHorseStatuses.Pending,
+                            DeclaredValue = bookingHorse.DeclaredValue,
+                            AgreedValue = bookingHorse.AgreedValue,
+                            ValueProofPath = bookingHorse.ValueProofPath,
+                            InsurancePlan = bookingHorse.InsurancePlan
+                        }
+                    }
+                };
+                await _bookingRepo.AddAsync(booking);
+
+                string priceText = free
+                    ? "It is free of charge because the incident was our fault."
+                    : "You will receive the final quote for this leg once the route is planned.";
+                await _notificationService.SendAsync(parent.CustomerUserId,
+                    $"Continuation booking {booking.BookingCode} for {horseName}",
+                    $"{horseName} is fit to travel again. We created booking {booking.BookingCode} from {tripHorse.VetClinicName} to {parent.DropoffAddress}, linked to {parent.BookingCode}. {priceText}",
+                    NotificationReferenceTypes.Booking, booking.BookingId, emailCustomers: true);
+                await _notificationService.SendToRoleAsync(UserRoles.LogisticsManager,
+                    $"Continuation booking {booking.BookingCode} waits for review",
+                    $"{horseName} (from {parent.BookingCode}, incident {incident.IncidentCode}) goes from {tripHorse.VetClinicName} to {parent.DropoffAddress}.{(free ? " Free of charge (company fault)." : string.Empty)}",
+                    NotificationReferenceTypes.Booking, booking.BookingId);
+                return booking.BookingId;
+            });
+            return bookingId;
+        }
+
         // Con ngựa của chuyến đã rời chuyến để ở lại phòng khám, kèm sự cố gốc
         private async Task<(TripIncident Incident, TripHorse TripHorse)> FindClinicHorseAsync(int tripId, int tripHorseId)
         {

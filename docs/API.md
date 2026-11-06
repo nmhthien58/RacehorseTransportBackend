@@ -2177,6 +2177,8 @@ Response `200` — phần `data`:
 | `totalHorses` | Số ngựa trong đơn |
 | `estimatedCost`, `currencyCode` | **Giá chốt** (R-10); `0` khi chưa có báo giá chốt (đơn `Submitted` / `PreApproved` / `RoutePlanned`), lúc đó hiển thị khoảng `quoteMin` – `quoteMax` |
 | `status` | Trạng thái đơn (mục 3) |
+| `parentBookingId`, `parentBookingCode` | Đơn nối tiếp: đơn gốc mà con ngựa đã ở lại phòng khám (Chính sách 9.6); `null` với đơn thường. Frontend nên hiện nhãn "Đơn nối tiếp của BKG-..." |
+| `isFreeOfCharge` | `true`: đơn nối tiếp **miễn cước** vì sự cố do lỗi công ty; báo giá chốt bằng 0 (dòng `CONTINUATION_WAIVER`), cọc 0 nên khách chấp nhận là đơn chạy ngay |
 | `customerStage` | Giai đoạn của đơn theo góc nhìn khách, server tự suy ra (xem bảng dưới). Dùng làm tab và nhãn trên màn "Đơn vận chuyển" của khách thay cho `status` |
 | `assignedSpecialistId`, `assignedSpecialistName` | Chuyên viên phụ trách; `null` khi đơn chưa duyệt |
 
@@ -5796,6 +5798,50 @@ Response `200`: con ngựa trên chuyến với `status` `Deceased`.
 |---|---|---|
 | 400 | `Kim Ngưu is Deceased; only a horse recovering at a vet clinic can be recorded here.` | Con ngựa không còn ở trạng thái `Offloaded` |
 | 400 | `Trip horse 4 did not stay at a vet clinic on trip 3 (no approved WaitRecover plan).` | Không có phương án `WaitRecover` đã duyệt |
+
+### POST /api/trips/{tripId}/horses/{tripHorseId}/continuation-booking — Tạo đơn nối tiếp từ phòng khám
+
+Con ngựa ở lại phòng khám (`WaitRecover`) đã khỏe: tạo đơn mới **từ phòng khám tới đích cũ**, cùng khách, cùng người nhận, cùng hạng chuồng, giá trị và gói bảo hiểm, liên kết đơn gốc (`parentBookingId`). Đơn mới ở `Submitted` và đi theo **luồng thường**: Manager duyệt sơ bộ, điều phối lập tuyến, báo giá chốt, khách chấp nhận, hồ sơ kiểm dịch, xếp chuyến (Chính sách 9.6).
+
+Điều kiện:
+- Sự cố gốc đã **đóng** (đã chọn nguyên nhân).
+- Sự cố có tài liệu **`FitToTravel`** (giấy bác sĩ xác nhận đủ sức đi tiếp), đính kèm bằng `POST /api/incidents/{id}/documents`.
+- Con ngựa chưa có đơn nối tiếp nào còn hiệu lực.
+
+Tiền: nguyên nhân `Company` → `isFreeOfCharge = true`, báo giá chốt bằng 0. Nguyên nhân khác → khách trả theo báo giá mới của chặng này (phần cước chưa đi của đơn gốc đã được hoàn khi đóng sự cố, theo nguyên nhân).
+
+Lịch đón vẫn theo quy tắc thời gian chuẩn bị của tuyến như đơn thường (duyệt, cọc, hồ sơ kiểm dịch, xếp chuyến).
+
+- **Ai gọi được:** FleetCoordinator, LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `pickupCountryCode` | chuỗi | Có | Nước của phòng khám (2 chữ cái), ví dụ `VN`, `CN` |
+| `pickupWindowStart`, `pickupWindowEnd` | thời gian | Có | Khoảng đón ngựa tại phòng khám |
+| `deliveryDeadline` | thời gian | Có | Hạn giao tới đích cũ |
+| `specialInstructions` | chuỗi | Không | Ghi chú, tối đa 1000 ký tự (bỏ trống thì hệ thống ghi "Continuation of BKG-...") |
+
+Ví dụ request:
+
+```json
+{
+  "pickupCountryCode": "VN",
+  "pickupWindowStart": "2026-11-30T08:00:00+07:00",
+  "pickupWindowEnd": "2026-12-02T08:00:00+07:00",
+  "deliveryDeadline": "2026-12-16T08:00:00+07:00"
+}
+```
+
+Response `201`: `data` là chi tiết đơn mới (dạng `GET /api/bookings/{id}`), có `parentBookingCode`, `isFreeOfCharge`; `pickupAddress` là tên + địa chỉ phòng khám. Khách nhận thông báo + email, Manager nhận thông báo để duyệt.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Resolve incident INC-... first (choose the cause): it decides whether the continuation is free.` | Sự cố chưa đóng |
+| 400 | `Attach the vet's FitToTravel certificate to incident INC-... before creating the continuation booking.` | Chưa có giấy đủ sức đi tiếp |
+| 400 | `Kim Ngưu already has a continuation booking.` | Đã tạo rồi |
+| 400 | `PickupWindowStart must be on or after ...` | Khoảng đón quá gần, không đủ thời gian chuẩn bị của tuyến |
+| 400 | `Trip horse 4 did not stay at a vet clinic on trip 3 ...` | Con ngựa không ở lại phòng khám |
 
 ### POST /api/incidents/{id}/reject — Từ chối phương án
 
@@ -9534,6 +9580,7 @@ Tổng cộng 139 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/incidents/{id}/customer-consent` | Khách đồng ý / từ chối đi đường vòng tốn thêm tiền, hoặc chủ ngựa trả lời khuyến nghị an tử | Customer có ngựa trên xe (an tử: chỉ chủ con ngựa) |
 | POST | `/api/trips/{tripId}/horses/{tripHorseId}/vet-expense` | Ghi viện phí của ngựa ở lại phòng khám; ai trả theo nguyên nhân | FleetCoordinator, LogisticsManager, Admin |
 | POST | `/api/trips/{tripId}/horses/{tripHorseId}/post-offload-death` | Ngựa chết khi đang điều trị tại phòng khám (kèm giấy chứng tử) | FleetCoordinator, LogisticsManager, Admin |
+| POST | `/api/trips/{tripId}/horses/{tripHorseId}/continuation-booking` | Tạo đơn nối tiếp từ phòng khám tới đích cũ (miễn cước nếu lỗi công ty) | FleetCoordinator, LogisticsManager, Admin |
 | POST | `/api/incidents/{id}/emergency-authorize` | Ủy quyền khẩn cấp khi chủ ngựa không trả lời khuyến nghị an tử kịp | FleetCoordinator, LogisticsManager, Admin |
 | GET | `/api/delay-compensations` | Danh sách bồi thường giao trễ | LogisticsManager, Admin |
 | GET | `/api/bookings/{bookingId}/delay-compensations` | Bồi thường giao trễ của một đơn | Khách của đơn, nhân sự |
