@@ -1,6 +1,8 @@
 # CHÍNH SÁCH DỊCH VỤ VẬN CHUYỂN NGỰA — RACEHORSE TRANSPORT
 
-Phiên bản: 1.1 (29/10/2026: thêm ngày dự phòng cho hạn giao, mục 7)
+Phiên bản: 1.2 (06/11/2026: ngựa điều trị tại phòng khám, đơn nối tiếp, khuyến nghị an tử và ủy quyền khẩn cấp, mục 9.5 – 9.6)
+
+1.1 (29/10/2026: thêm ngày dự phòng cho hạn giao, mục 7)
 
 > Ghi chú cho nhóm phát triển (không hiển thị cho khách):
 > - Các con số trong ngoặc vuông `[...]` là **giá trị cấu hình**, trang web phải đọc từ cấu hình hệ thống thay vì viết cứng. Tên khóa cấu hình ghi bên cạnh.
@@ -173,12 +175,27 @@ Công ty có thể cho đoàn chờ biên giới mở lại (ngựa ở chuồng
 
 ### 9.5 Ngựa có vấn đề sức khỏe giữa đường
 - Ngựa có thể phải dừng hành trình tại phòng khám hoặc chuồng gần nhất theo chỉ định của bác sĩ thú y.
-- Sau đó Khách được thông báo và cùng công ty chọn: chờ hồi phục rồi đi chuyến sau, đưa về nơi đi, hoặc Khách nhận ngựa tại chỗ.
-- Chi phí theo bảng 9.1. Bồi thường theo mục 8.
+- Sau đó Khách được thông báo và cùng công ty chọn: ở lại phòng khám điều trị (mục 9.6), đưa về nơi đi, hoặc Khách nhận ngựa tại chỗ.
+- Tài xế / áp tải chụp ảnh hiện trường và gửi biên bản của bác sĩ thú y lên hệ thống ngay khi có; Khách xem được trên ứng dụng.
+- Chi phí theo bảng 9.1 và mục 9.6. Bồi thường theo mục 8.
 
-### 9.6 Ngựa chết
-- Chỉ bác sĩ thú y được quyết định an tử, và chỉ vì lý do nhân đạo khẩn cấp.
-- Công ty thông báo Khách ngay, lập biên bản có xác nhận của bác sĩ thú y, và mở hồ sơ bồi thường (mục 8).
+### 9.6 Ngựa điều trị tại phòng khám, an tử và ngựa chết
+
+**a) Ở lại phòng khám điều trị**
+- Khách được báo tên, địa chỉ, số điện thoại phòng khám và bác sĩ phụ trách.
+- Đơn của con ngựa đó **kết thúc tại phòng khám**. Phần cước chưa đi được hoàn theo bảng 9.1 (lỗi Khách thì không hoàn).
+- **Viện phí:** sự cố do lỗi công ty thì công ty trả; ngựa tự phát bệnh, bất khả kháng hoặc lỗi Khách thì Khách trả trực tiếp cho phòng khám. Số tiền được báo cho Khách qua ứng dụng và email.
+- **Đi tiếp khi khỏi bệnh:** khi bác sĩ cấp giấy xác nhận đủ sức đi tiếp, công ty tạo **đơn nối tiếp** từ phòng khám tới điểm giao cũ, cùng người nhận, hạng chuồng, giá trị và gói bảo hiểm. Đơn nối tiếp đi qua các bước như đơn thường (lập tuyến, báo giá, hồ sơ kiểm dịch). Sự cố do lỗi công ty thì đơn nối tiếp **miễn cước**; trường hợp khác Khách trả theo báo giá của chặng mới. Khách không muốn đi tiếp thì tự đón ngựa tại phòng khám.
+
+**b) Khuyến nghị an tử**
+- Chỉ bác sĩ thú y được khuyến nghị an tử, và chỉ vì lý do nhân đạo khẩn cấp. Biên bản của bác sĩ được gửi lên hệ thống trước.
+- Khi ngựa còn sống, công ty **hỏi ý chủ ngựa** qua ứng dụng và email. Chủ ngựa có `[Incident.EuthanasiaConsentMinutes = 60]` phút để đồng ý hoặc từ chối.
+- **Chủ ngựa từ chối:** ngựa tiếp tục được điều trị (thường là ở lại phòng khám, mục a); đoàn xe vẫn đi tiếp với các con ngựa khác. Chi phí điều trị từ lúc đó **do chủ ngựa chịu**, kể cả khi sự cố ban đầu do lỗi công ty.
+- **Ủy quyền khẩn cấp:** khi đặt đơn, Khách đồng ý rằng nếu hết thời gian trên mà công ty không liên lạc được và bác sĩ chỉ định an tử để ngựa không phải chịu đau đớn thêm, công ty được làm theo chỉ định của bác sĩ. Công ty ghi lại các lần đã liên lạc và báo ngay cho Khách.
+
+**c) Ngựa chết**
+- Công ty thông báo Khách ngay, lập biên bản có xác nhận của bác sĩ thú y (giấy chứng tử), và mở hồ sơ bồi thường (mục 8). Ngựa chết khi đang điều trị tại phòng khám cũng vậy.
+- Nếu trước đó đã có hồ sơ bồi thường thương tích được duyệt cho con ngựa, hồ sơ tử vong chỉ trả **phần còn lại**: tổng hai hồ sơ không vượt mức tối đa khi chết / mất ở mục 8.
 - Phần cước chưa đi của con ngựa đó được hoàn theo bảng 9.1.
 
 ---
