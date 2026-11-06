@@ -8969,7 +8969,7 @@ Chính sách mục 8. Mỗi hồ sơ (`claim`) là yêu cầu bồi thường ch
 | Cách mở | Khi nào | Loại |
 |---|---|---|
 | Hệ thống tự mở | Tổ lái báo sự cố `Critical` có chọn con ngựa (`affectedTripHorseId`) | `Injury` |
-| Hệ thống tự mở | Duyệt cho ngựa rời chuyến với kết quả `Deceased` | `Death` (nếu sự cố đã có hồ sơ `Injury` chưa quyết định thì hồ sơ đó đổi thành `Death`) |
+| Hệ thống tự mở | Duyệt cho ngựa rời chuyến với kết quả `Deceased` | `Death`. Nếu sự cố đã có hồ sơ `Injury` **chưa quyết định** thì hồ sơ đó đổi thành `Death`; nếu hồ sơ `Injury` **đã duyệt / đã chi** thì mở thêm một hồ sơ `Death` bổ sung, và khi duyệt, trần trừ đi phần đã duyệt cho con ngựa |
 | Hệ thống tự mở | Duyệt cho ngựa rời chuyến vì sự cố `EquineHealthIssue` | `Injury` |
 | Hệ thống tự mở | Biên bản e-POD có `overallCondition = Injured` | `Injury` cho từng con giao lần đó |
 | Hệ thống tự mở | Người nhận từ chối vì `RefusedInjured` / `RefusedWrongHorse` (mục 12b) | `Injury` / `Loss` cho từng con của đơn |
@@ -8998,6 +8998,7 @@ Một hồ sơ có dạng:
   "agreedValue": 100000.0,
   "faultParty": null,
   "cap": 20000.0,
+  "priorApprovedForHorse": 0,
   "description": "Critical incident INC-2026-0012: Ngựa ngã trong xe",
   "requestedAmount": 3500.0,
   "approvedAmount": null,
@@ -9018,7 +9019,8 @@ Một hồ sơ có dạng:
 |---|---|
 | `claimType` | `Death` chết / phải an tử · `Injury` bị thương · `Loss` mất, thất lạc, giao nhầm |
 | `insurancePlan`, `agreedValue` | Gói và giá trị thỏa thuận của con ngựa lúc mở hồ sơ |
-| `cap` | Mức trả tối đa. Gói `None` hiện mức trả khi lỗi công ty |
+| `cap` | Mức trả tối đa **còn lại** của hồ sơ này. Gói `None` hiện mức trả khi lỗi công ty. Hồ sơ `Death` / `Loss`: đã trừ tiền duyệt ở các hồ sơ khác của cùng con ngựa, để tổng không vượt trần chết / mất (ví dụ gói `None`: thương tích đã duyệt 1.000 USD → tử vong bổ sung tối đa 4.000 USD) |
+| `priorApprovedForHorse` | Hồ sơ `Death` / `Loss`: tiền đã duyệt / đã chi ở các hồ sơ khác của cùng con ngựa (0 với `Injury`) |
 | `faultParty` | Nguyên nhân Manager chốt khi duyệt (`Company`, `Customer`, `ForceMajeure`) |
 | `requestedAmount` | Số khách đề nghị (có thể trống) |
 | `approvedAmount` | Số Manager duyệt |

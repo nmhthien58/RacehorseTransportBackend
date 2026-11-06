@@ -59,24 +59,35 @@ namespace RacehorseTransport.Services.Implementations
         public async Task OpenAutomaticallyAsync(int bookingHorseId, string claimType, string description, int? incidentId = null, int? deliveryFailureId = null)
         {
             // Một sự cố / một lần không giao được chỉ mở một hồ sơ cho mỗi con ngựa
-            var existing = await _claimRepo.GetQueryable()
+            var related = await _claimRepo.GetQueryable()
                 .Where(c => c.BookingHorseId == bookingHorseId
                     && c.Status != ClaimStatuses.Rejected
                     && ((incidentId != null && c.IncidentId == incidentId)
                         || (deliveryFailureId != null && c.DeliveryFailureId == deliveryFailureId)
                         || (incidentId == null && deliveryFailureId == null && c.ClaimType == claimType)))
-                .FirstOrDefaultAsync();
+                .ToListAsync();
+            if (related.Any(c => c.ClaimType == claimType))
+            {
+                return;
+            }
+            var existing = related.FirstOrDefault();
             if (existing != null)
             {
-                // Sự cố Critical đã mở hồ sơ thương tích, sau đó ngựa chết -> nâng thành hồ sơ tử vong nếu chưa quyết định
+                // Sự cố đã mở hồ sơ thương tích, sau đó ngựa chết -> nâng thành hồ sơ tử vong nếu chưa quyết định
                 if (claimType == ClaimTypes.Death && existing.ClaimType == ClaimTypes.Injury && ClaimStatuses.Reviewable.Contains(existing.Status))
                 {
                     existing.ClaimType = ClaimTypes.Death;
                     string merged = $"{existing.Description} | {description}";
                     existing.Description = merged.Length > 2000 ? merged[..2000] : merged;
                     await _claimRepo.SaveChangesAsync();
+                    return;
                 }
-                return;
+                // Thương tích đã duyệt / đã chi -> mở hồ sơ tử vong bổ sung; khi duyệt, trần trừ phần đã duyệt
+                if (!ClaimRules.NeedsSupplementaryDeathClaim(claimType, existing.ClaimType, existing.Status))
+                {
+                    return;
+                }
+                description = $"Supplementary death claim after {existing.ClaimCode} ({existing.ApprovedAmount:N2} USD approved for the injury). {description}";
             }
             var bookingHorse = await LoadBookingHorseAsync(bookingHorseId);
             var claim = await CreateAsync(bookingHorse, claimType, description, null, null, incidentId, deliveryFailureId, new List<string>());
@@ -214,7 +225,8 @@ namespace RacehorseTransport.Services.Implementations
                 fault = await _incidentRepo.GetQueryable().Where(i => i.IncidentId == claim.IncidentId).Select(i => i.FaultParty).FirstOrDefaultAsync();
             }
             var policy = await _settingService.GetPolicySettingsAsync();
-            ClaimRules.EnsureApprovable(claim.InsurancePlan, claim.ClaimType, claim.AgreedValue, fault, approvedAmount, policy);
+            decimal prior = await PriorApprovedForHorseAsync(claim.BookingHorseId, claim.ClaimId);
+            ClaimRules.EnsureApprovable(claim.InsurancePlan, claim.ClaimType, claim.AgreedValue, fault, approvedAmount, policy, prior);
 
             claim.FaultParty = fault;
             claim.ApprovedAmount = approvedAmount;
@@ -363,9 +375,17 @@ namespace RacehorseTransport.Services.Implementations
                 .Include(bh => bh.Horse)
                 .FirstAsync(bh => bh.BookingHorseId == bookingHorseId);
 
+        // Tiền đã duyệt / đã chi cho các hồ sơ khác của cùng con ngựa (trừ vào trần chết / mất)
+        private async Task<decimal> PriorApprovedForHorseAsync(int bookingHorseId, int exceptClaimId) =>
+            await _claimRepo.GetQueryable()
+                .Where(c => c.BookingHorseId == bookingHorseId && c.ClaimId != exceptClaimId
+                    && (c.Status == ClaimStatuses.Approved || c.Status == ClaimStatuses.Paid))
+                .SumAsync(c => c.ApprovedAmount ?? 0m);
+
         private async Task<ClaimModel> ToModelAsync(InsuranceClaim c)
         {
             var policy = await _settingService.GetPolicySettingsAsync();
+            decimal prior = c.ClaimType == ClaimTypes.Injury ? 0m : await PriorApprovedForHorseAsync(c.BookingHorseId, c.ClaimId);
             return new ClaimModel
             {
                 ClaimId = c.ClaimId,
@@ -381,7 +401,10 @@ namespace RacehorseTransport.Services.Implementations
                 AgreedValue = c.AgreedValue,
                 FaultParty = c.FaultParty,
                 // Trần ước tính: gói không mua mà chưa rõ lỗi công ty thì hiện trần khi lỗi công ty
-                Cap = ClaimRules.Cap(c.InsurancePlan, c.ClaimType, c.AgreedValue, c.InsurancePlan == InsurancePlans.Full ? c.FaultParty : FaultParties.Company, policy),
+                Cap = ClaimRules.RemainingCap(
+                    ClaimRules.Cap(c.InsurancePlan, c.ClaimType, c.AgreedValue, c.InsurancePlan == InsurancePlans.Full ? c.FaultParty : FaultParties.Company, policy),
+                    c.ClaimType, prior),
+                PriorApprovedForHorse = prior,
                 Description = c.Description,
                 RequestedAmount = c.RequestedAmount,
                 ApprovedAmount = c.ApprovedAmount,

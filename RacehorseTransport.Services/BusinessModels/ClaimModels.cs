@@ -24,7 +24,8 @@ namespace RacehorseTransport.Services.BusinessModels
         public string InsurancePlan { get; set; } = string.Empty;
         public decimal? AgreedValue { get; set; }
         public string? FaultParty { get; set; }
-        public decimal Cap { get; set; }                 // trần chi trả theo gói
+        public decimal Cap { get; set; }                 // trần chi trả theo gói (chết / mất: đã trừ phần đã duyệt cho con ngựa)
+        public decimal PriorApprovedForHorse { get; set; } // chết / mất: tiền đã duyệt ở hồ sơ khác của cùng con ngựa
         public string Description { get; set; } = string.Empty;
         public decimal? RequestedAmount { get; set; }
         public decimal? ApprovedAmount { get; set; }
