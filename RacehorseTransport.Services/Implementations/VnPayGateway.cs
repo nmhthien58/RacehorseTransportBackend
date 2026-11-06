@@ -93,7 +93,8 @@ namespace RacehorseTransport.Services.Implementations
 
         public async Task<GatewayRefundResult> RefundAsync(GatewayRefundRequest request)
         {
-            string requestId = request.RefundTxnRef;
+            // vnp_RequestId không được trùng: mã thanh toán có thể lặp lại sau khi dựng lại dữ liệu demo, nên thêm hậu tố thời gian
+            string requestId = $"{request.RefundTxnRef}{DateTimeOffset.UtcNow:HHmmssfff}";
             string createDate = ToVnTime(DateTimeOffset.UtcNow);
             string transactionType = request.IsFullRefund ? "02" : "03"; // 02 hoàn toàn phần, 03 hoàn một phần
             string amount = (request.AmountVnd * 100).ToString(CultureInfo.InvariantCulture);
