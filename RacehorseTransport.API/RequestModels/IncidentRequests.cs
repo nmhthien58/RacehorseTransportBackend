@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 
@@ -123,14 +124,18 @@ namespace RacehorseTransport.API.RequestModels
         public List<CheckpointRequest> NewCheckpoints { get; set; } = new();
     }
 
+    // multipart/form-data: tài liệu của sự cố (ảnh hiện trường, biên bản thú y, giấy chứng tử, giấy đủ sức đi tiếp)
     public class UploadIncidentDocumentRequest
     {
-        [Required(ErrorMessage = "FilePath is required.")]
-        [MaxLength(500, ErrorMessage = "FilePath cannot exceed 500 characters.")]
-        public string FilePath { get; set; } = string.Empty;
-
         // ScenePhoto | VetReport | DeathCertificate | FitToTravel
         [Required(ErrorMessage = "DocumentType is required.")]
         public string DocumentType { get; set; } = string.Empty;
+
+        [MaxLength(500, ErrorMessage = "Note cannot exceed 500 characters.")]
+        public string? Note { get; set; }
+
+        // pdf, jpg, png; tối đa 10 MB
+        [Required(ErrorMessage = "File is required.")]
+        public IFormFile? File { get; set; }
     }
 }

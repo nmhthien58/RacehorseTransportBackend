@@ -421,6 +421,11 @@ SELECT setval(pg_get_serial_sequence('fleet.trip_horses', 'trip_horse_id'),     
 SELECT setval(pg_get_serial_sequence('fleet.route_checkpoints', 'checkpoint_id'),      (SELECT max(checkpoint_id) FROM fleet.route_checkpoints));
 SELECT setval(pg_get_serial_sequence('tracking.horse_welfare_logs', 'log_id'),         (SELECT max(log_id) FROM tracking.horse_welfare_logs));
 SELECT setval(pg_get_serial_sequence('incident.trip_incidents', 'incident_id'),        (SELECT max(incident_id) FROM incident.trip_incidents));
+-- Mức ban đầu của sự cố mẫu = mức hiện tại; biên bản thú y mẫu cũng là tài liệu VetReport
+UPDATE incident.trip_incidents SET initial_severity = severity WHERE initial_severity IS NULL;
+INSERT INTO incident.incident_documents (incident_id, file_path, document_type, uploaded_by_user_id, uploaded_at)
+SELECT incident_id, vet_report_path, 'VetReport', COALESCE(approved_by_user_id, reported_by_user_id), COALESCE(approved_at, reported_at)
+FROM incident.trip_incidents WHERE vet_report_path IS NOT NULL;
 SELECT setval(pg_get_serial_sequence('acceptance.handover_acceptances', 'handover_id'), (SELECT max(handover_id) FROM acceptance.handover_acceptances));
 SELECT setval(pg_get_serial_sequence('billing.payments', 'payment_id'),                 (SELECT max(payment_id) FROM billing.payments));
 

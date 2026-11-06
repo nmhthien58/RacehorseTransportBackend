@@ -56,6 +56,7 @@ namespace RacehorseTransport.Services.Mappers
                     IncidentId = d.IncidentId,
                     FilePath = d.FilePath,
                     DocumentType = d.DocumentType,
+                    Note = d.Note,
                     UploadedByUserId = d.UploadedByUserId,
                     UploadedByName = d.UploadedBy?.FullName,
                     UploadedAt = d.UploadedAt

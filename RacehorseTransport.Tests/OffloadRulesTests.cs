@@ -16,13 +16,15 @@ public class OffloadRulesTests
 
     // ---------- ValidatePlan ----------
 
+    private static readonly string[] NoDocs = Array.Empty<string>();
+
     [Theory]
     [InlineData(OffloadOutcomes.WaitRecover)]
     [InlineData(OffloadOutcomes.ReturnToOrigin)]
     [InlineData(OffloadOutcomes.HandOverHere)]
-    public void ValidatePlan_AcceptsNonFatalOutcomeOnAnySeverityWithoutReport(string outcome)
+    public void ValidatePlan_AcceptsNonFatalOutcomeWithoutDocuments(string outcome)
     {
-        OffloadRules.ValidatePlan(outcome, IncidentSeverities.Minor, vetReportPath: null);
+        OffloadRules.ValidatePlan(outcome, NoDocs);
     }
 
     [Theory]
@@ -31,42 +33,32 @@ public class OffloadRulesTests
     [InlineData("Recover")]
     public void ValidatePlan_RejectsMissingOrUnknownOutcome(string? outcome)
     {
-        Assert.Throws<BusinessException>(() => OffloadRules.ValidatePlan(outcome, IncidentSeverities.Major, null));
+        Assert.Throws<BusinessException>(() => OffloadRules.ValidatePlan(outcome, NoDocs));
     }
 
-    [Fact]
-    public void ValidatePlan_Deceased_AllowedOnNonCriticalIncident_WhenVetReportPresent()
-    {
-        // Allowed now: incident severity will be upgraded to Critical upon approval
-        OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, IncidentSeverities.Major, "documents/vet.pdf");
-        OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, new[] { IncidentDocumentTypes.VetReport });
-        OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, new[] { IncidentDocumentTypes.DeathCertificate });
-    }
-
+    // Không còn bắt buộc sự cố Critical: có giấy thú y là đủ, mức độ được nâng lên Critical lúc duyệt
     [Theory]
-    [InlineData(null)]
-    [InlineData("  ")]
-    public void ValidatePlan_Deceased_RequiresVetReport(string? vetReportPath)
+    [InlineData(IncidentDocumentTypes.VetReport)]
+    [InlineData(IncidentDocumentTypes.DeathCertificate)]
+    public void ValidatePlan_Deceased_AllowedWithVetOrDeathDocument(string documentType)
     {
-        var ex = Assert.Throws<BusinessException>(() =>
-            OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, IncidentSeverities.Critical, vetReportPath));
-
-        Assert.Contains("veterinary report", ex.Message);
+        OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, new[] { documentType });
     }
 
     [Fact]
     public void ValidatePlan_Deceased_Blocked_WhenNoVetOrDeathDocument()
     {
-        var ex = Assert.Throws<BusinessException>(() =>
-            OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, Array.Empty<string>()));
+        var ex = Assert.Throws<BusinessException>(() => OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, NoDocs));
 
         Assert.Contains("veterinary report or death certificate", ex.Message);
     }
 
-    [Fact]
-    public void ValidatePlan_Deceased_OkOnCriticalWithReport()
+    [Theory]
+    [InlineData(IncidentDocumentTypes.ScenePhoto)]
+    [InlineData(IncidentDocumentTypes.FitToTravel)]
+    public void ValidatePlan_Deceased_Blocked_WithOnlyOtherDocuments(string documentType)
     {
-        OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, IncidentSeverities.Critical, "documents/vet.pdf");
+        Assert.Throws<BusinessException>(() => OffloadRules.ValidatePlan(OffloadOutcomes.Deceased, new[] { documentType }));
     }
 
     // ---------- CanBeOffloaded ----------

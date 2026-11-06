@@ -7,6 +7,7 @@ namespace RacehorseTransport.Repositories.Entities
         public int IncidentId { get; set; }
         public string FilePath { get; set; } = string.Empty;
         public string DocumentType { get; set; } = string.Empty;
+        public string? Note { get; set; }
         public int UploadedByUserId { get; set; }
         public DateTimeOffset UploadedAt { get; set; } = DateTimeOffset.UtcNow;
 

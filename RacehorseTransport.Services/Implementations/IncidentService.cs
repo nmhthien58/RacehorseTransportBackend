@@ -368,16 +368,17 @@ namespace RacehorseTransport.Services.Implementations
             if (model.ResponseAction == IncidentResponseActions.OffloadHorse)
             {
                 offloadHorse = ResolveOffloadHorse(incident, model.AffectedTripHorseId);
+                if (!string.IsNullOrWhiteSpace(model.VetReportPath) && !_fileStorage.IsValidPath(model.VetReportPath.Trim(), FileCategories.Documents))
+                {
+                    throw new BusinessException("VetReportPath is not a valid file path. Attach the report with POST /api/incidents/{id}/documents instead.");
+                }
+                // VetReportPath (cách cũ) vẫn nhận: được tính như một tài liệu VetReport của sự cố
                 var docTypes = incident.Documents.Select(d => d.DocumentType).ToList();
                 if (!string.IsNullOrWhiteSpace(model.VetReportPath))
                 {
                     docTypes.Add(IncidentDocumentTypes.VetReport);
                 }
                 OffloadRules.ValidatePlan(model.OffloadOutcome, docTypes);
-                if (!string.IsNullOrWhiteSpace(model.VetReportPath) && !_fileStorage.IsValidPath(model.VetReportPath.Trim(), FileCategories.Documents))
-                {
-                    throw new BusinessException("VetReportPath is not a valid file path. Upload the report with POST /api/files (category 'documents') and send the returned path.");
-                }
             }
             else if (incident.EmergencyOffload)
             {
@@ -429,6 +430,11 @@ namespace RacehorseTransport.Services.Implementations
                 incident.ExtraCostForCustomer = model.ExtraCostForCustomer;
                 incident.OffloadOutcome = offloadHorse == null ? null : model.OffloadOutcome;
                 incident.VetReportPath = offloadHorse == null || string.IsNullOrWhiteSpace(model.VetReportPath) ? null : model.VetReportPath.Trim();
+                // Biên bản gửi theo cách cũ cũng lưu thành tài liệu của sự cố, để mọi nơi chỉ đọc một chỗ
+                if (incident.VetReportPath != null && !incident.Documents.Any(d => d.FilePath == incident.VetReportPath))
+                {
+                    await AddDocumentAsync(incident, incident.VetReportPath, IncidentDocumentTypes.VetReport, null, currentUser.UserId);
+                }
                 if (offloadHorse != null)
                 {
                     incident.AffectedTripHorseId = offloadHorse.TripHorseId;
@@ -917,51 +923,100 @@ namespace RacehorseTransport.Services.Implementations
             return await GetIncidentByIdAsync(incidentId, currentUser);
         }
 
+        // Tài liệu của sự cố: tài xế bổ sung sau lúc báo SOS (biên bản thú y thường có sau), Coordinator đính kèm lúc lập phương án
         public async Task<IncidentDocumentModel> UploadDocumentAsync(int incidentId, UploadIncidentDocumentModel model, CurrentUser currentUser)
         {
-            if (string.IsNullOrWhiteSpace(model.FilePath) || !_fileStorage.IsValidPath(model.FilePath.Trim(), FileCategories.Documents))
-            {
-                throw new BusinessException("FilePath is invalid. Upload the file with POST /api/files (category 'documents') and pass the returned path.");
-            }
-
             if (!IncidentDocumentTypes.All.Contains(model.DocumentType))
             {
-                throw new BusinessException($"DocumentType '{model.DocumentType}' is invalid. Allowed: {string.Join(", ", IncidentDocumentTypes.All)}.");
+                throw new BusinessException($"DocumentType '{model.DocumentType}' is invalid. Allowed values: {string.Join(", ", IncidentDocumentTypes.All)}.");
             }
 
             var incident = await GetTrackedIncidentAsync(incidentId);
-            bool canView = await ApplyVisibility(_incidentRepo.GetQueryable(), currentUser).AnyAsync(i => i.IncidentId == incidentId);
-            if (!canView)
+            await EnsureCanSeeIncidentAsync(incidentId, currentUser);
+
+            // Mọi kiểm tra nghiệp vụ đã qua mới đẩy file lên storage
+            var stored = await _fileStorage.UploadAsync(model.File.Content, model.File.FileName, model.File.SizeBytes, FileCategories.Documents);
+            var doc = await AddDocumentAsync(incident, stored.Path, model.DocumentType, model.Note, currentUser.UserId);
+
+            // Người xử lý sự cố cần biết có giấy mới (ví dụ biên bản thú y để lập phương án Deceased)
+            var trip = incident.Trip!;
+            string title = $"New {doc.DocumentType} on incident {incident.IncidentCode}";
+            string message = $"Trip {trip.TripCode}: a {doc.DocumentType} was attached to incident {incident.IncidentCode}.{(doc.Note == null ? string.Empty : $" Note: {doc.Note}")}";
+            var recipients = WithPlanner(new List<int>(), trip).Where(id => id != currentUser.UserId).ToList();
+            if (recipients.Count > 0)
             {
-                throw new ForbiddenException("You cannot upload documents to this incident.");
+                await _notificationService.SendToUsersAsync(recipients, title, message, NotificationReferenceTypes.Incident, incident.IncidentId);
+            }
+            else if (!trip.PlannedByUserId.HasValue)
+            {
+                await _notificationService.SendToRoleAsync(UserRoles.FleetCoordinator, title, message, NotificationReferenceTypes.Incident, incident.IncidentId);
+            }
+            await _notificationService.SendToRoleAsync(UserRoles.LogisticsManager, title, message, NotificationReferenceTypes.Incident, incident.IncidentId);
+
+            var user = await _userRepo.GetByIdAsync(currentUser.UserId);
+            var result = ToDocumentModel(doc, user?.FullName);
+            await _fileStorage.ResolveViewUrlsAsync(new[] { result }, d => d.FilePath, (d, url) => d.FileUrl = url);
+            return result;
+        }
+
+        public async Task DeleteDocumentAsync(int incidentId, int documentId, CurrentUser currentUser)
+        {
+            var incident = await GetTrackedIncidentAsync(incidentId);
+            await EnsureCanSeeIncidentAsync(incidentId, currentUser);
+
+            var doc = incident.Documents.FirstOrDefault(d => d.IncidentDocumentId == documentId)
+                ?? throw new NotFoundException($"Document with ID {documentId} was not found on incident {incident.IncidentCode}.");
+
+            bool isManager = currentUser.Role == UserRoles.LogisticsManager || currentUser.Role == UserRoles.Admin;
+            if (doc.UploadedByUserId != currentUser.UserId && !isManager)
+            {
+                throw new ForbiddenException("Only the person who uploaded this document (or a logistics manager) can delete it.");
+            }
+            if (incident.Status == IncidentStatuses.Approved || incident.Status == IncidentStatuses.Resolved)
+            {
+                throw new BusinessException($"Incident {incident.IncidentCode} is {incident.Status}; its documents are kept as evidence and cannot be deleted.");
             }
 
+            await _documentRepo.DeleteAsync(doc);
+        }
+
+        private async Task<IncidentDocument> AddDocumentAsync(TripIncident incident, string path, string documentType, string? note, int userId)
+        {
             var doc = new IncidentDocument
             {
                 IncidentId = incident.IncidentId,
-                FilePath = model.FilePath.Trim(),
-                DocumentType = model.DocumentType.Trim(),
-                UploadedByUserId = currentUser.UserId,
+                FilePath = path,
+                DocumentType = documentType,
+                Note = note,
+                UploadedByUserId = userId,
                 UploadedAt = DateTimeOffset.UtcNow
             };
-
             await _documentRepo.AddAsync(doc);
             await _documentRepo.SaveChangesAsync();
+            incident.Documents.Add(doc);
+            return doc;
+        }
 
-            var user = await _userRepo.GetByIdAsync(currentUser.UserId);
-            var result = new IncidentDocumentModel
+        private static IncidentDocumentModel ToDocumentModel(IncidentDocument doc, string? uploadedByName) => new()
+        {
+            IncidentDocumentId = doc.IncidentDocumentId,
+            IncidentId = doc.IncidentId,
+            FilePath = doc.FilePath,
+            DocumentType = doc.DocumentType,
+            Note = doc.Note,
+            UploadedByUserId = doc.UploadedByUserId,
+            UploadedByName = uploadedByName,
+            UploadedAt = doc.UploadedAt
+        };
+
+        // Khách / tài xế chỉ thấy sự cố của chuyến mình (cùng luật với GET)
+        private async Task EnsureCanSeeIncidentAsync(int incidentId, CurrentUser currentUser)
+        {
+            bool canView = await ApplyVisibility(_incidentRepo.GetQueryable(), currentUser).AnyAsync(i => i.IncidentId == incidentId);
+            if (!canView)
             {
-                IncidentDocumentId = doc.IncidentDocumentId,
-                IncidentId = doc.IncidentId,
-                FilePath = doc.FilePath,
-                DocumentType = doc.DocumentType,
-                UploadedByUserId = doc.UploadedByUserId,
-                UploadedByName = user?.FullName,
-                UploadedAt = doc.UploadedAt
-            };
-
-            await _fileStorage.ResolveViewUrlsAsync(new[] { result }, d => d.FilePath, (d, url) => d.FileUrl = url);
-            return result;
+                throw new ForbiddenException("You can only manage documents of incidents on your own trips.");
+            }
         }
 
         // =============================================================================================

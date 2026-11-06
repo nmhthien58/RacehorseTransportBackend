@@ -31,17 +31,6 @@ namespace RacehorseTransport.Services.Implementations
             }
         }
 
-        // Tương thích ngược: kiểm tra theo đường dẫn báo cáo thú y hoặc tài liệu
-        public static void ValidatePlan(string? outcome, string incidentSeverity, string? vetReportPath)
-        {
-            var docTypes = new List<string>();
-            if (!string.IsNullOrWhiteSpace(vetReportPath))
-            {
-                docTypes.Add(IncidentDocumentTypes.VetReport);
-            }
-            ValidatePlan(outcome, docTypes);
-        }
-
         // Con ngựa có thể được chọn cho phương án OffloadHorse: còn trên xe, hoặc đã được dỡ khẩn cấp trong chính sự cố này
         public static bool CanBeOffloaded(TripHorse tripHorse, TripIncident incident)
         {

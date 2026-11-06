@@ -129,12 +129,14 @@ namespace RacehorseTransport.API.Mappers
             };
         }
 
-        public static UploadIncidentDocumentModel ToBusinessModel(this UploadIncidentDocumentRequest request)
+        // Stream của file do controller giữ và giải phóng (request.File.ToUploadModel())
+        public static UploadIncidentDocumentModel ToBusinessModel(this UploadIncidentDocumentRequest request, FileUploadModel file)
         {
             return new UploadIncidentDocumentModel
             {
-                FilePath = request.FilePath.Trim(),
-                DocumentType = request.DocumentType.Trim()
+                DocumentType = request.DocumentType.Trim(),
+                Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(),
+                File = file
             };
         }
 
@@ -147,6 +149,7 @@ namespace RacehorseTransport.API.Mappers
                 FilePath = model.FilePath,
                 FileUrl = model.FileUrl,
                 DocumentType = model.DocumentType,
+                Note = model.Note,
                 UploadedByUserId = model.UploadedByUserId,
                 UploadedByName = model.UploadedByName,
                 UploadedAt = model.UploadedAt

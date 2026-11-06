@@ -46,6 +46,7 @@ namespace RacehorseTransport.API.ResponseModels
         public string FilePath { get; set; } = string.Empty;
         public string? FileUrl { get; set; }
         public string DocumentType { get; set; } = string.Empty;
+        public string? Note { get; set; }
         public int UploadedByUserId { get; set; }
         public string? UploadedByName { get; set; }
         public DateTimeOffset UploadedAt { get; set; }

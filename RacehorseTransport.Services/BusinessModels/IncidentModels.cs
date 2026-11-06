@@ -104,6 +104,7 @@ namespace RacehorseTransport.Services.BusinessModels
         public string FilePath { get; set; } = string.Empty;
         public string? FileUrl { get; set; }
         public string DocumentType { get; set; } = string.Empty;
+        public string? Note { get; set; }
         public int UploadedByUserId { get; set; }
         public string? UploadedByName { get; set; }
         public DateTimeOffset UploadedAt { get; set; }
@@ -111,8 +112,9 @@ namespace RacehorseTransport.Services.BusinessModels
 
     public class UploadIncidentDocumentModel
     {
-        public string FilePath { get; set; } = string.Empty;
         public string DocumentType { get; set; } = string.Empty;
+        public string? Note { get; set; }
+        public FileUploadModel File { get; set; } = null!;
     }
 
     public class IncidentActionPayloadModel
