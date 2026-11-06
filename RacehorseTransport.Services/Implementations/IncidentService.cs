@@ -144,6 +144,7 @@ namespace RacehorseTransport.Services.Implementations
             // Paging
             var page = await query.ToPagedResultAsync(options, i => i.ToBusinessModel());
             await ResolveVetReportUrlsAsync(page.Items);
+            await FillDetourShareAsync(page.Items, currentUser);
             return page;
         }
 
@@ -160,6 +161,7 @@ namespace RacehorseTransport.Services.Implementations
 
             var models = incidents.Select(i => i.ToBusinessModel()).ToList();
             await ResolveVetReportUrlsAsync(models);
+            await FillDetourShareAsync(models, currentUser);
             return models;
         }
 
@@ -179,6 +181,7 @@ namespace RacehorseTransport.Services.Implementations
 
             var model = incident.ToBusinessModel();
             await ResolveVetReportUrlsAsync(new[] { model });
+            await FillDetourShareAsync(new[] { model }, currentUser);
             return model;
         }
 
@@ -1733,6 +1736,42 @@ namespace RacehorseTransport.Services.Implementations
                 {
                     await _notificationService.SendToRoleAsync(UserRoles.FleetCoordinator, planTitle, planMessage, NotificationReferenceTypes.Trip, trip.TripId);
                 }
+            }
+        }
+
+        // Khách: phần phí đi vòng của mình = phí cả xe × số ngựa của mình còn trên xe / tổng số ngựa còn trên xe
+        private async Task FillDetourShareAsync(IEnumerable<IncidentModel> models, CurrentUser currentUser)
+        {
+            if (!currentUser.IsCustomer)
+            {
+                return;
+            }
+            var withCost = models.Where(m => m.ExtraCostForCustomer > 0).ToList();
+            if (withCost.Count == 0)
+            {
+                return;
+            }
+            var tripIds = withCost.Select(m => m.TripId).Distinct().ToList();
+            var counts = await _tripHorseRepo.GetQueryable().AsNoTracking()
+                .Where(th => tripIds.Contains(th.TripId) && TripHorseStatuses.OnBoard.Contains(th.Status))
+                .GroupBy(th => th.TripId)
+                .Select(g => new
+                {
+                    TripId = g.Key,
+                    Total = g.Count(),
+                    Mine = g.Count(th => th.BookingHorse!.Booking!.CustomerUserId == currentUser.UserId)
+                })
+                .ToListAsync();
+            foreach (var m in withCost)
+            {
+                var c = counts.FirstOrDefault(x => x.TripId == m.TripId);
+                if (c == null)
+                {
+                    continue;
+                }
+                m.MyHorsesOnBoard = c.Mine;
+                m.HorsesOnBoard = c.Total;
+                m.MyExtraCostShare = DetourShareRules.Share(m.ExtraCostForCustomer, c.Mine, c.Total);
             }
         }
 

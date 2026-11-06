@@ -5398,6 +5398,7 @@ Một sự cố (`incident`) có dạng:
 | `pendingConsentType` | Khi `status` là `AwaitingConsent`: đang chờ khách trả lời loại gì. `Detour` (đi đường vòng tốn thêm tiền) hoặc `Euthanasia` (an tử) |
 | `consentRequestedAt`, `consentDeadline` | Lúc bắt đầu chờ khách. Với an tử, `consentDeadline` = lúc bắt đầu + `Incident.EuthanasiaConsentMinutes`; quá mốc này mới được ủy quyền khẩn cấp. Frontend nên hiện đồng hồ đếm ngược |
 | `emergencyAuthorizedAt`, `emergencyAuthorizedByName`, `emergencyAuthorizationNote` | Có giá trị khi ngựa được an tử theo điều khoản ủy quyền khẩn cấp (Chính sách 9.6) vì chủ ngựa không trả lời kịp |
+| `myExtraCostShare`, `myHorsesOnBoard`, `horsesOnBoard` | **Chỉ khi khách gọi**, với sự cố có phí đi vòng: phần khách phải trả = `extraCostForCustomer` × số ngựa của khách còn trên xe / tổng số ngựa còn trên xe (làm tròn 2 số). Ví dụ 180 USD, khách có 2 / 3 con → 120 USD. Nhân sự gọi thì là `null` |
 | `consents[]` | Ý kiến của khách: `consentType` (`Detour` / `Euthanasia`), `bookingId`, `bookingCode`, `accepted`, `decidedAt` |
 | `documents` | Tài liệu của sự cố (`POST /api/incidents/{id}/documents`): `documentType` là `ScenePhoto` (ảnh hiện trường), `VetReport` (biên bản thú y), `DeathCertificate` (giấy chứng tử), `FitToTravel` (giấy đủ sức đi tiếp); `fileUrl` là link xem có hạn |
 
