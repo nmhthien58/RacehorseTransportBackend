@@ -452,6 +452,15 @@ namespace RacehorseTransport.Repositories.Constants
         public static readonly string[] All = { Minor, Moderate, Major, Critical };
     }
 
+    // Loại ý kiến khách: đi đường vòng tốn thêm tiền (R-14) hoặc an tử theo khuyến nghị của bác sĩ thú y
+    public static class ConsentTypes
+    {
+        public const string Detour = "Detour";
+        public const string Euthanasia = "Euthanasia";
+
+        public static readonly string[] All = { Detour, Euthanasia };
+    }
+
     public static class IncidentDocumentTypes
     {
         public const string ScenePhoto = "ScenePhoto";

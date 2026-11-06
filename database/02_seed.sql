@@ -389,7 +389,8 @@ INSERT INTO common.system_settings (setting_key, setting_value, description) VAL
 ('Delivery.WaitingFeePerHourUsd',        '40',    'Phí chờ (USD / giờ) sau thời gian chờ miễn phí'),
 ('Delivery.MaxWaitingHours',             '24',    'Số giờ chờ tính phí tối đa'),
 ('Delivery.DecisionHours',               '24',    'Số giờ khách có để chọn cách xử lý khi không giao được'),
-('Delivery.DeadlineBufferDays',          '2',     'Số ngày dự phòng cộng vào hạn giao sớm nhất khách được chọn');
+('Delivery.DeadlineBufferDays',          '2',     'Số ngày dự phòng cộng vào hạn giao sớm nhất khách được chọn'),
+('Incident.EuthanasiaConsentMinutes',    '60',    'Số phút chờ chủ ngựa trả lời khuyến nghị an tử trước khi được áp dụng ủy quyền khẩn cấp');
 
 INSERT INTO common.system_notifications (recipient_user_id, title, message, reference_type, reference_id, is_read, created_at) VALUES
 (5, 'Đơn BKG-2026-0001 đã được phê duyệt', 'Yêu cầu vận chuyển của bạn đã được phê duyệt và phân công nhân sự phụ trách.', 'Booking', 1, true,  '2026-09-20 09:00:00+07'),

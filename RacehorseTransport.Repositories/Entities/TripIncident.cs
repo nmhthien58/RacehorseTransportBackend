@@ -36,6 +36,17 @@ namespace RacehorseTransport.Repositories.Entities
         // Tài xế đã dỡ con ngựa ngay lúc báo sự cố (thú y yêu cầu); phương án OffloadHorse vẫn phải được duyệt sau
         public bool EmergencyOffload { get; set; }
 
+        // An tử: phương án Deceased mà ngựa còn sống (bác sĩ khuyến nghị an tử) -> duyệt xong phải chờ chủ ngựa đồng ý
+        public bool RequiresEuthanasiaConsent { get; set; }
+        // Đang chờ khách trả lời loại gì (ConsentTypes) và từ lúc nào (tính hạn ủy quyền khẩn cấp)
+        public string? PendingConsentType { get; set; }
+        public DateTimeOffset? ConsentRequestedAt { get; set; }
+        // Quá hạn mà chủ ngựa chưa trả lời: điều phối / quản lý áp dụng điều khoản ủy quyền khẩn cấp (Chính sách 9.6)
+        public DateTimeOffset? EmergencyAuthorizedAt { get; set; }
+        public int? EmergencyAuthorizedByUserId { get; set; }
+        public string? EmergencyAuthorizationNote { get; set; }
+        public virtual User? EmergencyAuthorizedBy { get; set; }
+
         // R-09: nguyên nhân, bắt buộc khi đóng sự cố (FaultParties) + giải thích ngắn
         public string? FaultParty { get; set; }
 

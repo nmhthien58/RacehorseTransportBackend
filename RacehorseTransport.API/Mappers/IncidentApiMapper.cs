@@ -49,7 +49,8 @@ namespace RacehorseTransport.API.Mappers
                 ExtraCostForCustomer = request.ExtraCostForCustomer,
                 AffectedTripHorseId = request.AffectedTripHorseId,
                 OffloadOutcome = string.IsNullOrWhiteSpace(request.OffloadOutcome) ? null : request.OffloadOutcome.Trim(),
-                VetReportPath = string.IsNullOrWhiteSpace(request.VetReportPath) ? null : request.VetReportPath.Trim()
+                VetReportPath = string.IsNullOrWhiteSpace(request.VetReportPath) ? null : request.VetReportPath.Trim(),
+                RequiresEuthanasiaConsent = request.RequiresEuthanasiaConsent
             };
         }
 
@@ -125,7 +126,14 @@ namespace RacehorseTransport.API.Mappers
                 Consents = model.Consents,
                 OffloadOutcome = model.OffloadOutcome,
                 VetReportUrl = model.VetReportUrl,
-                Documents = model.Documents.Select(d => d.ToResponse()).ToList()
+                Documents = model.Documents.Select(d => d.ToResponse()).ToList(),
+                RequiresEuthanasiaConsent = model.RequiresEuthanasiaConsent,
+                PendingConsentType = model.PendingConsentType,
+                ConsentRequestedAt = model.ConsentRequestedAt,
+                ConsentDeadline = model.ConsentDeadline,
+                EmergencyAuthorizedAt = model.EmergencyAuthorizedAt,
+                EmergencyAuthorizedByName = model.EmergencyAuthorizedByName,
+                EmergencyAuthorizationNote = model.EmergencyAuthorizationNote
             };
         }
 

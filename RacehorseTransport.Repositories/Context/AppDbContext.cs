@@ -346,6 +346,19 @@ namespace RacehorseTransport.Repositories.Context
                 entity.HasOne(e => e.ReportedBy).WithMany().HasForeignKey(e => e.ReportedByUserId);
                 entity.HasOne(e => e.ApprovedBy).WithMany().HasForeignKey(e => e.ApprovedByUserId);
                 entity.HasOne(e => e.AffectedTripHorse).WithMany().HasForeignKey(e => e.AffectedTripHorseId);
+                entity.HasOne(e => e.EmergencyAuthorizedBy).WithMany().HasForeignKey(e => e.EmergencyAuthorizedByUserId);
+            });
+
+            modelBuilder.Entity<IncidentDocument>(entity =>
+            {
+                entity.ToTable("incident_documents", "incident");
+                entity.HasKey(e => e.IncidentDocumentId);
+                entity.HasOne(e => e.Incident)
+                      .WithMany(i => i.Documents)
+                      .HasForeignKey(e => e.IncidentId);
+                entity.HasOne(e => e.UploadedBy)
+                      .WithMany()
+                      .HasForeignKey(e => e.UploadedByUserId);
             });
 
             modelBuilder.Entity<IncidentDocument>(entity =>

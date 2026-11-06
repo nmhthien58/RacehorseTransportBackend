@@ -5360,7 +5360,14 @@ Một sự cố (`incident`) có dạng:
       "uploadedByName": "Phạm Văn Đức",
       "uploadedAt": "2026-11-06T07:25:00Z"
     }
-  ]
+  ],
+  "requiresEuthanasiaConsent": false,
+  "pendingConsentType": null,
+  "consentRequestedAt": null,
+  "consentDeadline": null,
+  "emergencyAuthorizedAt": null,
+  "emergencyAuthorizedByName": null,
+  "emergencyAuthorizationNote": null
 }
 ```
 
@@ -5383,6 +5390,11 @@ Một sự cố (`incident`) có dạng:
 | `emergencyOffload` | `true` khi tài xế đã dỡ con ngựa `affectedTripHorseId` xuống ngay lúc báo sự cố |
 | `offloadOutcome` | Hướng xử lý tiếp của phương án `OffloadHorse` (`WaitRecover`, `ReturnToOrigin`, `HandOverHere`, `Deceased`); `null` với phương án khác |
 | `vetReportUrl` | Link xem biên bản thú y gửi theo cách cũ (`vetReportPath`). Cách mới: xem `documents` |
+| `requiresEuthanasiaConsent` | `true` khi phương án là ngựa chết (`Deceased`) theo **khuyến nghị an tử** của bác sĩ (ngựa còn sống): duyệt xong phải chờ chủ ngựa đồng ý |
+| `pendingConsentType` | Khi `status` là `AwaitingConsent`: đang chờ khách trả lời loại gì. `Detour` (đi đường vòng tốn thêm tiền) hoặc `Euthanasia` (an tử) |
+| `consentRequestedAt`, `consentDeadline` | Lúc bắt đầu chờ khách. Với an tử, `consentDeadline` = lúc bắt đầu + `Incident.EuthanasiaConsentMinutes`; quá mốc này mới được ủy quyền khẩn cấp. Frontend nên hiện đồng hồ đếm ngược |
+| `emergencyAuthorizedAt`, `emergencyAuthorizedByName`, `emergencyAuthorizationNote` | Có giá trị khi ngựa được an tử theo điều khoản ủy quyền khẩn cấp (Chính sách 9.6) vì chủ ngựa không trả lời kịp |
+| `consents[]` | Ý kiến của khách: `consentType` (`Detour` / `Euthanasia`), `bookingId`, `bookingCode`, `accepted`, `decidedAt` |
 | `documents` | Tài liệu của sự cố (`POST /api/incidents/{id}/documents`): `documentType` là `ScenePhoto` (ảnh hiện trường), `VetReport` (biên bản thú y), `DeathCertificate` (giấy chứng tử), `FitToTravel` (giấy đủ sức đi tiếp); `fileUrl` là link xem có hạn |
 
 ### POST /api/trips/{tripId}/incidents — Báo sự cố
@@ -5583,6 +5595,7 @@ Các trường gửi lên:
 | `extraCostForCustomer` | số | Không | Chỉ với `Reroute`: tiền đi đường vòng khách phải trả thêm (tổng, chia cho các đơn theo số ngựa). > 0 thì sau khi quản lý duyệt, sự cố chuyển `AwaitingConsent` và tuyến **chưa** đổi cho tới khi mọi khách có ngựa trên xe đồng ý |
 | `affectedTripHorseId` | số | Không | Chỉ dùng với `OffloadHorse`: con ngựa rời chuyến. Bỏ trống = con ngựa đã chọn lúc báo sự cố. Sự cố dỡ khẩn cấp thì phải là đúng con đã dỡ |
 | `offloadOutcome` | chuỗi | Có khi `responseAction` là `OffloadHorse` | Hướng xử lý tiếp: `WaitRecover`, `ReturnToOrigin`, `HandOverHere`, `Deceased` (bảng ở đầu mục 11) |
+| `requiresEuthanasiaConsent` | boolean | Không | Chỉ dùng với `OffloadHorse` + `Deceased` khi ngựa **còn sống** và bác sĩ khuyến nghị an tử. `true` → sau khi quản lý duyệt, sự cố chờ chủ ngựa đồng ý (`AwaitingConsent`, `pendingConsentType = Euthanasia`), con ngựa chưa đổi trạng thái. Ngựa đã chết thì để `false` |
 | `vetReportPath` | chuỗi | Không (cách cũ) | Đường dẫn biên bản thú y từ `POST /api/files`. Vẫn nhận để tương thích và được lưu thành tài liệu `VetReport` của sự cố. **Cách mới:** đính kèm biên bản bằng `POST /api/incidents/{id}/documents` trước khi đề xuất |
 
 Ví dụ request:
@@ -5723,23 +5736,53 @@ Lỗi thường gặp:
 | 400 | `The offload plan can no longer be applied (Sakura Wind is Delivered). Reject the plan so the coordinator can propose a new one.` | Từ lúc đề xuất tới lúc duyệt con ngựa đã được giao / đổi trạng thái, hoặc phương án `OffloadHorse` cũ (đề xuất trước bản này) chưa có hướng xử lý. Từ chối để điều phối viên đề xuất lại |
 | 400 | `The proposed route change no longer fits the current route: ... Reject the plan so the coordinator can propose a new one.` | Từ lúc đề xuất tới lúc duyệt, đoàn xe đã đi qua mốc liên quan (hoặc chuyến không còn trên đường). Từ chối để điều phối viên đề xuất lại |
 
-### POST /api/incidents/{id}/customer-consent — Khách đồng ý / từ chối đi đường vòng
+### POST /api/incidents/{id}/customer-consent — Khách đồng ý / từ chối (đi đường vòng hoặc an tử)
 
-Khi sự cố `AwaitingConsent` (đi vòng tốn thêm `extraCostForCustomer`). Mỗi khách có ngựa trên xe trả lời cho các đơn của mình; trả lời lại được tới khi có kết quả.
+Khi sự cố `AwaitingConsent`. Xem `pendingConsentType` để biết khách đang được hỏi việc gì.
 
-- **Ai gọi được:** Customer có ngựa đang trên xe của chuyến
+- **Ai gọi được:** Customer (điều kiện theo từng loại bên dưới)
 - **Dữ liệu gửi lên:** `{ "accept": true }` hoặc `{ "accept": false }`
 
-Kết quả:
+**`pendingConsentType = Detour`** (đi vòng tốn thêm `extraCostForCustomer`). Mỗi khách có ngựa trên xe trả lời cho các đơn của mình; trả lời lại được tới khi có kết quả.
 - **Mọi** đơn có ngựa trên xe đồng ý → tuyến vòng được áp, `extraCostForCustomer` cộng vào `additionalCost` (khoản phát sinh, chia theo số ngựa khi đóng chuyến), sự cố `Approved`; đơn đã giao kết hợp đồng có bản hợp đồng mới `DetourAccepted` (mục 7c).
 - **Một** khách từ chối → phương án thành `ReturnToOrigin`, tuyến về được áp ngay, không thu tiền đi vòng (Chính sách 9.4).
 
-Response `200`: sự cố, có `consents[]` (`bookingId`, `bookingCode`, `accepted`, `decidedAt`).
+**`pendingConsentType = Euthanasia`** (bác sĩ thú y khuyến nghị an tử, Chính sách 9.6). **Chỉ chủ của con ngựa `affectedTripHorseId`** trả lời được; khách khác trên xe không bị hỏi. Trước khi bấm, frontend nên cho khách xem biên bản thú y trong `documents` và đồng hồ đếm ngược tới `consentDeadline`.
+- **Đồng ý** → sự cố `Approved`, con ngựa thành `Deceased` (trên chuyến và trong đơn), mức độ thành `Critical`, hệ thống tự mở hồ sơ bảo hiểm `Death`.
+- **Từ chối** → sự cố về `Rejected` kèm `rejectionReason`, để điều phối viên lập phương án khác (thường là `OffloadHorse` + `WaitRecover` tại phòng khám thú y). **Đoàn xe vẫn đi tiếp, không quay về.** Chi phí điều trị từ lúc đó do chủ ngựa chịu (Chính sách 9.6).
+
+Response `200`: sự cố, có `consents[]` (`consentType`, `bookingId`, `bookingCode`, `accepted`, `decidedAt`).
 
 | HTTP | `message` | Khi nào |
 |---|---|---|
 | 400 | `This incident is not waiting for your agreement (status: Approved).` | Không ở `AwaitingConsent` |
-| 403 | `Only customers with horses on this trip can answer.` | Không có ngựa trên xe |
+| 403 | `Only customers with horses on this trip can answer.` | Đi vòng: không có ngựa trên xe |
+| 403 | `Only the owner of Kim Ngưu can answer this euthanasia request.` | An tử: không phải chủ con ngựa |
+
+### POST /api/incidents/{id}/emergency-authorize — Ủy quyền khẩn cấp khi chủ ngựa không trả lời
+
+Áp dụng điều khoản ủy quyền khẩn cấp (Chính sách 9.6): chủ ngựa không trả lời khuyến nghị an tử trong `Incident.EuthanasiaConsentMinutes` phút (mặc định 60), công ty làm theo chỉ định của bác sĩ để con ngựa không phải chịu đau thêm. Con ngựa thành `Deceased`, sự cố `Approved`, khách nhận thông báo + email giải thích.
+
+- **Ai gọi được:** FleetCoordinator, LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `note` | chuỗi | Có | Đã liên lạc với khách thế nào, tối đa 500 ký tự |
+
+Ví dụ request:
+
+```json
+{ "note": "Gọi khách 3 lần lúc 14:05, 14:20, 14:40 không được; email không phản hồi" }
+```
+
+Response `200`: sự cố với `status` `Approved`, có `emergencyAuthorizedAt`, `emergencyAuthorizedByName`, `emergencyAuthorizationNote`.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `The owner still has 40 minute(s) to answer. ...` | Chưa hết thời gian chờ |
+| 400 | `Incident INC-... is not waiting for the owner's decision on euthanasia ...` | Sự cố không chờ ý kiến an tử (đã trả lời, hoặc đang chờ đi vòng) |
+| 400 | `Emergency authorisation needs the veterinarian's report attached to the incident (VetReport).` | Sự cố chưa có biên bản thú y |
 
 ### POST /api/incidents/{id}/reject — Từ chối phương án
 
@@ -9154,6 +9197,7 @@ Response `200`:
     },
     "horse": { "minAgeMonths": 6, "gestationDays": 340, "latePregnancyPercent": 90, "postFoalingDays": 7 },
     "delivery": { "stableFeePerHorsePerDayUsd": 50, "extraKmFeeUsd": 2, "freeWaitingHours": 2, "waitingFeePerHourUsd": 40, "maxWaitingHours": 24, "decisionHours": 24, "deadlineBufferDays": 2 },
+    "incident": { "euthanasiaConsentMinutes": 60 },
     "values": {
       "Policy.Version": "1.0",
       "Payment.DepositPercent": 30,
@@ -9181,7 +9225,8 @@ Response `200`:
       "Delivery.WaitingFeePerHourUsd": 40,
       "Delivery.MaxWaitingHours": 24,
       "Delivery.DecisionHours": 24,
-      "Delivery.DeadlineBufferDays": 2
+      "Delivery.DeadlineBufferDays": 2,
+      "Incident.EuthanasiaConsentMinutes": 60
     }
   },
   "errors": null
@@ -9256,6 +9301,7 @@ Response `200`:
     "deliveryMaxWaitingHours": 24,
     "deliveryDecisionHours": 24,
     "deliveryDeadlineBufferDays": 2,
+    "euthanasiaConsentMinutes": 60,
     "updatedAt": "2026-10-27T07:05:09.094261+00:00",
     "updatedByName": "Trần Quốc Bảo"
   },
@@ -9301,6 +9347,7 @@ Giá trị mới áp dụng từ lúc lưu. Đơn đã đồng ý chính sách g
 | `deliveryMaxWaitingHours` | số nguyên | 1 – 168 | `Delivery.MaxWaitingHours` |
 | `deliveryDecisionHours` | số nguyên | 1 – 168 | `Delivery.DecisionHours` |
 | `deliveryDeadlineBufferDays` | số nguyên | 0 – 30 | `Delivery.DeadlineBufferDays` (không gửi thì lấy 2) |
+| `euthanasiaConsentMinutes` | số nguyên | 5 – 1440 | `Incident.EuthanasiaConsentMinutes`: số phút chờ chủ ngựa trả lời khuyến nghị an tử trước khi được ủy quyền khẩn cấp (không gửi thì lấy 60) |
 
 Ví dụ request (cách dễ nhất: lấy `data` của `GET /api/settings/policy`, sửa vài trường rồi gửi lại):
 
@@ -9482,7 +9529,8 @@ Tổng cộng 139 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/incidents/{id}/reject` | Từ chối phương án | LogisticsManager, Admin |
 | POST | `/api/incidents/{id}/apply-reroute` | Nắn tuyến | FleetCoordinator, Admin |
 | POST | `/api/incidents/{id}/resolve` | Đóng sự cố, chọn nguyên nhân (`faultParty`); quay về thì tự hoàn tiền | FleetCoordinator, Admin |
-| POST | `/api/incidents/{id}/customer-consent` | Khách đồng ý / từ chối đi đường vòng tốn thêm tiền | Customer có ngựa trên xe |
+| POST | `/api/incidents/{id}/customer-consent` | Khách đồng ý / từ chối đi đường vòng tốn thêm tiền, hoặc chủ ngựa trả lời khuyến nghị an tử | Customer có ngựa trên xe (an tử: chỉ chủ con ngựa) |
+| POST | `/api/incidents/{id}/emergency-authorize` | Ủy quyền khẩn cấp khi chủ ngựa không trả lời khuyến nghị an tử kịp | FleetCoordinator, LogisticsManager, Admin |
 | GET | `/api/delay-compensations` | Danh sách bồi thường giao trễ | LogisticsManager, Admin |
 | GET | `/api/bookings/{bookingId}/delay-compensations` | Bồi thường giao trễ của một đơn | Khách của đơn, nhân sự |
 | POST | `/api/delay-compensations/{id}/approve` | Duyệt bồi thường (có thể sửa số tiền) | LogisticsManager, Admin |

@@ -33,6 +33,7 @@ namespace RacehorseTransport.API.Mappers
                 DeliveryMaxWaitingHours = model.DeliveryMaxWaitingHours,
                 DeliveryDecisionHours = model.DeliveryDecisionHours,
                 DeliveryDeadlineBufferDays = model.DeliveryDeadlineBufferDays,
+                EuthanasiaConsentMinutes = model.EuthanasiaConsentMinutes,
                 UpdatedAt = model.UpdatedAt,
                 UpdatedByName = model.UpdatedByName
             };
@@ -63,7 +64,8 @@ namespace RacehorseTransport.API.Mappers
                 DeliveryWaitingFeePerHourUsd = request.DeliveryWaitingFeePerHourUsd,
                 DeliveryMaxWaitingHours = request.DeliveryMaxWaitingHours,
                 DeliveryDecisionHours = request.DeliveryDecisionHours,
-                DeliveryDeadlineBufferDays = request.DeliveryDeadlineBufferDays
+                DeliveryDeadlineBufferDays = request.DeliveryDeadlineBufferDays,
+                EuthanasiaConsentMinutes = request.EuthanasiaConsentMinutes
             };
         }
 
@@ -115,6 +117,10 @@ namespace RacehorseTransport.API.Mappers
                     DecisionHours = s.DeliveryDecisionHours,
                     DeadlineBufferDays = s.DeliveryDeadlineBufferDays
                 },
+                Incident = new PolicyIncidentSection
+                {
+                    EuthanasiaConsentMinutes = s.EuthanasiaConsentMinutes
+                },
                 Values = new Dictionary<string, object>
                 {
                     [SystemSettingService.PolicyVersionKey] = s.PolicyVersion,
@@ -143,7 +149,8 @@ namespace RacehorseTransport.API.Mappers
                     [SystemSettingService.DeliveryWaitingFeePerHourUsdKey] = s.DeliveryWaitingFeePerHourUsd,
                     [SystemSettingService.DeliveryMaxWaitingHoursKey] = s.DeliveryMaxWaitingHours,
                     [SystemSettingService.DeliveryDecisionHoursKey] = s.DeliveryDecisionHours,
-                    [SystemSettingService.DeliveryDeadlineBufferDaysKey] = s.DeliveryDeadlineBufferDays
+                    [SystemSettingService.DeliveryDeadlineBufferDaysKey] = s.DeliveryDeadlineBufferDays,
+                    [SystemSettingService.EuthanasiaConsentMinutesKey] = s.EuthanasiaConsentMinutes
                 }
             };
         }

@@ -21,6 +21,7 @@ namespace RacehorseTransport.API.Controllers
         private const string ReportRoles = UserRoles.DriverEscort + "," + UserRoles.Admin;
         private const string PlanWriteRoles = UserRoles.FleetCoordinator + "," + UserRoles.Admin;
         private const string PlanReviewRoles = UserRoles.LogisticsManager + "," + UserRoles.Admin;
+        private const string EmergencyRoles = UserRoles.FleetCoordinator + "," + UserRoles.LogisticsManager + "," + UserRoles.Admin;
 
         private readonly IIncidentService _incidentService;
 
@@ -122,8 +123,11 @@ namespace RacehorseTransport.API.Controllers
         }
 
         /// <summary>
-        /// Customer with horses on the trip accepts or declines a detour that costs extra. All accept -> the detour is applied;
+        /// Customer answers an incident waiting for consent (status AwaitingConsent; see pendingConsentType).
+        /// Detour: customers with horses on board accept or decline the extra cost. All accept -> the detour is applied;
         /// one declines -> the plan becomes ReturnToOrigin.
+        /// Euthanasia: only the owner of the affected horse answers. Accept -> the horse is recorded as deceased;
+        /// decline -> the plan goes back to the coordinator (status Rejected), the convoy carries on and further treatment is at the owner's cost.
         /// </summary>
         [HttpPost("{id:int}/customer-consent")]
         [Authorize(Roles = UserRoles.Customer)]
@@ -135,6 +139,21 @@ namespace RacehorseTransport.API.Controllers
         {
             var incident = await _incidentService.RecordCustomerConsentAsync(id, request.Accept!.Value, User.ToCurrentUser());
             return Ok(ApiResponse<IncidentResponse>.SuccessResult(incident.ToResponse(), "Your answer has been recorded"));
+        }
+
+        /// <summary>
+        /// Apply the emergency authorisation clause (service policy 9.6) when the owner has not answered a euthanasia request
+        /// within Incident.EuthanasiaConsentMinutes. Needs a VetReport attached to the incident and a note; the horse is recorded as deceased.
+        /// </summary>
+        [HttpPost("{id:int}/emergency-authorize")]
+        [Authorize(Roles = EmergencyRoles)]
+        [ProducesResponseType(typeof(ApiResponse<IncidentResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> EmergencyAuthorize(int id, [FromBody] EmergencyAuthorizeRequest request)
+        {
+            var incident = await _incidentService.EmergencyAuthorizeAsync(id, request.Note, User.ToCurrentUser());
+            return Ok(ApiResponse<IncidentResponse>.SuccessResult(incident.ToResponse(), "Emergency authorisation applied"));
         }
 
         /// <summary>

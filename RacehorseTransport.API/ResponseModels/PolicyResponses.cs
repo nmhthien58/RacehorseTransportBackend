@@ -25,6 +25,7 @@ namespace RacehorseTransport.API.ResponseModels
         public int DeliveryMaxWaitingHours { get; set; }
         public int DeliveryDecisionHours { get; set; }
         public int DeliveryDeadlineBufferDays { get; set; }
+        public int EuthanasiaConsentMinutes { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
         public string? UpdatedByName { get; set; }
     }
@@ -42,6 +43,7 @@ namespace RacehorseTransport.API.ResponseModels
         public PolicyInsuranceSection Insurance { get; set; } = new();
         public PolicyHorseSection Horse { get; set; } = new();
         public PolicyDeliverySection Delivery { get; set; } = new();
+        public PolicyIncidentSection Incident { get; set; } = new();
 
         // Theo đúng tên khóa trong chính sách (ví dụ "Delay.GraceHours"), để thay các chỗ [...] trong văn bản
         public Dictionary<string, object> Values { get; set; } = new();
@@ -84,6 +86,11 @@ namespace RacehorseTransport.API.ResponseModels
         public int GestationDays { get; set; }
         public decimal LatePregnancyPercent { get; set; }
         public int PostFoalingDays { get; set; }
+    }
+
+    public class PolicyIncidentSection
+    {
+        public int EuthanasiaConsentMinutes { get; set; }
     }
 
     public class PolicyDeliverySection

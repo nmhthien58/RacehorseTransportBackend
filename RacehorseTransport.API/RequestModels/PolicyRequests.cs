@@ -72,5 +72,8 @@ namespace RacehorseTransport.API.RequestModels
         // Không gửi thì giữ mặc định 2 (app cũ chưa có trường này)
         [Range(0, 30, ErrorMessage = "DeliveryDeadlineBufferDays must be between 0 and 30.")]
         public int DeliveryDeadlineBufferDays { get; set; } = 2;
+
+        [Range(5, 1440, ErrorMessage = "EuthanasiaConsentMinutes must be between 5 and 1440.")]
+        public int EuthanasiaConsentMinutes { get; set; } = 60;
     }
 }

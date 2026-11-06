@@ -41,8 +41,15 @@ namespace RacehorseTransport.Services.Mappers
                 ResolvedAt = entity.ResolvedAt,
                 EmergencyOffload = entity.EmergencyOffload,
                 ExtraCostForCustomer = entity.ExtraCostForCustomer,
+                RequiresEuthanasiaConsent = entity.RequiresEuthanasiaConsent,
+                PendingConsentType = entity.PendingConsentType,
+                ConsentRequestedAt = entity.ConsentRequestedAt,
+                EmergencyAuthorizedAt = entity.EmergencyAuthorizedAt,
+                EmergencyAuthorizedByName = entity.EmergencyAuthorizedBy?.FullName,
+                EmergencyAuthorizationNote = entity.EmergencyAuthorizationNote,
                 Consents = entity.Consents.Select(c => new IncidentConsentModel
                 {
+                    ConsentType = c.ConsentType,
                     BookingId = c.BookingId,
                     BookingCode = c.Booking?.BookingCode ?? string.Empty,
                     Accepted = c.Accepted,

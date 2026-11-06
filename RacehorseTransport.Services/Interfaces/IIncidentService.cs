@@ -20,6 +20,8 @@ namespace RacehorseTransport.Services.Interfaces
         // R-14 (BE-14b): khách có ngựa trên xe đồng ý / từ chối đi đường vòng tốn thêm tiền
         Task<IncidentModel> RecordCustomerConsentAsync(int incidentId, bool accept, CurrentUser currentUser);
 
+        Task<IncidentModel> EmergencyAuthorizeAsync(int incidentId, string note, CurrentUser currentUser);
+
         Task<IncidentModel> ResolveIncidentAsync(int incidentId, string faultParty, string? faultNote, CurrentUser currentUser);
 
         Task<IncidentDocumentModel> UploadDocumentAsync(int incidentId, UploadIncidentDocumentModel model, CurrentUser currentUser);
