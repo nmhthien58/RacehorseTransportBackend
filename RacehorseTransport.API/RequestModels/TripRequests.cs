@@ -64,8 +64,17 @@ namespace RacehorseTransport.API.RequestModels
         [Range(1, int.MaxValue, ErrorMessage = "BookingHorseId is required.")]
         public int BookingHorseId { get; set; }
 
+        // Khoang trên xe (1 = khoang đầu) và vị trí trong khoang (1-3). Mỗi khoang chỉ chứa ngựa cùng hạng chuồng:
+        // Shared tối đa 3 con, Comfort 2, Private 1.
+        [Range(1, 4, ErrorMessage = "CompartmentNo must be between 1 and 4.")]
+        public int? CompartmentNo { get; set; }
+
+        [Range(1, 3, ErrorMessage = "PositionNo must be between 1 and 3.")]
+        public int? PositionNo { get; set; }
+
+        // Cách cũ, vẫn nhận: chỉ dùng khi không gửi CompartmentNo. Ô n = khoang ceil(n / 3), vị trí ((n - 1) % 3) + 1.
         [Range(1, 12, ErrorMessage = "StallSlotNumber must be between 1 and 12.")]
-        public int StallSlotNumber { get; set; }
+        public int? StallSlotNumber { get; set; }
 
         [MaxLength(200, ErrorMessage = "Notes cannot exceed 200 characters.")]
         public string? Notes { get; set; }

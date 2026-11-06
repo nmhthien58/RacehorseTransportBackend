@@ -215,6 +215,13 @@ namespace RacehorseTransport.Repositories.Constants
         public static readonly string[] All = { HorseTruckAirSuspension, HorseVan, AirStall };
     }
 
+    // Xe chia khoang: mỗi khoang rộng 3 vị trí, xe có 1-4 khoang (khớp CHECK ck_transport_assets_compartments)
+    public static class VehicleCompartments
+    {
+        public const int PositionsPerCompartment = 3;
+        public const int MaxCompartments = 4;
+    }
+
     public static class AssetStatuses
     {
         public const string Available = "Available";

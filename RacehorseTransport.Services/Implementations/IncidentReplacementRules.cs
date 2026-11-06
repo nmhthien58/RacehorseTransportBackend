@@ -9,7 +9,7 @@ namespace RacehorseTransport.Services.Implementations
         public static void ValidateVehicle(
             TransportAsset currentVehicle,
             TransportAsset replacement,
-            int horsesToCarry,
+            IReadOnlyCollection<string> stallClassesToCarry,
             bool requiresClimateControl)
         {
             if (replacement.AssetId == currentVehicle.AssetId)
@@ -24,9 +24,16 @@ namespace RacehorseTransport.Services.Implementations
             {
                 throw new BusinessException($"Replacement vehicle {replacement.AssetCode} is not available (current status: {replacement.Status}).");
             }
-            if (replacement.CapacityHorses < horsesToCarry)
+            if (replacement.CapacityHorses < stallClassesToCarry.Count)
             {
-                throw new BusinessException($"Replacement vehicle {replacement.AssetCode} has only {replacement.CapacityHorses} stall(s), but {horsesToCarry} horse(s) still need transport.");
+                throw new BusinessException($"Replacement vehicle {replacement.AssetCode} has only {replacement.CapacityHorses} stall(s), but {stallClassesToCarry.Count} horse(s) still need transport.");
+            }
+            int requiredCompartments = CompartmentRules.RequiredCompartments(stallClassesToCarry);
+            if (replacement.CompartmentCount < requiredCompartments)
+            {
+                throw new BusinessException(
+                    $"Replacement vehicle {replacement.AssetCode} has {replacement.CompartmentCount} compartment(s) but the horses still on board need {requiredCompartments} " +
+                    "(a Shared compartment takes 3 horses, Comfort 2, Private 1).");
             }
             if (requiresClimateControl && !replacement.HasClimateControl)
             {
