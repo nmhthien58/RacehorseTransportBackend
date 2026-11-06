@@ -328,7 +328,7 @@ namespace RacehorseTransport.Repositories.Constants
         public static readonly string[] All = { Planned, InTransit, Delivered, Offloaded, Deceased, Cancelled };
 
         // Con ngựa đang được một chuyến "giữ" (chưa thể xếp lên chuyến khác).
-        // Con Offloaded chỉ được thả về hàng chờ khi hướng xử lý là WaitRecover: các truy vấn kiểm tra thêm OffloadOutcome.
+        // Con Offloaded cũng không được xếp lại (các truy vấn kiểm tra thêm Offloaded); WaitRecover đi tiếp bằng đơn nối tiếp.
         public static readonly string[] Holding = { Planned, InTransit, Delivered, Deceased };
 
         // Con ngựa còn phải chở / giao trên chuyến
@@ -338,7 +338,7 @@ namespace RacehorseTransport.Repositories.Constants
     // Hướng xử lý tiếp khi ngựa rời chuyến qua sự cố (R-12); null = tài xế dỡ khẩn cấp, chờ phương án được duyệt
     public static class OffloadOutcomes
     {
-        public const string WaitRecover = "WaitRecover";       // chờ hồi phục rồi về hàng chờ xếp chuyến khác
+        public const string WaitRecover = "WaitRecover";       // ở lại phòng khám; đơn kết thúc tại đó, khỏi bệnh thì đi tiếp bằng đơn nối tiếp
         public const string ReturnToOrigin = "ReturnToOrigin"; // đưa về nơi đi (sắp xếp ngoài hệ thống); con ngựa kết thúc
         public const string HandOverHere = "HandOverHere";     // khách nhận tại nơi dỡ, ký e-POD tại chỗ
         public const string Deceased = "Deceased";             // ngựa chết; bắt buộc biên bản thú y
@@ -443,6 +443,15 @@ namespace RacehorseTransport.Repositories.Constants
         public const string Critical = "Critical";
 
         public static readonly string[] All = { Minor, Moderate, Major, Critical };
+    }
+
+    // Ai chịu viện phí khi ngựa ở lại phòng khám (Chính sách 9.6)
+    public static class VetExpenseBearers
+    {
+        public const string Company = "Company";
+        public const string Customer = "Customer";
+
+        public static readonly string[] All = { Company, Customer };
     }
 
     // Loại ý kiến khách: đi đường vòng tốn thêm tiền (R-14) hoặc an tử theo khuyến nghị của bác sĩ thú y

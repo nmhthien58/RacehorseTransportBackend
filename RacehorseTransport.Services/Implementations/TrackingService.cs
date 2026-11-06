@@ -272,6 +272,9 @@ namespace RacehorseTransport.Services.Implementations
                                     OffloadedAt = x.TripHorse.OffloadedAt,
                                     OffloadReason = x.TripHorse.OffloadReason,
                                     OffloadOutcome = x.TripHorse.OffloadOutcome,
+                                    VetClinic = x.TripHorse.ToVetClinic(),
+                                    VetExpenseAmount = x.TripHorse.VetExpenseAmount,
+                                    VetExpenseBearer = x.TripHorse.VetExpenseBearer,
                                     LatestLog = logs.FirstOrDefault(),
                                     Logs = logs
                                 };

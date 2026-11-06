@@ -77,6 +77,10 @@ namespace RacehorseTransport.API.ResponseModels
         public DateTimeOffset? OffloadedAt { get; set; }
         public string? OffloadReason { get; set; }
         public string? OffloadOutcome { get; set; } // WaitRecover | ReturnToOrigin | HandOverHere | Deceased (R-12)
+        public RacehorseTransport.Services.BusinessModels.VetClinicModel? VetClinic { get; set; } // WaitRecover: phòng khám thú y
+        public decimal? VetExpenseAmount { get; set; }
+        public string? VetExpenseBearer { get; set; }  // Company | Customer
+        public string? VetExpenseNote { get; set; }
     }
 
     public class TripCheckpointResponse

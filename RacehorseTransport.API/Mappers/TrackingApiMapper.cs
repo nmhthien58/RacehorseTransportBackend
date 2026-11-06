@@ -136,6 +136,9 @@ namespace RacehorseTransport.API.Mappers
                         OffloadedAt = h.OffloadedAt,
                         OffloadReason = h.OffloadReason,
                         OffloadOutcome = h.OffloadOutcome,
+                        VetClinic = h.VetClinic,
+                        VetExpenseAmount = h.VetExpenseAmount,
+                        VetExpenseBearer = h.VetExpenseBearer,
                         LatestLog = h.LatestLog?.ToResponse(),
                         Logs = h.Logs.Select(l => l.ToResponse()).ToList()
                     }).ToList()

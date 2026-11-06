@@ -50,7 +50,16 @@ namespace RacehorseTransport.API.Mappers
                 AffectedTripHorseId = request.AffectedTripHorseId,
                 OffloadOutcome = string.IsNullOrWhiteSpace(request.OffloadOutcome) ? null : request.OffloadOutcome.Trim(),
                 VetReportPath = string.IsNullOrWhiteSpace(request.VetReportPath) ? null : request.VetReportPath.Trim(),
-                RequiresEuthanasiaConsent = request.RequiresEuthanasiaConsent
+                RequiresEuthanasiaConsent = request.RequiresEuthanasiaConsent,
+                VetClinic = request.VetClinic == null ? null : new VetClinicModel
+                {
+                    Name = request.VetClinic.Name.Trim(),
+                    Address = request.VetClinic.Address.Trim(),
+                    Phone = string.IsNullOrWhiteSpace(request.VetClinic.Phone) ? null : request.VetClinic.Phone.Trim(),
+                    AttendingVetName = string.IsNullOrWhiteSpace(request.VetClinic.AttendingVetName) ? null : request.VetClinic.AttendingVetName.Trim(),
+                    Latitude = request.VetClinic.Latitude,
+                    Longitude = request.VetClinic.Longitude
+                }
             };
         }
 

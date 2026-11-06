@@ -435,7 +435,7 @@ Các trường dưới đây chỉ nhận đúng những giá trị liệt kê, 
 | `checkpointType` (loại mốc) | `Origin` điểm đi · `PickUp` điểm đón ngựa của một đơn · `RestStop` trạm nghỉ · `BorderGate` cửa khẩu · `DropOff` điểm trả ngựa của một đơn · `Destination` điểm giao (mốc cuối) |
 | Trạng thái mốc | `Pending` chưa tới · `Arrived` đã tới · `Cleared` đã thông quan (chỉ cửa khẩu) · `Departed` đã rời · `Cancelled` bị bỏ khi nắn tuyến |
 | Trạng thái ngựa trên chuyến (`horses[].status`) | `Planned` đã xếp chuyến, chưa lên xe · `InTransit` đang trên xe · `Delivered` đã ký bàn giao (ở điểm trả, hoặc tại chỗ khi rời chuyến) · `Offloaded` đã rời chuyến giữa đường qua sự cố, đi tiếp thế nào xem `offloadOutcome` · `Deceased` chết trên đường · `Cancelled` chuyến bị hủy |
-| Hướng xử lý khi ngựa rời chuyến (`offloadOutcome`) | `WaitRecover` chờ hồi phục rồi về hàng chờ xếp chuyến khác · `ReturnToOrigin` đưa về nơi đi (con ngựa kết thúc với đơn) · `HandOverHere` khách nhận ngựa tại nơi dỡ, ký e-POD tại chỗ · `Deceased` ngựa chết. `null` khi tài xế vừa dỡ khẩn cấp và phương án chưa được duyệt |
+| Hướng xử lý khi ngựa rời chuyến (`offloadOutcome`) | `WaitRecover` ở lại phòng khám thú y: đơn của con ngựa kết thúc tại đó, khỏi bệnh thì đi tiếp bằng đơn nối tiếp · `ReturnToOrigin` đưa về nơi đi (con ngựa kết thúc với đơn) · `HandOverHere` khách nhận ngựa tại nơi dỡ, ký e-POD tại chỗ · `Deceased` ngựa chết. `null` khi tài xế vừa dỡ khẩn cấp và phương án chưa được duyệt |
 | Trạng thái ngựa trong đơn | `Pending` chờ duyệt · `Approved` đã duyệt · `Cancelled` đã hủy · `Deceased` chết trên đường |
 | `feedStatus` (ăn uống) | `Normal` bình thường · `Reduced` ăn ít · `Refused` bỏ ăn |
 | `stressLevel` | `Calm` bình tĩnh · `MildStress` hơi căng thẳng · `Agitated` kích động |
@@ -4509,6 +4509,8 @@ Response `200` — phần `data`:
 | `horses[].pickedUpAt`, `deliveredAt` | Lúc xe rời điểm đón của con ngựa, lúc ký bàn giao |
 | `horses[].offloadedAt`, `offloadReason` | Lúc và lý do con ngựa rời chuyến (qua sự cố) |
 | `horses[].offloadOutcome` | Hướng xử lý tiếp khi rời chuyến (mục 3): `WaitRecover`, `ReturnToOrigin`, `HandOverHere`, `Deceased`; `null` nếu chưa rời chuyến hoặc đang chờ phương án |
+| `horses[].vetClinic` | Ngựa ở lại phòng khám (`WaitRecover`): `{ name, address, phone, attendingVetName, latitude, longitude }`; `null` với ngựa khác. Có cả trong `GET /api/tracking/bookings/{id}` để khách liên hệ / đón ngựa |
+| `horses[].vetExpenseAmount`, `vetExpenseBearer`, `vetExpenseNote` | Viện phí tại phòng khám (USD) và ai chịu: `Company` hoặc `Customer` (`POST /api/trips/{tripId}/horses/{tripHorseId}/vet-expense`) |
 | `checkpoints[].bookingId`, `bookingCode` | Với mốc `PickUp` / `DropOff`: đơn được đón / trả ở đây; `null` với mốc khác |
 | `checkpoints[].estimatedArrivalTime` | Mốc đã tới: giờ tới thực tế. Mốc chưa tới: giờ kế hoạch cộng độ trễ hiện tại (cách tính xem "Giờ dự kiến theo check-in" ở `GET /api/tracking/trips`). `null` với mốc đã bị bỏ khi nắn tuyến |
 | `liveDelayMinutes` | Số phút chuyến đang trễ theo check-in thực tế (0 là đúng giờ). Khác `delayMinutes` là kết quả chốt khi đóng chuyến |
@@ -5260,7 +5262,7 @@ Ai thấy sự cố nào: khách thấy sự cố trên chuyến có ngựa củ
 
 | `offloadOutcome` | Ý nghĩa | Sau khi quản lý duyệt |
 |---|---|---|
-| `WaitRecover` | Chờ hồi phục rồi đi chuyến khác | Ngựa `Offloaded`, **quay về hàng chờ xếp chuyến** (`GET /api/trips/unplanned-horses`); người lập chuyến được báo |
+| `WaitRecover` | Ở lại phòng khám thú y | Ngựa `Offloaded`. **Bắt buộc gửi `vetClinic`** (tên, địa chỉ). Đơn của con ngựa **kết thúc tại phòng khám**: không quay lại hàng chờ xếp chuyến của đơn cũ; khi đóng sự cố, phần cước chưa đi được hoàn theo nguyên nhân. Khỏi bệnh thì điều phối viên tạo **đơn nối tiếp** từ phòng khám tới đích (miễn cước nếu lỗi công ty). Khách và người lập chuyến được báo, kèm thông tin phòng khám |
 | `ReturnToOrigin` | Đưa ngựa về nơi đi | Ngựa `Offloaded`, **không** về hàng chờ; việc chở về do điều phối sắp xếp. Con ngựa được tính là đã xong với đơn |
 | `HandOverHere` | Khách nhận ngựa tại nơi dỡ | Ngựa `Offloaded`; đoàn xe ký e-POD tại chỗ (`POST /api/trips/{tripId}/handover` với `tripHorseId`) → `Delivered` |
 | `Deceased` | Ngựa chết | Ngựa `Deceased` (cả trên chuyến và trong đơn). **Bắt buộc sự cố đã có tài liệu `VetReport` hoặc `DeathCertificate`** (đính kèm bằng `POST /api/incidents/{id}/documents`). Sự cố ở mức nào cũng chọn được; khi duyệt, mức độ tự nâng lên `Critical`, mức ban đầu giữ ở `initialSeverity` |
@@ -5547,6 +5549,7 @@ Các trường gửi lên:
 | `extraCostForCustomer` | số | Không | Chỉ với `Reroute`: tiền đi đường vòng khách phải trả thêm (tổng, chia cho các đơn theo số ngựa). > 0 thì sau khi quản lý duyệt, sự cố chuyển `AwaitingConsent` và tuyến **chưa** đổi cho tới khi mọi khách có ngựa trên xe đồng ý |
 | `affectedTripHorseId` | số | Không | Chỉ dùng với `OffloadHorse`: con ngựa rời chuyến. Bỏ trống = con ngựa đã chọn lúc báo sự cố. Sự cố dỡ khẩn cấp thì phải là đúng con đã dỡ |
 | `offloadOutcome` | chuỗi | Có khi `responseAction` là `OffloadHorse` | Hướng xử lý tiếp: `WaitRecover`, `ReturnToOrigin`, `HandOverHere`, `Deceased` (bảng ở đầu mục 11) |
+| `vetClinic` | object | Có khi `offloadOutcome` là `WaitRecover` | Phòng khám nơi con ngựa ở lại: `name` (bắt buộc, ≤ 150), `address` (bắt buộc, ≤ 255), `phone` (≤ 30), `attendingVetName` (≤ 100), `latitude`, `longitude`. Hướng xử lý khác không được gửi |
 | `requiresEuthanasiaConsent` | boolean | Không | Chỉ dùng với `OffloadHorse` + `Deceased` khi ngựa **còn sống** và bác sĩ khuyến nghị an tử. `true` → sau khi quản lý duyệt, sự cố chờ chủ ngựa đồng ý (`AwaitingConsent`, `pendingConsentType = Euthanasia`), con ngựa chưa đổi trạng thái. Ngựa đã chết thì để `false` |
 | `vetReportPath` | chuỗi | Không (cách cũ) | Đường dẫn biên bản thú y từ `POST /api/files`. Vẫn nhận để tương thích và được lưu thành tài liệu `VetReport` của sự cố. **Cách mới:** đính kèm biên bản bằng `POST /api/incidents/{id}/documents` trước khi đề xuất |
 
@@ -5734,6 +5737,65 @@ Response `200`: sự cố với `status` `Approved`, có `emergencyAuthorizedAt`
 | 400 | `The owner still has 40 minute(s) to answer. ...` | Chưa hết thời gian chờ |
 | 400 | `Incident INC-... is not waiting for the owner's decision on euthanasia ...` | Sự cố không chờ ý kiến an tử (đã trả lời, hoặc đang chờ đi vòng) |
 | 400 | `Emergency authorisation needs the veterinarian's report attached to the incident (VetReport).` | Sự cố chưa có biên bản thú y |
+
+### POST /api/trips/{tripId}/horses/{tripHorseId}/vet-expense — Ghi viện phí của ngựa ở lại phòng khám
+
+Ghi hóa đơn của phòng khám cho con ngựa đã ở lại (`WaitRecover`). Phải **đóng sự cố trước** (chọn nguyên nhân), vì nguyên nhân quyết định ai trả (Chính sách 9.6):
+
+| Trường hợp | `vetExpenseBearer` |
+|---|---|
+| Sự cố do lỗi công ty (`Company`) | `Company`: công ty trả |
+| Ngựa tự phát bệnh / bất khả kháng (`ForceMajeure`) hoặc lỗi khách (`Customer`) | `Customer`: chủ ngựa trả thẳng cho phòng khám |
+| Chủ ngựa đã **từ chối** khuyến nghị an tử | `Customer`, kể cả khi sự cố do lỗi công ty |
+
+Khách nhận thông báo + email ghi số tiền và ai trả. Gọi lại được để sửa số tiền.
+
+- **Ai gọi được:** FleetCoordinator, LogisticsManager, Admin
+- **Dữ liệu gửi lên:** JSON
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `amount` | số | Có | Viện phí (USD), 0 – 1.000.000 |
+| `note` | chuỗi | Không | Ghi chú (ví dụ hạng mục điều trị), tối đa 500 ký tự |
+
+Ví dụ request:
+
+```json
+{ "amount": 850, "note": "Chụp X-quang + 3 ngày lưu chuồng" }
+```
+
+Response `200`: `data` là con ngựa trên chuyến (dạng `horses[]` của chi tiết chuyến), có `vetExpenseAmount`, `vetExpenseBearer`, `vetExpenseNote`.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Resolve incident INC-... first (choose the cause): it decides who bears the vet costs.` | Sự cố chưa đóng |
+| 400 | `Trip horse 4 did not stay at a vet clinic on trip 3 (no approved WaitRecover plan).` | Con ngựa không có phương án `WaitRecover` đã duyệt |
+
+### POST /api/trips/{tripId}/horses/{tripHorseId}/post-offload-death — Ngựa chết khi đang điều trị tại phòng khám
+
+Con ngựa ở lại phòng khám (`WaitRecover`) không qua khỏi. Con ngựa thành `Deceased` (trên chuyến và trong đơn), giấy chứng tử được lưu vào **sự cố gốc** (tài liệu `DeathCertificate`), hệ thống tự mở hồ sơ bảo hiểm `Death` (hồ sơ bổ sung nếu đã có hồ sơ thương tích được duyệt, mục 19c). Khách nhận thông báo + email.
+
+- **Ai gọi được:** FleetCoordinator, LogisticsManager, Admin
+- **Dữ liệu gửi lên:** `multipart/form-data`
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `file` | file | Có | Giấy chứng tử / biên bản thú y: PDF, JPG, PNG, tối đa 10 MB |
+| `note` | chuỗi | Không | Ghi chú, tối đa 500 ký tự |
+
+```js
+const form = new FormData();
+form.append("file", deathCertificateFile);
+form.append("note", "Đau bụng cấp tại phòng khám ngày 08/11");
+await api.post(`/api/trips/${tripId}/horses/${tripHorseId}/post-offload-death`, form);
+```
+
+Response `200`: con ngựa trên chuyến với `status` `Deceased`.
+
+| HTTP | `message` | Khi nào |
+|---|---|---|
+| 400 | `Kim Ngưu is Deceased; only a horse recovering at a vet clinic can be recorded here.` | Con ngựa không còn ở trạng thái `Offloaded` |
+| 400 | `Trip horse 4 did not stay at a vet clinic on trip 3 (no approved WaitRecover plan).` | Không có phương án `WaitRecover` đã duyệt |
 
 ### POST /api/incidents/{id}/reject — Từ chối phương án
 
@@ -9470,6 +9532,8 @@ Tổng cộng 139 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/incidents/{id}/apply-reroute` | Nắn tuyến | FleetCoordinator, Admin |
 | POST | `/api/incidents/{id}/resolve` | Đóng sự cố, chọn nguyên nhân (`faultParty`); quay về thì tự hoàn tiền | FleetCoordinator, Admin |
 | POST | `/api/incidents/{id}/customer-consent` | Khách đồng ý / từ chối đi đường vòng tốn thêm tiền, hoặc chủ ngựa trả lời khuyến nghị an tử | Customer có ngựa trên xe (an tử: chỉ chủ con ngựa) |
+| POST | `/api/trips/{tripId}/horses/{tripHorseId}/vet-expense` | Ghi viện phí của ngựa ở lại phòng khám; ai trả theo nguyên nhân | FleetCoordinator, LogisticsManager, Admin |
+| POST | `/api/trips/{tripId}/horses/{tripHorseId}/post-offload-death` | Ngựa chết khi đang điều trị tại phòng khám (kèm giấy chứng tử) | FleetCoordinator, LogisticsManager, Admin |
 | POST | `/api/incidents/{id}/emergency-authorize` | Ủy quyền khẩn cấp khi chủ ngựa không trả lời khuyến nghị an tử kịp | FleetCoordinator, LogisticsManager, Admin |
 | GET | `/api/delay-compensations` | Danh sách bồi thường giao trễ | LogisticsManager, Admin |
 | GET | `/api/bookings/{bookingId}/delay-compensations` | Bồi thường giao trễ của một đơn | Khách của đơn, nhân sự |

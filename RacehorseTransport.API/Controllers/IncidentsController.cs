@@ -5,6 +5,7 @@ using RacehorseTransport.API.Mappers;
 using RacehorseTransport.API.RequestModels;
 using RacehorseTransport.API.ResponseModels;
 using RacehorseTransport.Repositories.Constants;
+using RacehorseTransport.Services.BusinessModels;
 using RacehorseTransport.Services.Implementations;
 using RacehorseTransport.Services.Interfaces;
 
@@ -154,6 +155,42 @@ namespace RacehorseTransport.API.Controllers
         {
             var incident = await _incidentService.EmergencyAuthorizeAsync(id, request.Note, User.ToCurrentUser());
             return Ok(ApiResponse<IncidentResponse>.SuccessResult(incident.ToResponse(), "Emergency authorisation applied"));
+        }
+
+        /// <summary>
+        /// A horse recovering at a vet clinic (WaitRecover) has died. multipart/form-data: death certificate in "file" (pdf, jpg, png; up to 10 MB),
+        /// optional "note". The horse becomes Deceased, the certificate is attached to the original incident and a death claim is opened.
+        /// </summary>
+        [HttpPost("~/api/trips/{tripId:int}/horses/{tripHorseId:int}/post-offload-death")]
+        [Authorize(Roles = EmergencyRoles)]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(SupabaseFileStorageService.MaxFileSizeBytes + 1024 * 1024)]
+        [ProducesResponseType(typeof(ApiResponse<TripHorseResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> PostOffloadDeath(int tripId, int tripHorseId, [FromForm] PostOffloadDeathRequest request)
+        {
+            using var file = request.File.ToUploadModel()!;
+            var horse = await _incidentService.RecordPostOffloadDeathAsync(tripId, tripHorseId,
+                new PostOffloadDeathModel { Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(), DeathCertificate = file },
+                User.ToCurrentUser());
+            return Ok(ApiResponse<TripHorseResponse>.SuccessResult(horse.ToResponse(), "Death at the vet clinic recorded"));
+        }
+
+        /// <summary>
+        /// Record the vet clinic bill of a horse that stayed at a clinic (WaitRecover). The incident must be resolved first:
+        /// its cause decides who pays (Company fault -> company; otherwise, or when the owner declined euthanasia -> the owner).
+        /// The customer is notified.
+        /// </summary>
+        [HttpPost("~/api/trips/{tripId:int}/horses/{tripHorseId:int}/vet-expense")]
+        [Authorize(Roles = EmergencyRoles)]
+        [ProducesResponseType(typeof(ApiResponse<TripHorseResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object?>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> RecordVetExpense(int tripId, int tripHorseId, [FromBody] RecordVetExpenseRequest request)
+        {
+            var horse = await _incidentService.RecordVetExpenseAsync(tripId, tripHorseId,
+                new RecordVetExpenseModel { Amount = request.Amount!.Value, Note = request.Note },
+                User.ToCurrentUser());
+            return Ok(ApiResponse<TripHorseResponse>.SuccessResult(horse.ToResponse(), "Vet expense recorded"));
         }
 
         /// <summary>

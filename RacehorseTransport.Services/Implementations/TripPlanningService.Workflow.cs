@@ -483,13 +483,13 @@ namespace RacehorseTransport.Services.Implementations
             string transportMode = modes[0];
 
             // Mỗi con ngựa trong đơn chỉ nằm trên một chuyến còn hiệu lực
-            // (con rời chuyến chỉ được xếp lại khi hướng xử lý là WaitRecover, R-12)
+            // (con rời chuyến không được xếp lại; ngựa ở lại phòng khám đi tiếp bằng đơn nối tiếp)
             var alreadyPlanned = await _tripHorseRepo.GetQueryable()
                 .Where(th => bookingHorseIds.Contains(th.BookingHorseId)
                     && th.TripId != excludeTripId
                     && th.Trip!.OverallStatus != TripStatuses.Cancelled
                     && (TripHorseStatuses.Holding.Contains(th.Status)
-                        || (th.Status == TripHorseStatuses.Offloaded && th.OffloadOutcome != OffloadOutcomes.WaitRecover)))
+                        || th.Status == TripHorseStatuses.Offloaded))
                 .Select(th => th.BookingHorse!.Horse!.Name + " (" + th.Trip!.TripCode + ")")
                 .ToListAsync();
 

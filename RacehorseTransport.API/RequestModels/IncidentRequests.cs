@@ -88,6 +88,53 @@ namespace RacehorseTransport.API.RequestModels
 
         // Chỉ với OffloadHorse + Deceased khi ngựa còn sống và bác sĩ khuyến nghị an tử: duyệt xong chờ chủ ngựa đồng ý
         public bool RequiresEuthanasiaConsent { get; set; }
+
+        // Bắt buộc với OffloadHorse + WaitRecover: phòng khám thú y nơi con ngựa ở lại
+        public VetClinicRequest? VetClinic { get; set; }
+    }
+
+    public class VetClinicRequest
+    {
+        [Required(ErrorMessage = "VetClinic.Name is required.")]
+        [MaxLength(150, ErrorMessage = "VetClinic.Name cannot exceed 150 characters.")]
+        public string Name { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "VetClinic.Address is required.")]
+        [MaxLength(255, ErrorMessage = "VetClinic.Address cannot exceed 255 characters.")]
+        public string Address { get; set; } = string.Empty;
+
+        [MaxLength(30, ErrorMessage = "VetClinic.Phone cannot exceed 30 characters.")]
+        public string? Phone { get; set; }
+
+        [MaxLength(100, ErrorMessage = "VetClinic.AttendingVetName cannot exceed 100 characters.")]
+        public string? AttendingVetName { get; set; }
+
+        [Range(-90, 90, ErrorMessage = "VetClinic.Latitude must be between -90 and 90.")]
+        public decimal? Latitude { get; set; }
+
+        [Range(-180, 180, ErrorMessage = "VetClinic.Longitude must be between -180 and 180.")]
+        public decimal? Longitude { get; set; }
+    }
+
+    public class RecordVetExpenseRequest
+    {
+        [Required(ErrorMessage = "Amount is required.")]
+        [Range(0, 1000000, ErrorMessage = "Amount must be between 0 and 1,000,000 USD.")]
+        public decimal? Amount { get; set; }
+
+        [MaxLength(500, ErrorMessage = "Note cannot exceed 500 characters.")]
+        public string? Note { get; set; }
+    }
+
+    // multipart/form-data: ngựa đang điều trị tại phòng khám thì chết
+    public class PostOffloadDeathRequest
+    {
+        [MaxLength(500, ErrorMessage = "Note cannot exceed 500 characters.")]
+        public string? Note { get; set; }
+
+        // Giấy chứng tử / biên bản thú y: pdf, jpg, png; tối đa 10 MB
+        [Required(ErrorMessage = "File is required.")]
+        public IFormFile? File { get; set; }
     }
 
     // R-14 (BE-14b): khách đồng ý / từ chối đi đường vòng tốn thêm tiền

@@ -31,6 +31,22 @@ namespace RacehorseTransport.Services.Implementations
             }
         }
 
+        // Ở lại phòng khám (WaitRecover) bắt buộc tên + địa chỉ phòng khám để khách liên hệ / đón ngựa; hướng khác không nhận
+        public static void ValidateVetClinic(string? outcome, BusinessModels.VetClinicModel? clinic)
+        {
+            if (outcome == OffloadOutcomes.WaitRecover)
+            {
+                if (clinic == null || string.IsNullOrWhiteSpace(clinic.Name) || string.IsNullOrWhiteSpace(clinic.Address))
+                {
+                    throw new BusinessException("A WaitRecover plan needs the vet clinic where the horse stays (VetClinic.Name and VetClinic.Address).");
+                }
+            }
+            else if (clinic != null)
+            {
+                throw new BusinessException("VetClinic is only used with an OffloadHorse plan whose outcome is WaitRecover.");
+            }
+        }
+
         // Con ngựa có thể được chọn cho phương án OffloadHorse: còn trên xe, hoặc đã được dỡ khẩn cấp trong chính sự cố này
         public static bool CanBeOffloaded(TripHorse tripHorse, TripIncident incident)
         {
@@ -56,7 +72,8 @@ namespace RacehorseTransport.Services.Implementations
         {
             return tripHorse.Status == TripHorseStatuses.Delivered
                 || tripHorse.Status == TripHorseStatuses.Deceased
-                || (tripHorse.Status == TripHorseStatuses.Offloaded && tripHorse.OffloadOutcome == OffloadOutcomes.ReturnToOrigin);
+                || (tripHorse.Status == TripHorseStatuses.Offloaded
+                    && (tripHorse.OffloadOutcome == OffloadOutcomes.ReturnToOrigin || tripHorse.OffloadOutcome == OffloadOutcomes.WaitRecover));
         }
 
         // Con ngựa còn việc phải làm trên chuyến trước khi đóng chuyến:

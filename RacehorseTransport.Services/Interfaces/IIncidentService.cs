@@ -22,6 +22,10 @@ namespace RacehorseTransport.Services.Interfaces
 
         Task<IncidentModel> EmergencyAuthorizeAsync(int incidentId, string note, CurrentUser currentUser);
 
+        Task<TripHorseModel> RecordPostOffloadDeathAsync(int tripId, int tripHorseId, PostOffloadDeathModel model, CurrentUser currentUser);
+
+        Task<TripHorseModel> RecordVetExpenseAsync(int tripId, int tripHorseId, RecordVetExpenseModel model, CurrentUser currentUser);
+
         Task<IncidentModel> ResolveIncidentAsync(int incidentId, string faultParty, string? faultNote, CurrentUser currentUser);
 
         Task<IncidentDocumentModel> UploadDocumentAsync(int incidentId, UploadIncidentDocumentModel model, CurrentUser currentUser);

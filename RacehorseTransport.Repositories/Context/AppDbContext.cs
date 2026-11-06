@@ -349,6 +349,13 @@ namespace RacehorseTransport.Repositories.Context
                 entity.HasOne(e => e.EmergencyAuthorizedBy).WithMany().HasForeignKey(e => e.EmergencyAuthorizedByUserId);
             });
 
+            modelBuilder.Entity<TripHorse>(entity =>
+            {
+                entity.Property(e => e.VetExpenseAmount).HasPrecision(18, 2);
+                entity.Property(e => e.VetClinicLat).HasPrecision(9, 6);
+                entity.Property(e => e.VetClinicLng).HasPrecision(9, 6);
+            });
+
             modelBuilder.Entity<IncidentDocument>(entity =>
             {
                 entity.ToTable("incident_documents", "incident");
