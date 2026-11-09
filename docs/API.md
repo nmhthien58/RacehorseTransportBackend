@@ -37,7 +37,7 @@ Tài liệu này hướng dẫn gọi API của hệ thống vận chuyển ng�
 19b. [Bồi thường giao trễ](#19b-bồi-thường-giao-trễ)
 19c. [Hồ sơ bồi thường bảo hiểm](#19c-hồ-sơ-bồi-thường-bảo-hiểm)
 20. [Chính sách dịch vụ và cấu hình](#20-chính-sách-dịch-vụ-và-cấu-hình)
-21. [Những phần chưa có API](#21-những-phần-chưa-có-api)
+21. [Kênh realtime ngoài REST API](#21-kênh-realtime-ngoài-rest-api)
 22. [Bảng tra nhanh mọi endpoint](#22-bảng-tra-nhanh-mọi-endpoint)
 
 ---
@@ -391,6 +391,44 @@ Lưu ý khi gửi file:
 ### 2.7. CORS
 
 Server chỉ nhận request từ các địa chỉ frontend đã khai báo; hiện cho phép `http://localhost:5173`. Nếu trình duyệt báo lỗi CORS, hoặc khi frontend có địa chỉ deploy, báo backend để thêm địa chỉ đó.
+
+### 2.8. Tải file dùng chung
+
+Hai endpoint này không hiện trên Swagger nhưng vẫn dùng khi một request JSON cần gửi đường dẫn file, ví dụ chứng từ giá trị ngựa, vận đơn hàng không, biên bản thú y hoặc bằng chứng claim. Mọi tài khoản đã đăng nhập đều gọi được.
+
+#### POST /api/files — Tải một file lên
+
+- **Content-Type:** `multipart/form-data`; không tự đặt header này khi dùng `FormData`.
+- **Giới hạn:** tối đa 10 MB; nội dung phải đúng định dạng `pdf`, `jpg`, `jpeg` hoặc `png`.
+
+| Trường | Kiểu | Bắt buộc | Ý nghĩa |
+|---|---|---|---|
+| `file` | file | Có | File cần lưu |
+| `category` | chuỗi | Có | `documents`, `horses`, `welfare` hoặc `signatures` |
+
+```js
+const form = new FormData();
+form.append("file", fileInput.files[0]);
+form.append("category", "documents");
+const uploaded = await api.post("/api/files", form);
+console.log(uploaded.data.data.path); // lưu path này vào request nghiệp vụ
+```
+
+Response `201`: `data` gồm `path`, `url`, `urlExpiresAt`, `fileName`, `contentType`, `sizeBytes`.
+
+| HTTP | Khi nào |
+|---|---|
+| 400 | Thiếu file/category, category sai, file quá lớn hoặc nội dung không đúng định dạng |
+| 401 | Chưa đăng nhập |
+
+#### GET /api/files/url — Cấp lại link xem file
+
+Gửi `path` nhận từ API tải file: `GET /api/files/url?path=documents/...`. Response `200` có `path`, `url`, `urlExpiresAt`. Không lưu lâu `url`; khi hết hạn hãy gọi lại endpoint này.
+
+| HTTP | Khi nào |
+|---|---|
+| 400 | `path` không phải đường dẫn hợp lệ do hệ thống cấp |
+| 401 | Chưa đăng nhập |
 
 ---
 
@@ -9480,13 +9518,9 @@ Response `200`: `data` là cấu hình sau khi lưu (dạng giống GET).
 
 ---
 
-## 21. Những phần chưa có API
+## 21. Kênh realtime ngoài REST API
 
-Các phần dưới đây backend chưa làm. Frontend có thể dựng giao diện trước nhưng chưa nối được.
-
-| Phần | Ghi chú |
-|---|---|
-| Đẩy thông báo tức thời (WebSocket / push) | Hiện chỉ có API đọc thông báo (mục 14); frontend gọi lại `unread-count` định kỳ |
+Backend đã có SignalR tại `/hubs/notifications`. Sau khi kết nối bằng access token, frontend lắng nghe sự kiện `notificationReceived`; chi tiết payload và ví dụ xem mục 14. Có thể gọi `GET /api/notifications/unread-count` khi vừa mở ứng dụng để đồng bộ số chưa đọc.
 
 Tiến độ từng phần xem ở [TASKS.md](TASKS.md).
 
@@ -9494,7 +9528,14 @@ Tiến độ từng phần xem ở [TASKS.md](TASKS.md).
 
 ## 22. Bảng tra nhanh mọi endpoint
 
-Tổng cộng 139 endpoint. Chi tiết từng cái xem ở mục tương ứng.
+Tổng cộng 181 endpoint HTTP. Chi tiết từng cái xem ở mục tương ứng. Ngoài ra có một kết nối SignalR `/hubs/notifications`.
+
+**2. Tệp dùng chung**
+
+| Method | Đường dẫn | Việc | Ai gọi được |
+|---|---|---|---|
+| POST | `/api/files` | Tải file dùng cho request nghiệp vụ, nhận `path` và link xem tạm | Mọi người đã đăng nhập |
+| GET | `/api/files/url` | Cấp lại link xem tạm từ `path` đã lưu | Mọi người đã đăng nhập |
 
 **4. Đăng nhập và tài khoản của tôi**
 
@@ -9544,6 +9585,7 @@ Tổng cộng 139 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | Method | Đường dẫn | Việc | Ai gọi được |
 |---|---|---|---|
 | POST | `/api/bookings/quote-preview` | Xem giá trước khi gửi đơn | Mọi người đã đăng nhập |
+| POST | `/api/bookings/estimate-distance` | Ước tính quãng đường và thời gian đường bộ | Mọi người đã đăng nhập |
 | POST | `/api/bookings` | Gửi đơn vận chuyển | Customer |
 | GET | `/api/bookings` | Danh sách đơn | Customer, LogisticsManager, TransportSpecialist, FleetCoordinator, Admin |
 | GET | `/api/bookings/{id}` | Chi tiết đơn | Như danh sách đơn |
@@ -9563,6 +9605,7 @@ Tổng cộng 139 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/bookings/{id}/approve-alternate-recipient` | Khách cho người khác nhận thay | Customer (chủ đơn) |
 | GET | `/api/trips/{id}/recipients` | Người nhận của từng đơn trên chuyến | Nhân sự; tài xế của chuyến |
 | POST | `/api/bookings/{id}/approve` | Duyệt sơ bộ đơn (→ `PreApproved`) | LogisticsManager, Admin |
+| PUT | `/api/bookings/{id}/transit-countries` | Xác nhận / sửa thứ tự nước quá cảnh và tính lại giá ước tính | LogisticsManager, Admin |
 | PUT | `/api/bookings/{id}/horse-values` | Chốt giá trị thỏa thuận từng con trước khi báo giá | LogisticsManager, Admin |
 | POST | `/api/bookings/{id}/reject` | Từ chối đơn (trước khi gửi báo giá) | LogisticsManager, Admin |
 | GET | `/api/bookings/{bookingId}/route-plans` | Các phiên bản tuyến dự kiến của đơn | Nhân sự; khách (chỉ tuyến đã duyệt) |
@@ -9571,6 +9614,7 @@ Tổng cộng 139 endpoint. Chi tiết từng cái xem ở mục tương ứng.
 | POST | `/api/bookings/{bookingId}/route-plans` | Tạo bản nháp tuyến | FleetCoordinator, Admin |
 | PUT | `/api/route-plans/{id}` | Sửa tuyến nháp / bị từ chối | FleetCoordinator, Admin |
 | POST | `/api/route-plans/{id}/submit` | Trình duyệt tuyến | FleetCoordinator, Admin |
+| GET | `/api/route-plans/{id}/quote-preview` | Xem báo giá chốt nếu duyệt tuyến, không lưu dữ liệu | LogisticsManager, Admin |
 | POST | `/api/route-plans/{id}/approve` | Duyệt tuyến (server gửi báo giá chốt, đơn → `Quoted`) | LogisticsManager, Admin |
 | POST | `/api/route-plans/{id}/reject` | Từ chối tuyến | LogisticsManager, Admin |
 | POST | `/api/bookings/{id}/reassign-specialist` | Đổi chuyên viên phụ trách | LogisticsManager, Admin |

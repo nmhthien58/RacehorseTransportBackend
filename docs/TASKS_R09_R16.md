@@ -125,7 +125,7 @@ Làm (thêm vào luồng sự cố hiện có, xem `IncidentService`):
 
 Xong khi: test cho các điều kiện chọn xe / người; báo lỗi rõ khi xe không đủ chỗ.
 
-### [ ] BE-18 · Seed demo + test tích hợp + tổng hợp tài liệu
+### [x] BE-18 · Seed demo + test tích hợp + tổng hợp tài liệu
 Làm sau cùng, khi các task kia đã merge.
 - `database/02_seed.sql` + một script `03_update_seed_r09.sql`: thêm dữ liệu demo đi hết các luồng mới (một đơn đang chờ báo giá, một đơn báo giá sắp hết hạn, một chuyến có sự cố đổi xe, một hồ sơ bồi thường, một đơn giao trễ có bồi thường, một lần không giao được có phí chờ).
 - Test tích hợp với PostgreSQL thật (DB tạm cổng 5433, xem `README.md`) cho luồng: tạo đơn → duyệt sơ bộ → lập tuyến → duyệt tuyến → chấp nhận báo giá + cọc.
