@@ -146,7 +146,11 @@ namespace RacehorseTransport.API.Extensions
 
             // Thanh toán (R-02): cổng VNPay thật + cổng giả lập; PaymentGatewayResolver chọn cổng theo cấu hình
             services.AddScoped<ISystemSettingService, SystemSettingService>();
-            services.AddHttpClient<VnPayGateway>(client => client.Timeout = TimeSpan.FromSeconds(30));
+            var vnPayOptions = configuration.GetSection(VnPayOptions.SectionName).Get<VnPayOptions>() ?? new VnPayOptions();
+            services.AddHttpClient<VnPayGateway>(client => client.Timeout = TimeSpan.FromSeconds(Math.Clamp(vnPayOptions.RefundTimeoutSeconds, 3, 25)))
+                .ConfigurePrimaryHttpMessageHandler(() => string.IsNullOrWhiteSpace(vnPayOptions.ProxyUrl)
+                    ? new HttpClientHandler()
+                    : new HttpClientHandler { Proxy = new System.Net.WebProxy(vnPayOptions.ProxyUrl), UseProxy = true });
             services.AddScoped<IPaymentGateway>(sp => sp.GetRequiredService<VnPayGateway>());
             services.AddScoped<IPaymentGateway, MockPaymentGateway>();
             services.AddScoped<IPaymentGatewayResolver, PaymentGatewayResolver>();

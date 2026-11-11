@@ -225,6 +225,13 @@ namespace RacehorseTransport.Services.Implementations
                 throw new BusinessException($"Trip horse with ID {model.AffectedTripHorseId} is not on trip {trip.TripCode}.");
             }
 
+            // Bấm gửi lặp / gửi lại sau khi mạng chập chờn: trả lại sự cố vừa báo thay vì tạo bản thứ hai
+            var duplicateId = await FindDuplicateReportAsync(tripId, model, currentUser);
+            if (duplicateId.HasValue)
+            {
+                return await GetIncidentByIdAsync(duplicateId.Value, currentUser);
+            }
+
             // Dỡ khẩn cấp (thú y bắt buộc dỡ ngay): con ngựa rời xe ngay, hướng xử lý tiếp chờ phương án được duyệt
             TripHorse? emergencyHorse = null;
             if (model.EmergencyOffload)
@@ -243,8 +250,17 @@ namespace RacehorseTransport.Services.Implementations
             var customerIds = await GetCustomerIdsAsync(tripId);
             var bookingRecipients = await _tripHorseRepo.GetQueryable().GetBookingRecipientsAsync(tripId);
 
+            int? duplicateInTransaction = null;
             var incident = await _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
+                // Hai request trùng tới cùng lúc: request sau chờ request trước commit rồi mới kiểm tra lại
+                await _unitOfWork.LockAsync($"incident-report:{tripId}:{currentUser.UserId}");
+                duplicateInTransaction = await FindDuplicateReportAsync(tripId, model, currentUser);
+                if (duplicateInTransaction.HasValue)
+                {
+                    return null;
+                }
+
                 var created = new TripIncident
                 {
                     IncidentCode = await _codeGenerator.NextAsync(CodePrefixes.Incident),
@@ -325,8 +341,13 @@ namespace RacehorseTransport.Services.Implementations
                         });
                 }
 
-                return created;
+                return (TripIncident?)created;
             });
+
+            if (incident == null)
+            {
+                return await GetIncidentByIdAsync(duplicateInTransaction!.Value, currentUser);
+            }
 
             await _trackingService.InvalidateTripAsync(tripId);
             // R-13: sự cố rất nghiêm trọng gắn với một con ngựa -> tự mở hồ sơ bồi thường
@@ -1787,6 +1808,28 @@ namespace RacehorseTransport.Services.Implementations
             await _fileStorage.ResolveViewUrlsAsync(models, m => m.VetReportPath, (m, url) => m.VetReportUrl = url);
             var docs = models.SelectMany(m => m.Documents).ToList();
             await _fileStorage.ResolveViewUrlsAsync(docs, d => d.FilePath, (d, url) => d.FileUrl = url);
+        }
+
+        // Cùng người báo, cùng chuyến, cùng loại / mức độ / ngựa / mô tả trong vài phút = một lần báo bị gửi lặp.
+        // Không so vị trí vì GPS lấy lại mỗi lần mở form nên lệch vài mét.
+        private static readonly TimeSpan DuplicateReportWindow = TimeSpan.FromMinutes(5);
+
+        private async Task<int?> FindDuplicateReportAsync(int tripId, ReportIncidentModel model, CurrentUser currentUser)
+        {
+            var since = DateTimeOffset.UtcNow - DuplicateReportWindow;
+            var description = model.Description.Trim();
+            return await _incidentRepo.GetQueryable().AsNoTracking()
+                .Where(i => i.TripId == tripId
+                    && i.ReportedByUserId == currentUser.UserId
+                    && i.ReportedAt >= since
+                    && i.IncidentType == model.IncidentType
+                    && i.InitialSeverity == model.Severity
+                    && i.AffectedTripHorseId == model.AffectedTripHorseId
+                    && i.EmergencyOffload == model.EmergencyOffload
+                    && i.Description.Trim() == description)
+                .OrderByDescending(i => i.IncidentId)
+                .Select(i => (int?)i.IncidentId)
+                .FirstOrDefaultAsync();
         }
 
         private static string Truncate(string value, int maxLength)

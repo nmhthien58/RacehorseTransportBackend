@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using RacehorseTransport.Repositories.Context;
 using RacehorseTransport.Repositories.Interfaces;
 
@@ -20,6 +21,16 @@ namespace RacehorseTransport.Repositories.Implementations
                 await action();
                 return true;
             });
+        }
+
+        public async Task LockAsync(string key)
+        {
+            if (_context.Database.CurrentTransaction == null)
+            {
+                throw new InvalidOperationException("LockAsync must be called inside ExecuteInTransactionAsync.");
+            }
+
+            await _context.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({key}))");
         }
 
         public async Task<TResult> ExecuteInTransactionAsync<TResult>(Func<Task<TResult>> action)

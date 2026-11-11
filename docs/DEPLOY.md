@@ -58,6 +58,8 @@ Tên biến dùng hai dấu gạch dưới `__` thay cho dấu `:` trong appsett
 | `Payment__PublicApiBaseUrl` | Địa chỉ công khai của API, ví dụ `https://racehorsetransportbackend-production.up.railway.app` (dùng làm `vnp_ReturnUrl`) |
 | `VnPay__TmnCode` | Mã website (Terminal ID) trong email VNPay gửi |
 | `VnPay__HashSecret` | Chuỗi bí mật tạo checksum trong email VNPay gửi. **Không** commit vào code |
+| `VnPay__RefundTimeoutSeconds` | (Tùy chọn, mặc định `12`) Chờ API hoàn tiền tối đa bấy nhiêu giây; phải nhỏ hơn timeout 30 giây của frontend |
+| `VnPay__ProxyUrl` | (Tùy chọn) Proxy HTTP đặt ở Việt Nam cho lệnh hoàn tiền, ví dụ `http://user:pass@host:3128`. Cần vì API hoàn tiền của VNPay sandbox không trả lời IP nước ngoài (Railway ở Singapore) |
 
 Railway tự cấp biến `PORT`, không cần thêm. Tạo `Jwt__Key` bằng PowerShell:
 
@@ -172,6 +174,7 @@ Nếu deploy báo lỗi, mở tab **Deployments** → **View logs**:
 | `42P01: relation "identity.user_tokens" does not exist` | Chưa chạy `database/03_update_user_tokens.sql` |
 | `42P01: relation "billing.payments" does not exist` | Chưa chạy `database/03_update_payments.sql` |
 | `VNPay is not configured on the server` khi khách bấm thanh toán | Thiếu `VnPay__TmnCode` / `VnPay__HashSecret`, hoặc đặt `Payment__Provider=Mock` để demo |
+| Hoàn tiền VNPay luôn `Failed`, ghi chú `Gateway: TIMEOUT VNPay did not answer in time` | API hoàn tiền của VNPay không nhận lệnh từ IP của Railway (Singapore). Từ IP Việt Nam (chạy API ở máy) thì gọi được. Trên Railway: đặt `VnPay__ProxyUrl` tới một proxy ở Việt Nam, hoặc hoàn tay trên cổng VNPay rồi bấm "Đã hoàn thủ công" |
 | `Email '...' could not be sent` kèm `timed out` | Đang dùng `Smtp` trên Railway (cổng bị chặn): đổi sang `GmailApi` |
 | `Gmail API token failed with 400` kèm `invalid_grant` | Refresh token hết hạn hoặc bị thu hồi: làm lại bước 5 của mục Google. Nếu lặp lại sau 7 ngày: ứng dụng còn ở trạng thái Testing (bước 3.3) |
 | `Gmail API token failed with 401` kèm `invalid_client` | Sai `Google__ClientId` hoặc `Google__ClientSecret` |

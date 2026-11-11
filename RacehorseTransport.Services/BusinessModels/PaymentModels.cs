@@ -165,6 +165,9 @@ namespace RacehorseTransport.Services.BusinessModels
 
     public class GatewayRefundResult
     {
+        // Không gọi được cổng (timeout / lỗi mạng): không biết cổng có nhận lệnh hay không
+        public const string Unreachable = "TIMEOUT";
+
         public bool Success { get; set; }
         public string ResponseCode { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
