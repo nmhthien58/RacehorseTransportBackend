@@ -12,5 +12,9 @@ namespace RacehorseTransport.Repositories.Interfaces
         // Đang trong transaction: chờ tới khi transaction ngoài cùng commit; rollback thì bỏ.
         // Không có transaction: chạy ngay.
         Task RunAfterCommitAsync(Func<Task> callback);
+
+        // Khóa theo tên, giữ tới khi transaction hiện tại kết thúc (pg_advisory_xact_lock).
+        // Dùng để hai request cùng lúc cho cùng một việc phải xếp hàng, ví dụ chặn báo trùng sự cố.
+        Task LockAsync(string key);
     }
 }

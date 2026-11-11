@@ -29,6 +29,14 @@ namespace RacehorseTransport.Services.Options
         public string Version { get; set; } = "2.1.0";
         public string Locale { get; set; } = "vn";
 
+        // Chờ API hoàn tiền tối đa bấy nhiêu giây. Phải ngắn hơn timeout 30s của frontend,
+        // để khi VNPay không trả lời Manager vẫn nhận kết quả (hoàn tiền Failed, thử lại sau) thay vì lỗi timeout.
+        public int RefundTimeoutSeconds { get; set; } = 12;
+
+        // Proxy HTTP đặt ở Việt Nam cho các lệnh gọi API VNPay (vd http://user:pass@host:3128). Để trống: gọi thẳng.
+        // VNPay sandbox không trả lời API hoàn tiền từ IP nước ngoài (server Railway ở Singapore).
+        public string ProxyUrl { get; set; } = string.Empty;
+
         public bool IsConfigured => !string.IsNullOrWhiteSpace(TmnCode) && !string.IsNullOrWhiteSpace(HashSecret);
     }
 }

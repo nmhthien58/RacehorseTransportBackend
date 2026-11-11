@@ -554,6 +554,7 @@ namespace RacehorseTransport.Services.Implementations
                 .ToListAsync();
 
             var results = new List<PaymentModel>();
+            bool gatewayUnreachable = false;
             foreach (var original in charges.Where(p => p.Status == PaymentStatuses.Succeeded && PaymentTypes.Charges.Contains(p.PaymentType)))
             {
                 decimal percent = original.PaymentType == PaymentTypes.Deposit && !fullRefund ? settings.CancelRefundPercent : 100;
@@ -594,7 +595,7 @@ namespace RacehorseTransport.Services.Implementations
                 // Tiền nhận ngoài hệ thống thì Manager hoàn tay rồi bấm "Đã hoàn thủ công"
                 if (original.Provider != PaymentProviders.Manual)
                 {
-                    await CallRefundGatewayAsync(refund, currentUser);
+                    gatewayUnreachable = await RefundThroughGatewayAsync(refund, currentUser, gatewayUnreachable);
                 }
                 results.Add(ToModel(refund));
             }
@@ -703,6 +704,7 @@ namespace RacehorseTransport.Services.Implementations
             // Khoản trả sau cùng hoàn trước (thường là phần còn lại / phát sinh)
             var results = new List<PaymentModel>();
             decimal left = amount;
+            bool gatewayUnreachable = false;
             foreach (var (original, remaining) in refundable.OrderByDescending(x => x.Charge.PaidAt ?? x.Charge.CreatedAt))
             {
                 if (left <= 0)
@@ -739,7 +741,7 @@ namespace RacehorseTransport.Services.Implementations
 
                 if (original.Provider != PaymentProviders.Manual)
                 {
-                    await CallRefundGatewayAsync(refund, currentUser);
+                    gatewayUnreachable = await RefundThroughGatewayAsync(refund, currentUser, gatewayUnreachable);
                 }
                 results.Add(ToModel(refund));
             }
@@ -802,7 +804,23 @@ namespace RacehorseTransport.Services.Implementations
             return ToModel(refund);
         }
 
-        private async Task CallRefundGatewayAsync(Payment refund, CurrentUser currentUser, bool retry = false)
+        // Gọi cổng hoàn một dòng; trả về true khi cổng không trả lời (timeout / lỗi mạng).
+        // Cổng vừa không trả lời ở dòng trước thì không gọi nữa, để một lần duyệt không phải chờ timeout cho từng dòng.
+        private async Task<bool> RefundThroughGatewayAsync(Payment refund, CurrentUser currentUser, bool gatewayUnreachable)
+        {
+            if (gatewayUnreachable)
+            {
+                refund.Status = PaymentStatuses.Failed;
+                refund.ResponseCode = GatewayRefundResult.Unreachable;
+                refund.Note = $"{refund.Note} | Gateway: skipped, the gateway did not answer the previous refund".Trim();
+                await _paymentRepo.UpdateAsync(refund);
+                return true;
+            }
+            return await CallRefundGatewayAsync(refund, currentUser) == GatewayRefundResult.Unreachable;
+        }
+
+        // Trả về mã phản hồi của cổng
+        private async Task<string> CallRefundGatewayAsync(Payment refund, CurrentUser currentUser, bool retry = false)
         {
             var original = refund.RefundOf ?? await _paymentRepo.GetByIdAsync(refund.RefundOfPaymentId!.Value)
                 ?? throw new NotFoundException($"Original payment of refund {refund.PaymentCode} was not found.");
@@ -831,6 +849,7 @@ namespace RacehorseTransport.Services.Implementations
                 refund.Note = $"{refund.Note} | Gateway: {result.ResponseCode} {result.Message}".Trim();
             }
             await _paymentRepo.UpdateAsync(refund);
+            return result.ResponseCode;
         }
 
         private async Task<Payment> GetOpenRefundAsync(int refundPaymentId)

@@ -143,6 +143,21 @@ namespace RacehorseTransport.Services.Implementations
                     RawResponse = raw
                 };
             }
+            catch (TaskCanceledException ex)
+            {
+                _logger.LogWarning(ex, "VNPay refund for {TxnRef} timed out.", request.OriginalTxnRef);
+                return new GatewayRefundResult
+                {
+                    Success = false,
+                    ResponseCode = GatewayRefundResult.Unreachable,
+                    Message = "VNPay did not answer in time (the refund API may not accept calls from this server's IP)"
+                };
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogWarning(ex, "VNPay refund for {TxnRef} could not reach VNPay.", request.OriginalTxnRef);
+                return new GatewayRefundResult { Success = false, ResponseCode = GatewayRefundResult.Unreachable, Message = ex.Message };
+            }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "VNPay refund for {TxnRef} failed.", request.OriginalTxnRef);
