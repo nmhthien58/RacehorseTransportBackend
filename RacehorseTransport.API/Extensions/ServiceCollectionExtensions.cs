@@ -147,7 +147,12 @@ namespace RacehorseTransport.API.Extensions
             // Thanh toán (R-02): cổng VNPay thật + cổng giả lập; PaymentGatewayResolver chọn cổng theo cấu hình
             services.AddScoped<ISystemSettingService, SystemSettingService>();
             var vnPayOptions = configuration.GetSection(VnPayOptions.SectionName).Get<VnPayOptions>() ?? new VnPayOptions();
-            services.AddHttpClient<VnPayGateway>(client => client.Timeout = TimeSpan.FromSeconds(Math.Clamp(vnPayOptions.RefundTimeoutSeconds, 3, 25)))
+            services.AddHttpClient<VnPayGateway>(client =>
+                {
+                    client.Timeout = TimeSpan.FromSeconds(Math.Clamp(vnPayOptions.RefundTimeoutSeconds, 3, 25));
+                    // VNPay (openresty) trả 403 trang HTML cho request không có User-Agent; HttpClient mặc định không gửi
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd("RacehorseTransport/1.0");
+                })
                 .ConfigurePrimaryHttpMessageHandler(() => string.IsNullOrWhiteSpace(vnPayOptions.ProxyUrl)
                     ? new HttpClientHandler()
                     : new HttpClientHandler { Proxy = new System.Net.WebProxy(vnPayOptions.ProxyUrl), UseProxy = true });
