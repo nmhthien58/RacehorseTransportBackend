@@ -124,8 +124,7 @@ namespace RacehorseTransport.Services.Implementations
 
             try
             {
-                // Gửi body có Content-Length: VNPay (openresty) trả 403 trang HTML cho body dạng chunked,
-                // mà PostAsJsonAsync lại gửi chunked
+                // Gửi body có Content-Length (PostAsJsonAsync gửi chunked); User-Agent đặt ở cấu hình HttpClient
                 using var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
                 using var response = await _httpClient.PostAsync(_options.ApiUrl, content);
                 string raw = await response.Content.ReadAsStringAsync();
