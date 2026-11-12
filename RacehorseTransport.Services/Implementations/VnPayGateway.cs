@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Net;
-using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -125,8 +124,21 @@ namespace RacehorseTransport.Services.Implementations
 
             try
             {
-                using var response = await _httpClient.PostAsJsonAsync(_options.ApiUrl, body);
+                // Gửi body có Content-Length: VNPay (openresty) trả 403 trang HTML cho body dạng chunked,
+                // mà PostAsJsonAsync lại gửi chunked
+                using var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+                using var response = await _httpClient.PostAsync(_options.ApiUrl, content);
                 string raw = await response.Content.ReadAsStringAsync();
+                if (!raw.TrimStart().StartsWith('{'))
+                {
+                    _logger.LogWarning("VNPay refund for {TxnRef} returned HTTP {Status} without JSON.", request.OriginalTxnRef, (int)response.StatusCode);
+                    return new GatewayRefundResult
+                    {
+                        Success = false,
+                        ResponseCode = "EX",
+                        Message = $"VNPay answered HTTP {(int)response.StatusCode} without a JSON body"
+                    };
+                }
 
                 using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(raw) ? "{}" : raw);
                 var root = doc.RootElement;
